@@ -73,6 +73,10 @@ def main(args):
         # total 3 channel all input
         segmentation_head_class = Segmentation_Head_d
 
+    class_1_seg = Segmentation_Head_d()
+    class_2_seg = Segmentation_Head_d()
+    class_3_seg = Segmentation_Head_d()
+
     segmentation_head = segmentation_head_class(n_classes=args.n_classes,
                                                 mask_res=args.mask_res,
                                                 use_batchnorm=args.use_batchnorm,
@@ -199,11 +203,10 @@ def main(args):
                 query_ = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query_.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads(query_)  # 1, res, res, dim
-                key = key_dict[layer][0].squeeze()      # head, pix_num, dim
-
-                q = query_dict[layer][0]
-                print(f'q = {q.shape} | key = {key.shape}')
-                attn_map = torch.bmm(query_dict[layer][0],
+                _, res, res, dim = reshaped_query.shape
+                q = reshaped_query.view(1, res * res, dim).contiguous()
+                key = key_dict[layer][0]      # head, pix_num, dim
+                attn_map = torch.bmm(q,
                                      key.transpose(-1, -2))  # 1, pix_num, sen_len
                 # what about use just short length
 

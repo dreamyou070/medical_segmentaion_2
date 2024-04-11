@@ -391,13 +391,12 @@ class Segmentation_Head_d(nn.Module):
                  use_instance_norm = True,
                  mask_res = 128,
                  use_init_query = False,):
-        super(Segmentation_Head_a, self).__init__()
+        super(Segmentation_Head_d, self).__init__()
 
         self.up = Up_conv(in_channels=3,
                           out_channels=3,
                           kernel_size=2)
 
-        self.outc = OutConv(160, n_classes)
     def forward(self, x):
         # x = [baatch, 64, 64, 3]
         x = self.up(x) # [batch, 128, 128, 3]
