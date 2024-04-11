@@ -380,3 +380,27 @@ class Segmentation_Attn_Head_A(nn.Module):
             x_in = x5_out
         logits = self.outc(x_in)  # 1,4, 128,128
         return logits
+
+
+class Segmentation_Head_d(nn.Module):
+
+    def __init__(self,
+                 n_classes,
+                 bilinear=False,
+                 use_batchnorm=True,
+                 use_instance_norm = True,
+                 mask_res = 128,
+                 use_init_query = False,):
+        super(Segmentation_Head_a, self).__init__()
+
+        self.up = Up_conv(in_channels=3,
+                          out_channels=3,
+                          kernel_size=2)
+
+        self.outc = OutConv(160, n_classes)
+    def forward(self, x):
+        # x = [baatch, 64, 64, 3]
+        x = self.up(x) # [batch, 128, 128, 3]
+        # dim 3 to dim 1
+        x = x.mean(dim=3) # [batch, 128, 128]
+        return x
