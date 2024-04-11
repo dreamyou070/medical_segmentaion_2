@@ -240,17 +240,22 @@ def main(args):
             print(f'attn_map_64 = {attn_map_64.shape}')
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
             print(f'attn_map_cat = {attn_map_cat.shape}')
+
             res_group_num = 3
-            chunk = attn_map_cat.shape[-1] // res_group_num
+            chunk = attn_map_cat.shape[-1] // res_group_num # 77
             class_dict = {}
-
-
 
             for group_idx in range(res_group_num):
                 for chunk_i in range(chunk) :
-                    map_chunk = attn_map_cat[:, :, group_idx * chunk_i]
+                    map_chunk = attn_map_cat[:, :, group_idx * chunk_i].squeeze() # batch, pix_num, 1
                     if chunk_i not in class_dict.keys() :
                         class_dict[chunk_i] = []
+                    if map_chunk.dim() == 1 :
+                        map_chunk = map_chunk.unsqueeze(0)
+                    if map_chunk.dim() == 2:
+                        map_chunk = map_chunk.unsqueeze(-1)
+                    print(f'map_chunk = {map_chunk.shape}')
+                        
                     class_dict[chunk_i].append(map_chunk)
 
 
