@@ -220,16 +220,20 @@ def main(args):
                 q_dict[k_res] = torch.cat(query_list, dim=1)
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
-            print(f'attn_map_16 = {attn_map_16.shape} | attn_map_32 = {attn_map_32.shape} | attn_map_64 = {attn_map_64.shape}')
+            # 1, 16*16, 77
+            # 1, 32*32, 77
+            # 1, 64*64, 77
 
             def upscaling (attn_map):
                 b, pix_num, sen_len = attn_map.shape
+                res = int(pix_num ** 0.5)
                 attn_map = attn_map.view(b, res, res, sen_len)
                 # 2d upscale
                 attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
                 return attn_map
             attn_map_16_out = upscaling(upscaling(attn_map_16))
             attn_map_32_out = upscaling(attn_map_32)
+
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
             res_group_num = 3
             chunk = attn_map_cat.shape[-1] // res_group_num
