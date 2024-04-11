@@ -81,7 +81,8 @@ class Up_conv(nn.Module):
         # if bilinear, use the normal convolutions to reduce the number of channels
         self.up = nn.ConvTranspose2d(in_channels = in_channels,
                                      out_channels = out_channels,
-                                     kernel_size=kernel_size, stride=kernel_size)
+                                     kernel_size=kernel_size,
+                                     stride=kernel_size)
     def forward(self, x1):
         x = self.up(x1)
         return x
@@ -388,12 +389,11 @@ class Segmentation_Head_d(nn.Module):
         super(Segmentation_Head_d, self).__init__()
 
         self.up = Up_conv(in_channels=3,
-                          out_channels=3,
+                          out_channels=1,
                           kernel_size=2)
 
     def forward(self, x):
         # x = [baatch, 64, 64, 3]
-        x = self.up(x) # [batch, 128, 128, 77]
-        # dim 3 to dim 1
-        # x = x.mean(dim=3) # [batch, 128, 128]
+        x = self.up(x) # [batch, 1, 128, 128]
         return x
+

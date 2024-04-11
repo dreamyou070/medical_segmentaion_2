@@ -266,14 +266,13 @@ def main(args):
             seg_map_list = []
             for i, head in enumerate(head_list):
                 token_idx = list(class_dict.keys())[i]
-                class_map = class_dict[token_idx]     # Batch, res, res, 3
-                print(f'class_map = {class_map.shape}')
-                seg_map = head(class_map)       # Batch, 128, 128, 1
+                class_map = class_dict[token_idx].permute(0,3,1,2)     # Batch, 3, res, res
+                seg_map = head(class_map)       # Batch, 3, 128, 128
                 print(f'res = {res} | seg_map = {seg_map.shape}')
                 seg_map_dict[token_idx] = seg_map
                 if token_idx < 4 :
                     seg_map_list.append(seg_map)
-            masks_pred = torch.cat(seg_map_list, dim=-1) # Batch, 128, 128, 4
+            masks_pred = torch.cat(seg_map_list, dim=1) # Batch, 4, 128, 128
             print(f'masks_pred = {masks_pred.shape}')
 
             # finalize attn_map
