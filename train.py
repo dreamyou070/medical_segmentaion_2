@@ -73,6 +73,7 @@ def main(args):
         # total 3 channel all input
         segmentation_head_class = Segmentation_Head_d
 
+    class_0_seg = Segmentation_Head_d()
     class_1_seg = Segmentation_Head_d()
     class_2_seg = Segmentation_Head_d()
     class_3_seg = Segmentation_Head_d()
@@ -253,27 +254,29 @@ def main(args):
                     class_dict[chunk_i].append(map_chunk)
 
             for class_idx in class_dict.keys():
+                # 0, ..., 76
                 final = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
                 b, pix_num, sen_len = final.shape
                 res = int(pix_num ** 0.5)
-                class_dict[class_idx] = final.view(b, res, res, sen_len)
+                final = final.view(b, res, res, sen_len)
+                class_dict[class_idx] = final
 
-            head_list = [class_1_seg, class_2_seg, class_3_seg]
+            head_list = [class_0_seg, class_1_seg, class_2_seg, class_3_seg]
             seg_map_dict = {}
+            seg_map_list = []
             for i, head in enumerate(head_list):
-                res = list(class_dict.keys())[i]
-                seg_map = head(class_dict[res])
+                token_idx = list(class_dict.keys())[i]
+                class_map = class_dict[token_idx]     # Batch, res, res, 1
+                seg_map = head(class_dict[res])       # Batch, 128, 128, 1
                 print(f'res = {res} | seg_map = {seg_map.shape}')
-                seg_map_dict[res] = seg_map
-
-
-
+                seg_map_dict[token_idx] = seg_map
+                if token_idx < 4 :
+                    seg_map_list.append(seg_map)
+            masks_pred = torch.cat(seg_map_list, dim=-1) # Batch, 128, 128, 4
+            print(f'masks_pred = {masks_pred.shape}')
 
 
             # finalize attn_map
-
-
-            
             # x16_out = [1, 16*16, 4]
             # x32_out = [1, 32*32, 4]
             # x64_out = [1, 64*64, 4]
@@ -281,12 +284,12 @@ def main(args):
             # classwise segmentation .. ?
 
             """ using cross attntion """
-            if not args.use_init_query:
-                out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
-            else:
-                out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
-            masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
+            #if not args.use_init_query:
+            #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
+            #else:
+            #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
+            #masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
+            #masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
 
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
