@@ -277,6 +277,7 @@ def main(args):
                 if token_idx < 4 :
                     seg_map_list.append(seg_map)
             masks_pred = torch.cat(seg_map_list, dim=1) # Batch, 4, 128, 128
+            print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
 
             # finalize attn_map
             # x16_out = [1, 16*16, 4]
