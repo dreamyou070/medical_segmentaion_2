@@ -25,6 +25,7 @@ from utils import get_noise_noisy_latents_and_timesteps
 
 
 def main(args):
+
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -87,7 +88,6 @@ def main(args):
     if args.vae_train :
         trainable_params.append({"params": vae.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -130,21 +130,11 @@ def main(args):
 
     print(f'\n step 8. model to device')
     if args.use_position_embedder:
-        if args.vae_train :
-            vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
-                accelerator.prepare(vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
-                                    test_dataloader, lr_scheduler, position_embedder)
-        else :
-            segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
+        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler, position_embedder)
     else:
-        if args.vae_train :
-            vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
-                                    test_dataloader, lr_scheduler)
-        else :
-            segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
 
@@ -224,24 +214,28 @@ def main(args):
                 query = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads(query)  # 1, res, res, dim
+                key = key_dict[layer][0].squeeze()      # head, pix_num, dim
                 if res not in q_dict:
                     q_dict[res] = []
                 q_dict[res].append(reshaped_query)
+
 
             for k_res in q_dict.keys():
                 query_list = q_dict[k_res]
                 q_dict[k_res] = torch.cat(query_list, dim=1)
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+            """ using cross attntion """
+
+
+
+
+
             if not args.use_init_query:
                 out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
             else:
                 out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
-
-
-
-
-
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
             masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
 
@@ -497,12 +491,10 @@ if __name__ == "__main__":
     parser.add_argument("--max_timestep", type=int, default=200)
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--use_noise_regularization", action='store_true')
-    parser.add_argument("--vae_train", action='store_true')
     parser.add_argument("--contrastive_learning", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
-
     passing_mvtec_argument(args)
     main(args)

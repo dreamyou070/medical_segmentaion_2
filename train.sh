@@ -1,6 +1,4 @@
 # !/bin/bash
-# brain -> BraTS2020_Segmentation_256
-# abdomen ->
 
 port_number=51265
 category="medical"
@@ -9,8 +7,7 @@ trigger_word="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_new_data_absolute_pe_segmentation_model_a_use_dice_ce_loss_unet_crossattn_vae_train_training_weight_decay_20240411"
-
+file_name="1_new_data_absolute_pe_segmentation_model_a_use_dice_ce_loss_unet_crossattn_training_weight_decay_20240411"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number train.py --log_with wandb \
