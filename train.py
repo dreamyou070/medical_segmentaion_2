@@ -90,7 +90,11 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    #trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": class_0_seg.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": class_1_seg.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": class_2_seg.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": class_3_seg.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -140,6 +144,7 @@ def main(args):
         segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
+    class_0_seg, class_1_seg, class_2_seg, class_3_seg = accelerator.prepare(class_0_seg, class_1_seg, class_2_seg, class_3_seg)
 
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
