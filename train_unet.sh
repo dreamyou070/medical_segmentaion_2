@@ -17,8 +17,8 @@ file_name="1_new_data_absolute_pe_segmentation_model_a_use_dice_ce_loss_unet_cro
 # --use_instance_norm
 # --binary_test
 
-accelerate launch --config_file ../../gpu_config/gpu_0_config \
- --main_process_port $port_number ../train_unet.py --log_with wandb \
+accelerate launch --config_file ../gpu_config/gpu_0_config \
+ --main_process_port $port_number train_unet.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
