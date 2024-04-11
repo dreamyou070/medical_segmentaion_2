@@ -26,10 +26,14 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 if argument.use_position_embedder :
                     hidden_states = position_embedder(hidden_states, layer_name)
 
+
+
             query = self.to_q(hidden_states)
             context = context if context is not None else hidden_states
             key_ = self.to_k(context)
             value = self.to_v(context)
+
+            # print(f'layer_name {layer_name} | after to_q {query.shape} | after to_k {key_.shape} | after to_v {value.shape}')
             query = self.reshape_heads_to_batch_dim(query)
             key = self.reshape_heads_to_batch_dim(key_)
             value = self.reshape_heads_to_batch_dim(value)
@@ -47,8 +51,11 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 alpha=self.scale,)
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
             hidden_states = torch.bmm(attention_probs, value)
+
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
+
             hidden_states = self.to_out[0](hidden_states)
+
             return hidden_states
         return forward
 

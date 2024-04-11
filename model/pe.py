@@ -1,56 +1,15 @@
 import torch.nn as nn
 import torch
 import einops
-"""
-class ContextEmbedding(nn.Module):
+
+class SinglePositional_Patch_Embedding(nn.Module):
 
     def __init__(self,
                  max_len: int = 64 * 64,
-                 d_model: int = 320,
-                 scale = 1.0,) :
-        super(ContextEmbedding, self).__init__()
-        # three convolution
-        self.b_conv = nn.Conv2d(d_model, d_model, kernel_size=3, stride=1, padding=1)
-        self.c_conv = nn.Conv2d(d_model, d_model, kernel_size=3, stride=1, padding=1)
-        self.d_conv = nn.Conv2d(d_model, d_model, kernel_size=3, stride=1, padding=1)
-        self.scale = scale
-
-    def forward(self, x: torch.Tensor):
-
-        start_dim = 4
-        if x.dim() == 3:
-            start_dim = 3
-            # x = B,L,D -> B,D,H,W
-            b,l,d = x.shape
-            h = int(l ** 0.5)
-            # B,L,D -> B,D,L
-            x = x.permute(0,2,1).contiguous()
-            x = x.view(b,d,h,h)
-
-        self.b_conv = self.b_conv.to(x.device).to(x.dtype)
-        self.c_conv = self.c_conv.to(x.device).to(x.dtype)
-        self.d_conv = self.d_conv.to(x.device).to(x.dtype)
-
-        B = self.b_conv(x)
-        C = self.c_conv(x)
-        B = B.view(B.size(0), B.size(1), -1)
-        C = C.view(C.size(0), C.size(1), -1)
-        S = torch.matmul(B.transpose(1, 2), C)
-        S = nn.functional.softmax(S, dim=-1)
-        # [5]
-        D = self.d_conv(x)
-        D = D.view(D.size(0), D.size(1), -1)
-        context_info = torch.matmul(D, S.transpose(1, 2)).permute(0,2,1) * self.scale
-        return context_info
-"""
-class SinglePositionalEmbedding(nn.Module):
-
-    def __init__(self,
-                 max_len: int = 64 * 64,
-                 d_model: int = 320) :
-        super(SinglePositionalEmbedding, self).__init__()
+                 d_model: int = 320, ):
+        super().__init__()
         self.positional_encodings = nn.Parameter(torch.randn(1,max_len, d_model), requires_grad=True)
-
+        self.linear = nn.Linear(d_model, d_model)
 
     def forward(self, x: torch.Tensor):
 
@@ -61,7 +20,89 @@ class SinglePositionalEmbedding(nn.Module):
         b_size = x.shape[0]
         res = int(x.shape[1] ** 0.5)
         pe = self.positional_encodings.expand(b_size, -1, -1).to(x.device)
-        x = x + pe # dim = 3
+        self.linear = self.linear.to(x.device)
+        pe = self.linear(pe)
+        x = x + pe
+        if start_dim == 4:
+            x = einops.rearrange(x, 'b (h w) c -> b c h w', h=res, w=res)
+        return x
+class SinglePositionalEmbedding(nn.Module):
+
+    def __init__(self,
+                 max_len: int = 64 * 64,
+                 d_model: int = 320, ):
+        super().__init__()
+        self.positional_encodings = nn.Parameter(torch.randn(1,max_len, d_model), requires_grad=True)
+
+    def forward(self, x: torch.Tensor):
+
+        start_dim = 3
+        if x.dim() == 4:
+            start_dim = 4
+            x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C
+        b_size = x.shape[0]
+        res = int(x.shape[1] ** 0.5)
+        pe = self.positional_encodings.expand(b_size, -1, -1).to(x.device)
+        x = x + pe
+        if start_dim == 4:
+            x = einops.rearrange(x, 'b (h w) c -> b c h w', h=res, w=res)
+        return x
+class SinglePositional_Semantic_Embedding(nn.Module):
+
+    def __init__(self,
+                 max_len: int = 64 * 64,
+                 d_model: int = 320,):
+        super().__init__()
+        # [1] positional embeddings
+        self.positional_encodings = nn.Parameter(torch.randn(1,max_len, d_model), requires_grad=True)
+        # [2] semantic embeddings
+        self.se_alpha = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
+
+    def forward(self, x: torch.Tensor):
+
+        # [1] positional embeddings
+        start_dim = 3
+        if x.dim() == 4:
+            start_dim = 4
+            x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C
+        b_size = x.shape[0]
+        res = int(x.shape[1] ** 0.5)
+        pe = self.positional_encodings.expand(b_size, -1, -1).to(x.device)
+        # [2] semantic embeddings
+        attention_scores = torch.baddbmm(torch.empty(x.shape[0], x.shape[1], x.shape[1], dtype=x.dtype, device=x.device),
+                                         x, x.transpose(-1, -2),beta=0,)
+        attention_probs = attention_scores.softmax(dim=-1).to(x.dtype)
+        se = torch.bmm(attention_probs, x)
+        # [3] add positional and semantic embeddings
+        x = x + pe + self.se_alpha.to(x.device) * se
+        # [4] reshape
+        if start_dim == 4:
+            x = einops.rearrange(x, 'b (h w) c -> b c h w', h=res, w=res)
+        return x
+class SinglePositionalEmbedding_concat(nn.Module):
+
+    def __init__(self,
+                 max_len: int = 64 * 64,
+                 d_model: int = 320, ):
+        super().__init__()
+        self.positional_encodings = nn.Parameter(torch.randn(1,max_len, d_model), requires_grad=True)
+        # [2] dimension reduction
+        self.fc = nn.Linear(2*d_model, d_model)
+
+    def forward(self, x: torch.Tensor):
+
+        start_dim = 3
+        if x.dim() == 4:
+            start_dim = 4
+            x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C
+        b_size = x.shape[0]
+        res = int(x.shape[1] ** 0.5)
+        pe = self.positional_encodings.expand(b_size, -1, -1).to(x.device)
+        # [1] concat query and position_embedder
+        x = torch.cat([x, pe], dim=2)
+        # [2] reshape query (dimension reduction)
+        self.fc = self.fc.to(x.device)
+        x = self.fc(x)
         if start_dim == 4:
             x = einops.rearrange(x, 'b (h w) c -> b c h w', h=res, w=res)
         return x
@@ -91,33 +132,40 @@ class AllPositionalEmbedding(nn.Module):
                            'up_blocks_3_attentions_1_transformer_blocks_0_attn2': (64, 320),
                            'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320), }
 
-    def __init__(self, use_context_info = True,
-                 context_scale = 1.0) -> None:
-        super(AllPositionalEmbedding, self).__init__()
+    def __init__(self,
+                 pe_do_concat,
+                 do_semantic_position,) -> None:
+        super().__init__()
 
         self.layer_dict = self.layer_names_res_dim
         self.positional_encodings = {}
-        self.use_context_info = use_context_info
-        self.context_encodings = {}
+        self.do_concat = pe_do_concat
+        self.do_semantic_position = do_semantic_position
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
-            self.positional_encodings[layer_name] = SinglePositionalEmbedding(max_len = res*res,
-                                                                              d_model = dim,)
-            """
-            if self.use_context_info :
-                self.context_encodings[layer_name] = ContextEmbedding(max_len=res * res,
-                                                                      d_model=dim,
-                                                                      scale=context_scale)
-            """
 
-    def forward(self, x: torch.Tensor, layer_name):
+            if self.do_concat :
+                self.positional_encodings[layer_name] = SinglePositionalEmbedding_concat(max_len = res*res, d_model = dim)
+
+            elif self.do_semantic_position :
+                self.positional_encodings[layer_name] = SinglePositional_Semantic_Embedding(max_len = res*res, d_model = dim)
+
+            else :
+                self.positional_encodings[layer_name] = SinglePositionalEmbedding(max_len = res*res, d_model = dim)
+
+
+
+    def forward(self,
+                x: torch.Tensor,
+                layer_name,
+                patch_idx=None):
+
+
         if layer_name in self.positional_encodings.keys() :
+
             position_embedder = self.positional_encodings[layer_name]
             output = position_embedder(x)
-            #if self.use_context_info:
-            #    context_embedder = self.context_encodings[layer_name]
-            #    context_info = context_embedder(x)
-            #    output = output + context_info
+
             return output
         else :
             return x

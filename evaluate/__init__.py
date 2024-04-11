@@ -1,66 +1,47 @@
-from ignite.engine import *
-from ignite.handlers import *
-from ignite.metrics import *
-import torch.nn.functional as F
 import torch
-def eval_step(engine, batch):
-    return batch
-
-def generate_confusion_matrix (y_pred, y_true, class_num) :
+from sklearn.metrics import auc, roc_curve
 
 
-    evaluator = Engine(eval_step)
+def dice_coeff(real_mask: torch.Tensor, smooth=0.000001, mse=None):
+    # real_mask = binary mask map
+    # mse = anomaly map
+    intersection = torch.sum(mse * real_mask, dim=[1, 2]) # only different value in anomal pixel region
+    union = torch.sum(mse, dim=[1, 2]) + torch.sum(real_mask, dim=[1, 2]) # dice = intersection / union
+    dice = torch.mean((2. * intersection + smooth) / (union + smooth), dim=0)
+    return dice
 
-    metric = ConfusionMatrix(num_classes=class_num)
-    # [1] confusion, dice index
-    metric.attach(evaluator, 'cm')
-    metric.attach(evaluator, 'dice')
+def IoU(real, recon):
+    import numpy as np
+    real = real.cpu().numpy()
+    recon = recon.cpu().numpy()
+    intersection = np.logical_and(real, recon)
+    union = np.logical_or(real, recon)
+    return np.sum(intersection) / (np.sum(union) + 1e-8)
 
-    # [2] calculate
-    state = evaluator.run([[y_pred, y_true]])
+def precision(real_mask, recon_mask):
+    TP = ((real_mask == 1) & (recon_mask == 1))
+    FP = ((real_mask == 1) & (recon_mask == 0))
+    return torch.sum(TP).float() / ((torch.sum(TP) + torch.sum(FP)).float() + 1e-6)
 
-    # [3] get value
-    confusion_matrix = state.metrics['cm']
-    dice_coeff = state.metrics['dice']
-    return confusion_matrix, dice_coeff
 
-def get_IoU(y_pred, y_true, class_num, confusion_matrix):
 
-    if confusion_matrix is None :
-        evaluator = Engine(eval_step)
-        confusion_matrix, dice_coeff = generate_confusion_matrix (evaluator, y_pred, y_true, class_num)
+def recall(real_mask, recon_mask):
+    TP = ((real_mask == 1) & (recon_mask == 1))
+    FN = ((real_mask == 0) & (recon_mask == 1))
+    return torch.sum(TP).float() / ((torch.sum(TP) + torch.sum(FN)).float() + 1e-6)
 
-    real_axis, pred_axis = confusion_matrix.shape
-    IoU_dict, IoU_list = {}, []
 
-    for real_idx in range(real_axis) :
-        TP = confusion_matrix[real_idx, real_idx]
-        FP = confusion_matrix[real_idx, :].sum() - TP
-        FN = confusion_matrix[:, real_idx].sum() - TP
-        IoU = TP / (TP + FP + FN)
-        if type(IoU) == torch.Tensor:
-            IoU_dict[real_idx] = IoU.item()
-        else:
-            IoU_dict[real_idx] = IoU
-        IoU_list.append(IoU)
-    mIOU = sum(IoU_list) / len(IoU_list)
-    return IoU_dict, mIOU
+def FPR(real_mask, recon_mask):
+    FP = ((real_mask == 1) & (recon_mask == 0))
+    TN = ((real_mask == 0) & (recon_mask == 0))
+    return torch.sum(FP).float() / ((torch.sum(FP) + torch.sum(TN)).float() + 1e-6)
 
-def tversky_loss(y_pred, y_true, class_num, confusion_matrix,
-                 alpha = 0.3, beta = 0.7,):
-    # alpha = coeff for FN
-    # beta = coeff for FP
 
-    if confusion_matrix is None :
-        evaluator = Engine(eval_step)
-        confusion_matrix, dice_coeff = generate_confusion_matrix (evaluator, y_pred, y_true, class_num)
+def ROC_AUC(real_mask, square_error):
+    if type(real_mask) == torch.Tensor:
+        return roc_curve(real_mask.detach().cpu().numpy().flatten(), square_error.detach().cpu().numpy().flatten())
+    else:
+        return roc_curve(real_mask.flatten(), square_error.flatten())
 
-    real_axis, pred_axis = confusion_matrix.shape
-    tversky_dict = {}
-    for real_idx in range(real_axis):
-        TP = confusion_matrix[real_idx, real_idx]
-        FP = confusion_matrix[real_idx, :].sum() - TP
-        FN = confusion_matrix[:, real_idx].sum() - TP
-        IoU = TP / (TP + beta * FP + alpha * FN)
-        tversky_dict[real_idx] = IoU
-    return tversky_dict
+def AUC_score(fpr, tpr):
+    return auc(fpr, tpr)

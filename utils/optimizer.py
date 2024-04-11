@@ -37,7 +37,7 @@ def get_optimizer(args, trainable_params):
             key, value = arg.split("=")
             value = ast.literal_eval(value)
             optimizer_kwargs[key] = value
-    # print("optkwargs:", optimizer_kwargs)
+    print("optkwargs:", optimizer_kwargs)
 
     lr = args.learning_rate
     optimizer = None

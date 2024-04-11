@@ -14,6 +14,6 @@ def save_model(args, saving_folder, saving_name, unwrapped_nw, save_dtype):
     save_model_base_dir = os.path.join(args.output_dir, saving_folder)
     os.makedirs(save_model_base_dir, exist_ok=True)
     if os.path.splitext(saving_name)[1] == ".safetensors":
-        save_file(state_dict, os.path.join(save_model_base_dir, saving_name), metadata)
+        save_file(state_dict, os.path.join(save_model_base_dir, saving_name))
     else :
         torch.save(state_dict, os.path.join(save_model_base_dir, saving_name))

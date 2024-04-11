@@ -849,6 +849,7 @@ class CrossAttnDownBlock2D(nn.Module):
                 trg_layer_list=None,
                 noise_type=None,
                 **model_kwargs):
+
         output_states = ()
         for resnet, attn in zip(self.resnets, self.attentions):
 
@@ -872,10 +873,10 @@ class CrossAttnDownBlock2D(nn.Module):
                                                                   hidden_states,
                                                                   encoder_hidden_states)[0]
             else:
-                #print(f'before resnet, hiden_states : {hidden_states.shape}')
-                hidden_states = resnet(hidden_states, temb, **model_kwargs) # batch, 4, 512,512
-                #print(f'after resnet block, hiden_states : {hidden_states.shape}')
 
+                hidden_states = resnet(hidden_states, temb, **model_kwargs) # batch, 4, 512,512
+                # -------------------------------------------------------------------------
+                # after resnet
                 hidden_states = attn(hidden_states,
                                      encoder_hidden_states=encoder_hidden_states,
                                      trg_layer_list=trg_layer_list,
@@ -1139,6 +1140,7 @@ class CrossAttnUpBlock2D(nn.Module):
 
         j = 0
         for resnet, attn in zip(self.resnets, self.attentions):
+
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
@@ -1159,13 +1161,13 @@ class CrossAttnUpBlock2D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet),
-                                                                  hidden_states, temb,
-                                                                  )
+                                                                  hidden_states, temb,)
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(attn, return_dict=False),
                                                                   hidden_states, encoder_hidden_states,
                                                                   )[0]
             else:
                 hidden_states = resnet(hidden_states, temb, **model_kwargs)
+
                 hidden_states = attn(hidden_states,
                                      encoder_hidden_states=encoder_hidden_states,
                                      trg_layer_list=trg_layer_list,
@@ -1469,15 +1471,32 @@ class UNet2DConditionModel(nn.Module):
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
-            res_samples = down_block_res_samples[-len(upsample_block.resnets) :] # -3
+
+            # -------------------------------------------------------------------------------------------
+            res_samples            = down_block_res_samples[-len(upsample_block.resnets) :] # -3
+            # the skip connection (every three)
+            #print(f'skip connection : {len(res_samples)}')
+
+            """
+            output = self.calculate_inner_attention(upsample_block.inner_attention,
+                                                    hidden_states=sample,
+                                                    context=encoder_hidden_states,
+                                                    trg_layer_list=trg_layer_list,
+                                                    noise_type=noise_type)
+            """
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]  # skip connection
+
+
+
+
+
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
 
             if upsample_block.has_cross_attention:
                 sample = upsample_block(hidden_states=sample,
                                         temb=emb,
-                                        res_hidden_states_tuple=res_samples,
+                                        res_hidden_states_tuple=res_samples,         # adding skip connection
                                         encoder_hidden_states=encoder_hidden_states, # text information
                                         upsample_size=upsample_size,
                                         trg_layer_list=trg_layer_list,
@@ -1516,4 +1535,3 @@ class UNet2DConditionModel(nn.Module):
         timesteps = timesteps.expand(sample.shape[0])
 
         return timesteps
-

@@ -74,12 +74,11 @@ class TrainDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
-                 caption: str = "necrotic, edema, tumor",
+                 caption: str = "brain",
                  latent_res: int = 64,
                  n_classes: int = 4,
-                 single_modality = False,
                  mask_res = 128,
-                 do_rotate = False,):
+                 use_data_aug = False,):
 
         # [1] base image
         self.root_dir = root_dir
@@ -87,7 +86,8 @@ class TrainDataset_Seg(Dataset):
         folders = os.listdir(self.root_dir)
         for folder in folders :
             folder_dir = os.path.join(self.root_dir, folder)
-            rgb_folder = os.path.join(folder_dir, f'image_{mask_res}')
+            folder_res = folder.split('_')[-1]
+            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}')
             gt_folder = os.path.join(folder_dir, f'mask_{mask_res}') # [128,128]
             files = os.listdir(rgb_folder)
             for file in files:
@@ -104,11 +104,9 @@ class TrainDataset_Seg(Dataset):
         self.gt_paths = gt_paths
         self.latent_res = latent_res
         self.n_classes = n_classes
-        self.single_modality = single_modality
         self.mask_res = mask_res
-        self.do_rotate = do_rotate
-        if do_rotate :
-            self.angles = [0, 90, 180, 270]
+        self.use_data_aug = use_data_aug
+
 
 
     def __len__(self):
@@ -145,37 +143,49 @@ class TrainDataset_Seg(Dataset):
         img_path = self.image_paths[idx]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
-        if self.single_modality :
-            img_back = np.zeros((self.resize_shape[0], self.resize_shape[1],3))
-            for i in range(3) :
-                img_back[:,:,i] = img[:,:,0]
-            img = img_back
+        if self.use_data_aug :
+            # rotating
+            random_p = np.random.rand()
+            if random_p < 0.25:
+                number = 1
+            elif 0.25 <= random_p < 0.5:
+                number = 2
+            elif 0.5 <= random_p < 0.75:
+                number = 3
+            elif 0.75 <= random_p:
+                number = 4
+
+            img = np.rot90(img, k=number) # ok, because it is 3 channel image
+
+        img = self.transform(img.copy())
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
-        gt_arr = np.load(gt_path)     # 256,256
-
+        gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
+        if self.use_data_aug:
+            gt_arr = np.rot90(gt_arr, k=number)
         if self.caption == 'brain':
-            gt_arr = np.where(gt_arr==4, 3, gt_arr)
-        #if self.n_classes == 2 :
-        #    gt_arr = np.where(gt_arr > 1, 1, gt_arr)
+            gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
 
-        gt_arr_ = to_categorical(gt_arr)
+        if argument.binary_test :
+            gt_arr = np.where(gt_arr==1, 1, 0)
+
+        gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
         gt = np.zeros((self.mask_res,   # 256
                        self.mask_res,   # 256
                        self.n_classes)) # 3
+
         # 256,256,3
         gt[:,:,:class_num] = gt_arr_
         gt = torch.tensor(gt).permute(2,0,1)        # 3,256,256
         # [3] gt flatten
         gt_flat = gt_arr.flatten() # 128*128
 
-
         # [3] caption
         input_ids, attention_mask = self.get_input_ids(self.caption)  # input_ids = [77]
 
-        return {'image': self.transform(img),  # [3,512,512]
+        return {'image': img,  # [3,512,512]
                 "gt": gt,                      # [3,256,256]
                 "gt_flat" : gt_flat,           # [128*128]
                 "input_ids": input_ids,}

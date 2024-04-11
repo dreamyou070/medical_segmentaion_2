@@ -35,3 +35,22 @@ def reshape_batch_dim_to_heads(tensor):
     tensor = tensor.view(batch_size // head_size, res, res, dim * head_size).contiguous()
     tensor = tensor.permute(0, 3, 1, 2).contiguous()  # 1, dim, res,res
     return tensor
+
+def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents, noise = None):
+    # Sample noise that we'll add to the latents
+    if noise is None:
+        noise = torch.randn_like(latents, device=latents.device)
+
+
+    # Sample a random timestep for each image
+    b_size = latents.shape[0]
+    min_timestep = 0 if args.min_timestep is None else args.min_timestep
+    max_timestep = noise_scheduler.config.num_train_timesteps if args.max_timestep is None else args.max_timestep
+
+    timesteps = torch.randint(min_timestep, max_timestep, (b_size,), device=latents.device)
+    timesteps = timesteps.long()
+    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+
+    return noise, noisy_latents, timesteps
+
+

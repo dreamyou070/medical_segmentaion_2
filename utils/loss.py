@@ -19,7 +19,9 @@ class FocalLoss(nn.Module):
     :param size_average: (bool, optional) By default, the losses are averaged over each losses element in the batch.
     """
 
-    def __init__(self, apply_nonlin=None, alpha=None, gamma=2, balance_index=0, smooth=1e-5, size_average=True):
+    def __init__(self,
+                 apply_nonlin=None, alpha=None, gamma=2,
+                 balance_index=0, smooth=1e-5, size_average=True):
         super(FocalLoss, self).__init__()
         self.apply_nonlin = apply_nonlin
         self.alpha = alpha
@@ -33,13 +35,14 @@ class FocalLoss(nn.Module):
                 raise ValueError('smooth value should be in [0,1]')
 
     def forward(self, logit, target):
+
         if self.apply_nonlin is not None:
             logit = self.apply_nonlin(logit)
         num_class = logit.shape[1]
         if logit.dim() > 2:
             # N,C,d1,d2 -> N,C,m (m=d1*d2*...)
             logit = logit.view(logit.size(0), logit.size(1), -1)
-            logit = logit.permute(0, 2, 1).contiguous()
+            logit = logit.permute(0, 2, 1).contiguous() # batch, pixel_num, class_num
             logit = logit.view(-1, logit.size(-1))
         target = torch.squeeze(target, 1)
         target = target.view(-1, 1)
@@ -62,9 +65,10 @@ class FocalLoss(nn.Module):
         if alpha.device != logit.device:
             alpha = alpha.to(logit.device)
 
-        idx = target.cpu().long()
+        idx = target.cpu().long() # pixel_num, class
 
         one_hot_key = torch.FloatTensor(target.size(0), num_class).zero_()
+        print(f'one_hot_key = {one_hot_key}')
         one_hot_key = one_hot_key.scatter_(1, idx, 1)
         if one_hot_key.device != logit.device:
             one_hot_key = one_hot_key.to(logit.device)
@@ -77,7 +81,9 @@ class FocalLoss(nn.Module):
         gamma = self.gamma
         alpha = alpha[idx]
         alpha = torch.squeeze(alpha)
+
         loss = -1 * alpha * torch.pow((1 - pt), gamma) * logpt
+
         if self.size_average:
             loss = loss.mean()
         return loss

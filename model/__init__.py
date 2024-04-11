@@ -1,10 +1,11 @@
 from model.lora import create_network
+from model.pe import AllPositionalEmbedding, SinglePositionalEmbedding
 from model.diffusion_model import load_target_model
 import os
 from safetensors.torch import load_file
 from model.unet import TimestepEmbedding
 
-def call_model_package(args, weight_dtype, accelerator):
+def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True, unet_lora = True ):
 
 
     # [1] diffusion
@@ -27,7 +28,7 @@ def call_model_package(args, weight_dtype, accelerator):
             net_kwargs[key] = value
     network = create_network(1.0, args.network_dim, args.network_alpha,
                              vae, text_encoder, unet, neuron_dropout=args.network_dropout, **net_kwargs, )
-    network.apply_to(text_encoder, unet, True, True)
+    network.apply_to(text_encoder, unet, text_encoder_lora, unet_lora)
 
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
@@ -39,6 +40,4 @@ def call_model_package(args, weight_dtype, accelerator):
         info = network.load_weights(args.network_weights)
     network.to(weight_dtype)
 
-
     return text_encoder, vae, unet, network
-
