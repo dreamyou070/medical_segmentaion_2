@@ -158,8 +158,6 @@ def main(args):
             t_enc.eval()
     del t_enc
     network.prepare_grad_etc(text_encoder, unet)
-    if not args.vae_train :
-        vae.to(accelerator.device, dtype=weight_dtype)
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -238,6 +236,7 @@ def main(args):
             for class_idx in class_dict.keys():
                 class_dict[class_idx] = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
                 print(f'class_dict[class_idx] = {class_dict[class_idx].shape}')
+
 
             # finalize attn_map
 
