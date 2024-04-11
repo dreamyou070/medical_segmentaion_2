@@ -239,6 +239,7 @@ def main(args):
             print(f'attn_map_32_out = {attn_map_32_out.shape}')
             print(f'attn_map_64 = {attn_map_64.shape}')
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
+            print(f'attn_map_cat = {attn_map_cat.shape}')
             res_group_num = 3
             chunk = attn_map_cat.shape[-1] // res_group_num
             class_dict = {}
