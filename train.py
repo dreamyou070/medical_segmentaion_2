@@ -138,8 +138,6 @@ def main(args):
 
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
-    if args.vae_train :
-        vae = transform_models_if_DDP([vae])[0]
     if args.use_position_embedder:
         position_embedder = transform_models_if_DDP([position_embedder])[0]
     if args.gradient_checkpointing:
@@ -238,8 +236,11 @@ def main(args):
                         class_dict[chunk_i] = []
                     class_dict[chunk_i].append(map_chunk)
             for class_idx in class_dict.keys():
-                class_dict[class_idx] = torch.cat(class_dict[class_idx], dim=-1)
+                class_dict[class_idx] = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
                 print(f'class_dict[class_idx] = {class_dict[class_idx].shape}')
+
+            # finalize attn_map
+
 
             
             # x16_out = [1, 16*16, 4]
