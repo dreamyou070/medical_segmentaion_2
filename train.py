@@ -210,23 +210,34 @@ def main(args):
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
+            attn_map_dict = {}
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads(query)  # 1, res, res, dim
                 key = key_dict[layer][0].squeeze()      # head, pix_num, dim
+                attn_map = torch.bmm(query,
+                                     key.transpose(-1, -2))  # 1, pix_num, sen_len
+                # what about use just short length
+
                 if res not in q_dict:
                     q_dict[res] = []
-                q_dict[res].append(reshaped_query)
-
-
+                q_dict[res].append(reshaped_query) # 1, res, res, dim
+                attn_map_dict[res] = attn_map
             for k_res in q_dict.keys():
                 query_list = q_dict[k_res]
                 q_dict[k_res] = torch.cat(query_list, dim=1)
-
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
+            
+            # x16_out = [1, 16*16, 4]
+            # x32_out = [1, 32*32, 4]
+            # x64_out = [1, 64*64, 4]
+            # segmentation head ... ?
+            # classwise segmentation .. ?
 
             """ using cross attntion """
+
 
 
 
