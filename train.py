@@ -266,7 +266,7 @@ def main(args):
             seg_map_list = []
             for i, head in enumerate(head_list):
                 token_idx = list(class_dict.keys())[i]
-                class_map = class_dict[token_idx]     # Batch, res, res, 1
+                class_map = class_dict[token_idx]     # Batch, res, res, 3
                 print(f'class_map = {class_map.shape}')
                 seg_map = head(class_dict[res])       # Batch, 128, 128, 1
                 print(f'res = {res} | seg_map = {seg_map.shape}')
