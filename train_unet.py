@@ -25,6 +25,7 @@ from utils import get_noise_noisy_latents_and_timesteps
 
 
 def main(args):
+
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -49,7 +50,9 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator, False, False)
     # [2] pe
-    position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat, do_semantic_position=args.do_semantic_position,)
+    if args.use_position_embedder:
+        position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
+                                                   do_semantic_position=args.do_semantic_position,)
 
     if args.position_embedder_weights is not None:
         position_embedder_state_dict = load_file(args.position_embedder_weights)
@@ -444,7 +447,6 @@ if __name__ == "__main__":
     parser.add_argument("--max_timestep", type=int, default=200)
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--use_noise_regularization", action='store_true')
-    parser.add_argument("--vae_train", action='store_true')
     parser.add_argument("--contrastive_learning", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)

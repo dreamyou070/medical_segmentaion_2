@@ -37,4 +37,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --use_batchnorm \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
- --vae_train
+ --use_position_embedder
