@@ -267,6 +267,7 @@ def main(args):
             for i, head in enumerate(head_list):
                 token_idx = list(class_dict.keys())[i]
                 class_map = class_dict[token_idx]     # Batch, res, res, 1
+                print(f'class_map = {class_map.shape}')
                 seg_map = head(class_dict[res])       # Batch, 128, 128, 1
                 print(f'res = {res} | seg_map = {seg_map.shape}')
                 seg_map_dict[token_idx] = seg_map
@@ -275,14 +276,12 @@ def main(args):
             masks_pred = torch.cat(seg_map_list, dim=-1) # Batch, 128, 128, 4
             print(f'masks_pred = {masks_pred.shape}')
 
-
             # finalize attn_map
             # x16_out = [1, 16*16, 4]
             # x32_out = [1, 32*32, 4]
             # x64_out = [1, 64*64, 4]
             # segmentation head ... ?
             # classwise segmentation .. ?
-
             """ using cross attntion """
             #if not args.use_init_query:
             #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
@@ -290,17 +289,16 @@ def main(args):
             #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
             #masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
             #masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
-
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
                                    target=batch['gt'].to(dtype=weight_dtype))
             else:
                 # [5.1] Multiclassification Loss
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
+                loss = loss_CE(masks_pred, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
 
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                focal_loss = loss_FC(masks_pred, gt_flat.squeeze().to(masks_pred.device))  # N
                 if args.use_monai_focal_loss:
                     focal_loss = focal_loss.mean()
                 loss += focal_loss
