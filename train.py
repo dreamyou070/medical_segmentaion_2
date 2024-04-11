@@ -203,8 +203,10 @@ def main(args):
                 query_ = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query_.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads(query_)  # 1, res, res, dim
-                _, res, res, dim = reshaped_query.shape
-                q = reshaped_query.view(1, res * res, dim).contiguous()
+                _, dim, res, res = reshaped_query.shape
+
+
+                q = reshaped_query.permute(0, 2, 3, 1).contiguous().view(1, res * res, dim).contiguous()
                 key = key_dict[layer][0]      # head, pix_num, dim
                 attn_map = torch.bmm(q,
                                      key.transpose(-1, -2))  # 1, pix_num, sen_len
@@ -249,6 +251,7 @@ def main(args):
             for i, head in enumerate(head_list):
                 res = class_dict.keys().tolist()[i]
                 seg_map = head(class_dict[res])
+                print(f'res = {res} | seg_map = {seg_map.shape}')
                 seg_map_dict[res] = seg_map
 
 
