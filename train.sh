@@ -1,6 +1,6 @@
 # !/bin/bash
 
-port_number=51261
+port_number=51264
 category="medical"
 obj_name="brain"
 trigger_word="brain"
@@ -9,7 +9,7 @@ layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="1_new_data_absolute_pe_segmentation_model_a_use_dice_ce_loss_unet_crossattn_training_weight_decay_20240411"
 
-accelerate launch --config_file ../../gpu_config/gpu_0_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number train.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

@@ -153,8 +153,6 @@ def main(args):
     if args.gradient_checkpointing:
         unet.train()
         position_embedder.train()
-        if args.vae_train :
-            vae.train()
         segmentation_head.train()
         for t_enc in text_encoders:
             t_enc.train()
@@ -393,13 +391,6 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.vae_train :
-                save_model(args,
-                           saving_folder='vae',
-                           saving_name=f'vae-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(vae),
-                           save_dtype=save_dtype)
-
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
         loader = test_dataloader
