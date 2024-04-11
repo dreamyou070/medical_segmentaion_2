@@ -229,7 +229,8 @@ def main(args):
                 q_dict[k_res] = torch.cat(query_list, dim=1)
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
-            
+            print(f'attn_map_16 = {attn_map_16.shape} | attn_map_32 = {attn_map_32.shape} | attn_map_64 = {attn_map_64.shape}')
+
             # x16_out = [1, 16*16, 4]
             # x32_out = [1, 32*32, 4]
             # x64_out = [1, 64*64, 4]
@@ -237,12 +238,6 @@ def main(args):
             # classwise segmentation .. ?
 
             """ using cross attntion """
-
-
-
-
-
-
             if not args.use_init_query:
                 out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
             else:
