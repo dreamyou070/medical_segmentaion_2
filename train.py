@@ -234,7 +234,7 @@ def main(args):
                 return attn_map.view(b, -1, sen_len)
             attn_map_16_out = upscaling(upscaling(attn_map_16))
             attn_map_32_out = upscaling(attn_map_32)
-            
+
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
             res_group_num = 3
             chunk = attn_map_cat.shape[-1] // res_group_num
@@ -247,6 +247,7 @@ def main(args):
                     class_dict[chunk_i].append(map_chunk)
             for class_idx in class_dict.keys():
                 final = torch.cat(class_dict[class_idx], dim=-1)
+                print(f'final = {final.shape}')
                 b, pix_num, sen_len = final.shape
                 res = int(pix_num ** 0.5)
                 class_dict[class_idx] = final.view(b, res, res, sen_len)
