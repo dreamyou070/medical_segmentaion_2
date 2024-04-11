@@ -317,4 +317,66 @@ class Segmentation_Head_d(nn.Module):
             x6_out = self.up6(x5_out)
             x_in = x6_out
         logits = self.outc(x_in)  # 1,3,256,256
+        return
+
+class Segmentation_Attn_Head_A(nn.Module):
+
+    def __init__(self,
+                 n_classes,
+                 bilinear=False,
+                 use_batchnorm=True,
+                 use_instance_norm = True,
+                 mask_res = 128,
+                 use_init_query = False,):
+        super(Segmentation_Head_a, self).__init__()
+
+        self.n_classes = n_classes
+        self.mask_res = mask_res
+        self.bilinear = bilinear
+        factor = 2 if bilinear else 1
+        self.use_init_query = use_init_query
+        if self.use_init_query :
+            self.init_conv = nn.Conv2d(4, 320, kernel_size=3, padding=1, bias=False)
+            self.double_conv = DoubleConv(640, 320, use_batchnorm = use_batchnorm, use_instance_norm = use_instance_norm)
+
+        self.up1 = Up(1, 640 // factor, bilinear, use_batchnorm, use_instance_norm)
+        self.up2 = Up(640, 320 // factor, bilinear, use_batchnorm, use_instance_norm)
+
+        if self.mask_res == 64 :
+            self.up3 = nn.Conv2d(320, 160, kernel_size=3, padding=1, bias=False)
+        if self.mask_res == 128:
+            self.up3 = Up_conv(in_channels = 320,
+                                out_channels = 160,
+                                kernel_size=2) # 64 -> 128 , channel 320 -> 160
+        if self.mask_res == 256 :
+            self.up4 = Up_conv(in_channels = 160,
+                                out_channels = 160,
+                                kernel_size=2)  # 128 -> 256
+        if self.mask_res == 512 :
+            self.up4 = Up_conv(in_channels=160,
+                               out_channels=160,
+                               kernel_size=2)  # 128 -> 256
+            self.up5 = Up_conv(in_channels = 160,
+                                out_channels = 160,
+                                kernel_size=2)
+        self.outc = OutConv(160, n_classes)
+    def forward(self, x16_out, x32_out, x64_out,
+                x_init = None):
+
+        x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
+        x = self.up2(x, x64_out)    # 1,320,64,64
+        if self.use_init_query :
+            x_init = self.init_conv(x_init)   # 1, 320, 64, 64
+            x = torch.cat([x, x_init], dim=1) # 1, 640, 64, 64
+            x = self.double_conv(x)           # 1, 320, 64, 64
+        x3_out = self.up3(x)  # 1,160,128,128
+        x_in = x3_out
+        if self.mask_res == 256 :
+            x4_out = self.up4(x3_out)
+            x_in = x4_out
+        if self.mask_res == 512 :
+            x4_out = self.up4(x3_out)
+            x5_out = self.up5(x4_out)
+            x_in = x5_out
+        logits = self.outc(x_in)  # 1,4, 128,128
         return logits

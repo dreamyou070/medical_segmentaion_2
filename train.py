@@ -85,8 +85,6 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    if args.vae_train :
-        trainable_params.append({"params": vae.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -192,18 +190,8 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            if args.vae_train :
+            with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            else :
-                with torch.no_grad():
-                    # how does it do ?
-                    latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
-            if args.use_noise_regularization :
-                # For Generalize add small noise
-                noise, noisy_latents, timesteps = get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents, noise = None)
-                latents = noisy_latents
-
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
                      noise_type=position_embedder)
@@ -231,6 +219,29 @@ def main(args):
             attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
             print(f'attn_map_16 = {attn_map_16.shape} | attn_map_32 = {attn_map_32.shape} | attn_map_64 = {attn_map_64.shape}')
 
+            def upscaling (attn_map):
+                b, pix_num, sen_len = attn_map.shape
+                attn_map = attn_map.view(b, res, res, sen_len)
+                # 2d upscale
+                attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
+                return attn_map
+            attn_map_16_out = upscaling(upscaling(attn_map_16))
+            attn_map_32_out = upscaling(attn_map_32)
+            attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
+            res_group_num = 3
+            chunk = attn_map_cat.shape[-1] // res_group_num
+            class_dict = {}
+            for group_idx in range(res_group_num):
+                for chunk_i in range(chunk) :
+                    map_chunk = attn_map_cat[:, :, group_idx * chunk_i]
+                    if chunk_i not in class_dict.keys() :
+                        class_dict[chunk_i] = []
+                    class_dict[chunk_i].append(map_chunk)
+            for class_idx in class_dict.keys():
+                class_dict[class_idx] = torch.cat(class_dict[class_idx], dim=-1)
+                print(f'class_dict[class_idx] = {class_dict[class_idx].shape}')
+
+            
             # x16_out = [1, 16*16, 4]
             # x32_out = [1, 32*32, 4]
             # x64_out = [1, 64*64, 4]
