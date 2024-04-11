@@ -178,7 +178,7 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-
+    head_list = [class_0_seg, class_1_seg, class_2_seg, class_3_seg]
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -266,7 +266,7 @@ def main(args):
                 final = final.view(b, res, res, sen_len)
                 class_dict[class_idx] = final
 
-            head_list = [class_0_seg, class_1_seg, class_2_seg, class_3_seg]
+
             seg_map_dict = {}
             seg_map_list = []
             for i, head in enumerate(head_list):
@@ -405,7 +405,8 @@ def main(args):
         if args.check_training:
             print(f'test with training data')
             loader = train_dataloader
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
+
+        score_dict, confusion_matrix, _ = evaluation_check(head_list, loader, accelerator.device,
                                                            text_encoder, unet, vae, controller, weight_dtype,
                                                            position_embedder, args)
         # saving
