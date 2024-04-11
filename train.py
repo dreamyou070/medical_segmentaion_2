@@ -215,7 +215,7 @@ def main(args):
                 q = reshaped_query.permute(0, 2, 3, 1).contiguous().view(1, res * res, dim).contiguous()
                 key = key_dict[layer][0]      # head, pix_num, dim
                 attn_map = torch.bmm(q,
-                                     key.transpose(-1, -2))  # 1, pix_num, sen_len
+                                     key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
                 # what about use just short length
                 if res not in q_dict:
                     q_dict[res] = []
@@ -223,7 +223,7 @@ def main(args):
                 attn_map_dict[res] = attn_map
             for k_res in q_dict.keys():
                 query_list = q_dict[k_res]
-                q_dict[k_res] = torch.cat(query_list, dim=1)
+                q_dict[k_res] = torch.cat(query_list, dim=1).contiguous()
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
             # 1, 16*16, 77
@@ -237,7 +237,7 @@ def main(args):
                 # 2d upscale
                 attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
                 # [b, res, res, sen_len] -> [b, res*res, sen_len]
-                return attn_map.view(b, -1, sen_len)
+                return attn_map.view(b, -1, sen_len).contiguous()
             attn_map_16_out = upscaling(upscaling(attn_map_16))
             attn_map_32_out = upscaling(attn_map_32)
 
