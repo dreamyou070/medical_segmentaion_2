@@ -230,10 +230,11 @@ def main(args):
                 attn_map = attn_map.view(b, res, res, sen_len)
                 # 2d upscale
                 attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
-                return attn_map
+                # [b, res, res, sen_len] -> [b, res*res, sen_len]
+                return attn_map.view(b, -1, sen_len)
             attn_map_16_out = upscaling(upscaling(attn_map_16))
             attn_map_32_out = upscaling(attn_map_32)
-
+            
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
             res_group_num = 3
             chunk = attn_map_cat.shape[-1] // res_group_num
