@@ -384,13 +384,7 @@ class Segmentation_Attn_Head_A(nn.Module):
 
 class Segmentation_Head_d(nn.Module):
 
-    def __init__(self,
-                 n_classes,
-                 bilinear=False,
-                 use_batchnorm=True,
-                 use_instance_norm = True,
-                 mask_res = 128,
-                 use_init_query = False,):
+    def __init__(self,):
         super(Segmentation_Head_d, self).__init__()
 
         self.up = Up_conv(in_channels=3,

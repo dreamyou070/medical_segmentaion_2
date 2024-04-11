@@ -209,7 +209,6 @@ def main(args):
                 attn_map = torch.bmm(q,
                                      key.transpose(-1, -2))  # 1, pix_num, sen_len
                 # what about use just short length
-
                 if res not in q_dict:
                     q_dict[res] = []
                 q_dict[res].append(reshaped_query) # 1, res, res, dim
@@ -244,8 +243,15 @@ def main(args):
                 b, pix_num, sen_len = final.shape
                 res = int(pix_num ** 0.5)
                 class_dict[class_idx] = final.view(b, res, res, sen_len)
-                print(f'class_dict[class_idx] = {class_dict[class_idx].shape}')
-            # batch,
+
+            head_list = [class_1_seg, class_2_seg, class_3_seg]
+            seg_map_dict = {}
+            for i, head in enumerate(head_list):
+                res = class_dict.keys().tolist()[i]
+                seg_map = head(class_dict[res])
+                seg_map_dict[res] = seg_map
+
+
 
 
 
