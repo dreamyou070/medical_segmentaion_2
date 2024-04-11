@@ -196,11 +196,11 @@ def main(args):
             q_dict = {}
             attn_map_dict = {}
             for layer in args.trg_layer_list:
-                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads(query)  # 1, res, res, dim
+                query_ = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                res = int(query_.shape[1] ** 0.5)
+                reshaped_query = reshape_batch_dim_to_heads(query_)  # 1, res, res, dim
                 key = key_dict[layer][0].squeeze()      # head, pix_num, dim
-                attn_map = torch.bmm(query,
+                attn_map = torch.bmm(query_dict[layer][0],
                                      key.transpose(-1, -2))  # 1, pix_num, sen_len
                 # what about use just short length
 
@@ -234,8 +234,13 @@ def main(args):
                         class_dict[chunk_i] = []
                     class_dict[chunk_i].append(map_chunk)
             for class_idx in class_dict.keys():
-                class_dict[class_idx] = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
+                final = torch.cat(class_dict[class_idx], dim=-1)
+                b, pix_num, sen_len = final.shape
+                res = int(pix_num ** 0.5)
+
+                class_dict[class_idx] = final.view(b, res, res, sen_len)
                 print(f'class_dict[class_idx] = {class_dict[class_idx].shape}')
+            # batch,
 
 
             # finalize attn_map
