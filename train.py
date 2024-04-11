@@ -235,11 +235,7 @@ def main(args):
             attn_map_16_out = upscaling(upscaling(attn_map_16))
             attn_map_32_out = upscaling(attn_map_32)
 
-            print(f'attn_map_16_out = {attn_map_16_out.shape}')
-            print(f'attn_map_32_out = {attn_map_32_out.shape}')
-            print(f'attn_map_64 = {attn_map_64.shape}')
             attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
-            print(f'attn_map_cat = {attn_map_cat.shape}')
 
             res_group_num = 3
             chunk = attn_map_cat.shape[-1] // res_group_num # 77
@@ -254,15 +250,10 @@ def main(args):
                         map_chunk = map_chunk.unsqueeze(0)
                     if map_chunk.dim() == 2:
                         map_chunk = map_chunk.unsqueeze(-1)
-                    print(f'map_chunk = {map_chunk.shape}')
-                        
                     class_dict[chunk_i].append(map_chunk)
-
-
 
             for class_idx in class_dict.keys():
                 final = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
-                print(f'final = {final.shape}')
                 b, pix_num, sen_len = final.shape
                 res = int(pix_num ** 0.5)
                 class_dict[class_idx] = final.view(b, res, res, sen_len)
@@ -270,7 +261,7 @@ def main(args):
             head_list = [class_1_seg, class_2_seg, class_3_seg]
             seg_map_dict = {}
             for i, head in enumerate(head_list):
-                res = class_dict.keys().tolist()[i]
+                res = list(class_dict.keys())[i]
                 seg_map = head(class_dict[res])
                 print(f'res = {res} | seg_map = {seg_map.shape}')
                 seg_map_dict[res] = seg_map
