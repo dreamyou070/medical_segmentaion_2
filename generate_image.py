@@ -187,15 +187,22 @@ def main(args):
                         for i in range(trial_times) :
                             z = decoder_model.sampling(z_mu, z_sigma)
                             reconstruction = decoder_model.decode(z)
-                            reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-                            print(f'original value = {reconstruction_img}')
-                            plt.imshow((reconstruction_img * 255).astype(np.uint8))
+                            # there is even minus value
+                            reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()#.numpy()
+                            # torch to numpy
+                            np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
+                            pil = Image.fromarray(np_img)
+
+                            #print(f'original value = {reconstruction_img}')
+                            #plt.imshow((reconstruction_img * 255).astype(np.uint8))
+
 
                             # save
                             recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
                             os.makedirs(recon_folder, exist_ok=True)
-                            plt.savefig(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
-                            plt.close()
+                            #plt.savefig(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
+                            pil.save(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
+                            #plt.close()
         for k in raw_state_dict_orig.keys():
             raw_state_dict[k] = raw_state_dict_orig[k]
         network.load_state_dict(raw_state_dict)
