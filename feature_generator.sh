@@ -16,7 +16,6 @@ sub_folder="up_16_32_64"
 file_name="Finetune_segment_head_with_featuregenerator"
 # --use_instance_norm
 # --binary_test
-
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
