@@ -39,79 +39,14 @@ def evaluation_check(segmentation_head, dataloader, device, text_encoder, unet, 
             controller.reset()
             q_dict = {}
             for layer in args.trg_layer_list:
-                query_ = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                res = int(query_.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads(query_)  # 1, res, res, dim
-                _, dim, res, res = reshaped_query.shape
-
-                q = reshaped_query.permute(0, 2, 3, 1).contiguous().view(1, res * res, dim).contiguous()
-                key = key_dict[layer][0]  # head, pix_num, dim
-                attn_map = torch.bmm(q,
-                                     key.transpose(-1, -2))  # 1, pix_num, sen_len
-                # what about use just short length
+                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 if res not in q_dict:
                     q_dict[res] = []
-                q_dict[res].append(reshaped_query)  # 1, res, res, dim
-                attn_map_dict[res] = attn_map
-            for k_res in q_dict.keys():
-                query_list = q_dict[k_res]
-                q_dict[k_res] = torch.cat(query_list, dim=1)
+                q_dict[res].append(reshaped_query)
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
-
-            # 1, 16*16, 77
-            # 1, 32*32, 77
-            # 1, 64*64, 77
-
-            def upscaling(attn_map):
-                b, pix_num, sen_len = attn_map.shape
-                res = int(pix_num ** 0.5)
-                attn_map = attn_map.view(b, res, res, sen_len)
-                # 2d upscale
-                attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
-                # [b, res, res, sen_len] -> [b, res*res, sen_len]
-                return attn_map.view(b, -1, sen_len)
-
-            attn_map_16_out = upscaling(upscaling(attn_map_16))
-            attn_map_32_out = upscaling(attn_map_32)
-
-            attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64],
-                                     dim=-1)  # batch, pix_num, sen_len*3
-
-            res_group_num = 3
-            chunk = attn_map_cat.shape[-1] // res_group_num  # 77
-            class_dict = {}
-
-            for group_idx in range(res_group_num):
-                for chunk_i in range(chunk):
-                    map_chunk = attn_map_cat[:, :, group_idx * chunk_i].squeeze()  # batch, pix_num, 1
-                    if chunk_i not in class_dict.keys():
-                        class_dict[chunk_i] = []
-                    if map_chunk.dim() == 1:
-                        map_chunk = map_chunk.unsqueeze(0)
-                    if map_chunk.dim() == 2:
-                        map_chunk = map_chunk.unsqueeze(-1)
-                    class_dict[chunk_i].append(map_chunk)
-
-            for class_idx in class_dict.keys():
-                # 0, ..., 76
-                final = torch.cat(class_dict[class_idx], dim=-1)  # batch, pix_num, 3
-                b, pix_num, sen_len = final.shape
-                res = int(pix_num ** 0.5)
-                final = final.view(b, res, res, sen_len)
-                class_dict[class_idx] = final
-
-            seg_map_dict = {}
-            seg_map_list = []
-            for i, head in enumerate(head_list):
-                token_idx = list(class_dict.keys())[i]
-                class_map = class_dict[token_idx].permute(0, 3, 1, 2)  # Batch, 3, res, res
-                seg_map = head(class_map)  # Batch, 3, 128, 128
-                seg_map_dict[token_idx] = seg_map
-                if token_idx < 4:
-                    seg_map_list.append(seg_map)
-            masks_pred = torch.cat(seg_map_list, dim=1)  # Batch, 4, 128, 128
-
+            masks_pred = segmentation_head(x16_out, x32_out, x64_out)
             #######################################################################################################################
             # [1] pred
             class_num = masks_pred.shape[1]  # 4
