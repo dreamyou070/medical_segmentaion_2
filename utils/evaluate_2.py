@@ -14,7 +14,7 @@ from ignite.engine import *
 from ignite.handlers import *
 from ignite.metrics import *
 import torch.nn.functional as F
-
+from torch import nn
 def eval_step(engine, batch):
     return batch
 @torch.inference_mode()
