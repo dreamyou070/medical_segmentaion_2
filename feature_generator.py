@@ -26,7 +26,7 @@ from model.autodecoder import AutoencoderKL
 from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from diffusers import DiagonalGaussianDistribution
+from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 
 def main(args):
 
