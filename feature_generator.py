@@ -17,7 +17,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
+from utils.evaluate_3 import evaluation_check
 from model.pe import AllPositionalEmbedding
 from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
@@ -173,7 +173,7 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-
+        """
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
@@ -235,7 +235,7 @@ def main(args):
                 # masks_pred = Batch, Class_num, H, W
                 if args.deactivating_loss:
                     eps = 1e-15
-                    """ background have not many to train """
+                    # background have not many to train 
                     deactivating_loss = []
                     pred_prob = torch.softmax(masks_pred, dim=1)
                     pred_prob = pred_prob.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4
@@ -294,6 +294,13 @@ def main(args):
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
 
+            save_model(args,
+                      saving_folder='decoder',
+                      saving_name=f'decoder-{saving_epoch}.pt',
+                      unwrapped_nw=accelerator.unwrap_model(decoder_model),
+                      save_dtype=save_dtype)
+        """
+
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
         loader = test_dataloader
@@ -302,7 +309,7 @@ def main(args):
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            text_encoder, unet, vae, controller, weight_dtype,
-                                                           position_embedder, args)
+                                                           position_embedder, decoder_model, epoch, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')
