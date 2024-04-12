@@ -28,4 +28,4 @@ def call_dataset(args) :
     test_dataloader = torch.utils.data.DataLoader(test_dataset,
                                                   batch_size=args.batch_size,
                                                   shuffle=False)
-    return train_dataloader, test_dataloader
+    return train_dataloader, test_dataloader, tokenizer

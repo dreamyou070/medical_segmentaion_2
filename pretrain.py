@@ -35,7 +35,7 @@ def main(args):
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
-    train_dataloader, test_dataloader = call_dataset(args)
+    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
 
     print(f'\n step 3. preparing accelerator')
     accelerator = prepare_accelerator(args)
@@ -136,7 +136,15 @@ def main(args):
                            'sample_sampler': 'ddim',
                            'enum': 0}
             from utils.sampling import sample_images
-            sample_images(args, prompt_dict =prompt_dict)
+            sample_images(args=args,
+                          epoch = epoch + 1,
+                          steps = global_step,
+                          device = accelerator.device,
+                          vae=vae,
+                          tokenizer=tokenizer,
+                          text_encoder=text_encoder,
+                          unet=unet,
+                          prompt_dict =prompt_dict)
 
     accelerator.end_training()
 
