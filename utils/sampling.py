@@ -14,7 +14,7 @@ from diffusers import (
     KDPM2DiscreteScheduler,
     KDPM2AncestralDiscreteScheduler,
     AutoencoderKL,)
-from lpw_diffusion import StableDiffusionLongPromptWeightingPipeline
+from utils.lpw_diffusion import StableDiffusionLongPromptWeightingPipeline
 import os
 import torch
 import time
