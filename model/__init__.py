@@ -37,6 +37,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     vae = vae.to(accelerator.device, dtype=weight_dtype)
     vae.eval()
     if args.network_weights is not None :
+        print(f'loading network weights')
         info = network.load_weights(args.network_weights)
     network.to(weight_dtype)
 
