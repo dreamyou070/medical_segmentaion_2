@@ -8,6 +8,16 @@ from torchvision import transforms
 import cv2
 from tensorflow.keras.utils import to_categorical
 
+class_map = {0: ['b','brain'],
+             1: ['n','non-enhancing tumor core'],
+             2: ['e','edema'],
+             3: ['t','enhancing tumor'],}
+
+base_prompts = ['this is a picture of ',
+                'this is a picture of a ',
+                'this is a picture of an ',
+                'this is a picture of the ',
+                'this picture is of ',]
 
 def passing_mvtec_argument(args):
     global argument
@@ -74,7 +84,6 @@ class TrainDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
-                 caption: str = "brain",
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -97,7 +106,6 @@ class TrainDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.caption = caption
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -106,8 +114,6 @@ class TrainDataset_Seg(Dataset):
         self.n_classes = n_classes
         self.mask_res = mask_res
         self.use_data_aug = use_data_aug
-
-
 
     def __len__(self):
         return len(self.image_paths)
@@ -167,6 +173,8 @@ class TrainDataset_Seg(Dataset):
         if self.caption == 'brain':
             gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
 
+        class_es = np.unique(gt_arr)
+
         if argument.binary_test :
             gt_arr = np.where(gt_arr==1, 1, 0)
 
@@ -183,7 +191,12 @@ class TrainDataset_Seg(Dataset):
         gt_flat = gt_arr.flatten() # 128*128
 
         # [3] caption
-        input_ids, attention_mask = self.get_input_ids(self.caption)  # input_ids = [77]
+        caption = base_prompts[np.random.randint(0, len(base_prompts))]
+        for i, class_idx in enumerate(class_es):
+            caption += class_map[class_idx][0]
+            if i < len(class_es) - 1:
+                caption += ', '
+        input_ids, attention_mask = self.get_input_ids(caption)  # input_ids = [77]
 
         return {'image': img,  # [3,512,512]
                 "gt": gt,                      # [3,256,256]
