@@ -17,7 +17,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils import get_noise_noisy_latents_and_timesteps
-
+from utils.sampling import sample_images
 
 def main(args):
 
@@ -135,7 +135,7 @@ def main(args):
                            'prompt': text_prompt,
                            'sample_sampler': 'ddim',
                            'enum': 0}
-            from utils.sampling import sample_images
+
             sample_images(accelerator=accelerator,
                           args=args,
                           epoch = epoch ,

@@ -14,8 +14,8 @@ from diffusers import (
     HeunDiscreteScheduler,
     KDPM2DiscreteScheduler,
     KDPM2AncestralDiscreteScheduler,
-    AutoencoderKL,
-)
+    AutoencoderKL,)
+
 import os
 import torch
 import time
@@ -164,6 +164,7 @@ def sample_image_inference(
 
 def sample_images(*args, **kwargs):
     return sample_images_common(StableDiffusionPipeline, *args, **kwargs)
+
 def sample_images_common(
     pipe_class,
     accelerator: Accelerator,
@@ -196,16 +197,17 @@ def sample_images_common(
     default_scheduler = get_my_scheduler(sample_sampler=args.sample_sampler,
                                          v_parameterization=args.v_parameterization,)
 
-    pipeline = pipe_class(
-        text_encoder=text_encoder,
-        vae=vae,
-        unet=unet,
-        tokenizer=tokenizer,
-        scheduler=default_scheduler,
-        safety_checker=None,
-        feature_extractor=None,
-        requires_safety_checker=False,)
+    # make pipeline, StableDiffusionPipeline
+    pipeline = pipe_class(vae=vae,
+                          text_encoder=text_encoder,
+                          tokenizer=tokenizer,
+                          unet=unet,
+                          scheduler=default_scheduler,
+                          safety_checker=None,
+                          feature_extractor=None,
+                          requires_safety_checker=False,)
     pipeline.to(distributed_state.device)
+
     save_dir = args.output_dir + "/sample"
     os.makedirs(save_dir, exist_ok=True)
 
@@ -221,9 +223,15 @@ def sample_images_common(
 
     #if distributed_state.num_processes <= 1:
         # If only one device is available, just use the original prompt list. We don't need to care about the distribution of prompts.
-    with torch.no_grad():
-        sample_image_inference(
-                accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet)
+    output = pipeline(prompt = prompt_dict["prompt"],
+                      num_inference_steps = prompt_dict["sample_steps"],
+                      guidance_scale = prompt_dict["scale"],
+                      negative_prompt = prompt_dict.get("negative_prompt"),
+                      height = prompt_dict.get("height", 512),
+                      width = prompt_dict.get("width", 512))
+    result_img = output.image
+    print(f'result_img : {type(result_img)}')
+
 
     """
     else:
