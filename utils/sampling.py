@@ -19,11 +19,27 @@ from diffusers import (
 import os
 import torch
 import time
+import gc
+
 # scheduler:
 SCHEDULER_LINEAR_START = 0.00085
 SCHEDULER_LINEAR_END = 0.0120
 SCHEDULER_TIMESTEPS = 1000
 SCHEDLER_SCHEDULE = "scaled_linear"
+
+def clean_memory_on_device(device: torch.device):
+    r"""
+    Clean memory on the specified device, will be called from training scripts.
+    """
+    gc.collect()
+
+    # device may "cuda" or "cuda:0", so we need to check the type of device
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    if device.type == "xpu":
+        torch.xpu.empty_cache()
+    if device.type == "mps":
+        torch.mps.empty_cache()
 
 def get_my_scheduler(
     *,
