@@ -228,7 +228,8 @@ def main(args):
                 remain_num = args.n_classes - masks_pred.shape[1]
                 masks_pred = torch.cat([masks_pred,
                                         torch.zeros(masks_pred.shape[0], remain_num, masks_pred.shape[2],
-                                                    masks_pred.shape[3])], dim=1)
+                                                    masks_pred.shape[3]).to(device=masks_pred.device,
+                                                                            dtype=weight_dtype)], dim=1)
             print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
             """ using cross attntion """
             if args.use_dice_ce_loss:
