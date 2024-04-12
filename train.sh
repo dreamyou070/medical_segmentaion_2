@@ -17,7 +17,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/pretrain/pretrain_model/lora-000008.safetensors" \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/test" \
- --network_dim 128 --network_alpha 64 \
+ --network_dim 64 --network_alpha 4 \
  --resize_shape 512 \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
