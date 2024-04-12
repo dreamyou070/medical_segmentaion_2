@@ -181,10 +181,23 @@ def main(args):
                         x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
                         hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
                         # ----------------------------------------------------------------------------------------------
+                        # [3.0] vae decode
+                        posterior = vae.encode(image).latent_dist
+                        #mean, logvar = posterior.mean, posterior.logvar
+                        for i in range(10):
+                            x = posterior.sample()
+                            reconstruction = vae.decode(x)
+                            reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
+                            np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
+                            pil = Image.fromarray(np_img)
+                            pil.save(f'{check_base_folder}/original_vae_{i}.png')
+
+                        # ----------------------------------------------------------------------------------------------
                         # [3] stochastic sampling
                         z_mu, z_sigma = decoder_model.encode(hidden_latent)
                         trial_times = 10
                         for i in range(trial_times) :
+
                             z = decoder_model.sampling(z_mu, z_sigma)
                             reconstruction = decoder_model.decode(z)
                             # there is even minus value
