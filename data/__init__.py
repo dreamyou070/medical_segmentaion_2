@@ -8,12 +8,9 @@ def call_dataset(args) :
     tokenizer = load_tokenizer(args)
 
     # [2] train & test dataset
-    TrainDataset_Seg = TrainDataset_Seg
-
     train_dataset = TrainDataset_Seg(root_dir=args.train_data_path,
                                      resize_shape=[args.resize_shape,args.resize_shape],
                                      tokenizer=tokenizer,
-                                     caption=args.trigger_word,
                                      latent_res=args.latent_res,
                                      n_classes = args.n_classes,
                                      mask_res = args.mask_res,
@@ -21,7 +18,6 @@ def call_dataset(args) :
     test_dataset = TrainDataset_Seg(root_dir=args.test_data_path,
                                     resize_shape=[args.resize_shape,args.resize_shape],
                                     tokenizer=tokenizer,
-                                    caption=args.trigger_word,
                                     latent_res=args.latent_res,
                                     n_classes=args.n_classes,
                                     mask_res = args.mask_res,
