@@ -13,7 +13,7 @@ trigger_word="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_with_featuregenerator_using_original_vae"
+file_name="Finetune_segment_head_high_feature"
 # --use_instance_norm
 # --binary_test
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
@@ -37,4 +37,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --mask_res 256 \
  --use_batchnorm \
  --use_dice_ce_loss \
- --optimizer_args weight_decay=0.00005
+ --optimizer_args weight_decay=0.00005 \
+ --independent_decoder

@@ -470,8 +470,7 @@ class AutoencoderKL(nn.Module):
     """
 
     def __init__(self,
-                 spatial_dims: int,
-                in_channels: int = 1,
+                spatial_dims: int,
                 out_channels: int = 1,
                 num_res_blocks: Sequence[int] | int = (2, 2, 2, 2),
                 num_channels: Sequence[int] = (32, 64, 64, 64),

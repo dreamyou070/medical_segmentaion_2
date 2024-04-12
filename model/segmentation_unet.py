@@ -103,7 +103,8 @@ class SemanticSeg(nn.Module):
                  bilinear=False,
                  use_batchnorm=True,
                  use_instance_norm = True,
-                 mask_res = 128,):
+                 mask_res = 128,
+                 high_latent_feature = False):
 
         super(SemanticSeg, self).__init__()
 
@@ -120,7 +121,9 @@ class SemanticSeg(nn.Module):
             self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2))
-        self.feature_generator = nn.Conv2d(320, 4, kernel_size=3, padding=1)
+        self.high_latent_feature = high_latent_feature
+        if not self.high_latent_feature :
+            self.feature_generator = nn.Conv2d(320, 4, kernel_size=3, padding=1)
         self.outc = OutConv(160, n_classes)
 
 
@@ -128,7 +131,10 @@ class SemanticSeg(nn.Module):
 
         x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
         x = self.up2(x, x64_out)       # 1,320,64,64
-        gen_feature = self.feature_generator(x)
+        if self.high_latent_feature :
+            gen_feature = x
+        else :
+            gen_feature = self.feature_generator(x)
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
         return gen_feature, logits

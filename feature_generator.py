@@ -73,11 +73,11 @@ def main(args):
     from model.autodecoder import AutoencoderKL
     if args.independent_decoder :
         decoder_model = AutoencoderKL(spatial_dims=2,
-                                      in_channels=1,
                                       out_channels=3,
-                                      num_res_blocks=(2, 2, 2, 2), num_channels=(32, 64, 64, 64),
+                                      num_res_blocks=(2, 2, 2, 2),
+                                      num_channels=(32, 64, 64, 64),
                                       attention_levels=(False, False, True, True),
-                                      latent_channels=4,
+                                      latent_channels=320,
                                       norm_num_groups=32, norm_eps=1e-6,
                                       with_encoder_nonlocal_attn=True, with_decoder_nonlocal_attn=True,
                                       use_flash_attention=False,
@@ -216,6 +216,7 @@ def main(args):
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
             generator_loss = recons_loss + kl_weight * kl_loss
             # do am i have to input the random noise ... ?
+            # [2] discriminator task
 
             # [1] segmentation task
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
