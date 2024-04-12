@@ -136,8 +136,7 @@ def main(args):
         segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
-    class_0_seg, class_1_seg, class_2_seg, class_3_seg = accelerator.prepare(class_0_seg, class_1_seg, class_2_seg, class_3_seg)
-
+    
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     if args.use_position_embedder:
