@@ -31,4 +31,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --aggregation_model_c \
  --n_classes 4 \
  --mask_res 256 \
+ --sample_prompts "medical.txt"
  --optimizer_args weight_decay=0.00005

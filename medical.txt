@@ -1,0 +1,1 @@
+"this is a picture of a b, n, e, t" --w 512 --h 512 --d 42 --s 30 --n "bad, ugly, poor image" --ss "ddim" --

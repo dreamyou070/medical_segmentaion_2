@@ -123,29 +123,8 @@ def main(args):
                        save_dtype=save_dtype)
         """
         # [evaluation / inference]
-        text_prompt = 'this is a picture of a b, n, e, t'
-        with torch.no_grad():
-            prompt_dict = {'negative_prompt': 'bad, ugly image',
-                           'sample_steps': 30,
-                           'width': 512,
-                           'height': 512,
-                           'scale': 7.5,
-                           'seed': None,
-                           'controlnet_image': None,
-                           'prompt': text_prompt,
-                           'sample_sampler': 'ddim',
-                           'enum': 0}
-
-            sample_images(accelerator=accelerator,
-                          args=args,
-                          epoch = epoch ,
-                          steps = global_step,
-                          device = accelerator.device,
-                          vae=vae,
-                          tokenizer=tokenizer,
-                          text_encoder=text_encoder,
-                          unet=unet,
-                          prompt_dict =prompt_dict)
+        from utils.sampling import sample_images
+        sample_images(accelerator, args, epoch, global_step, vae, tokenizer, text_encoder, unet)
 
     accelerator.end_training()
 
@@ -258,6 +237,8 @@ if __name__ == "__main__":
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--v_parameterization", action='store_true')
     parser.add_argument("--sample_sampler", type=str, default = 'ddim',)
+    parser.add_argument("--sample_prompts", type=str,
+                        default=0)
 
     args = parser.parse_args()
     unet_passing_argument(args)

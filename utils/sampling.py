@@ -2,7 +2,6 @@ from diffusers import StableDiffusionPipeline
 import argparse
 from accelerate import Accelerator, PartialState
 from diffusers import (
-    StableDiffusionPipeline,
     DDPMScheduler,
     EulerAncestralDiscreteScheduler,
     DPMSolverMultistepScheduler,
@@ -15,12 +14,13 @@ from diffusers import (
     KDPM2DiscreteScheduler,
     KDPM2AncestralDiscreteScheduler,
     AutoencoderKL,)
-
+from lpw_diffusion import StableDiffusionLongPromptWeightingPipeline
 import os
 import torch
 import time
 import gc
-
+import toml, json
+import re
 # scheduler:
 SCHEDULER_LINEAR_START = 0.00085
 SCHEDULER_LINEAR_END = 0.0120
@@ -179,7 +179,61 @@ def sample_image_inference(
         pass
 
 def sample_images(*args, **kwargs):
-    return sample_images_common(StableDiffusionPipeline, *args, **kwargs)
+    return sample_images_common(StableDiffusionLongPromptWeightingPipeline, *args, **kwargs)
+
+def line_to_prompt_dict(line: str) -> dict:
+    # subset of gen_img_diffusers
+    prompt_args = line.split(" --")
+    prompt_dict = {}
+    prompt_dict["prompt"] = prompt_args[0]
+
+    for parg in prompt_args:
+        try:
+            m = re.match(r"w (\d+)", parg, re.IGNORECASE)
+            if m:
+                prompt_dict["width"] = int(m.group(1))
+                continue
+
+            m = re.match(r"h (\d+)", parg, re.IGNORECASE)
+            if m:
+                prompt_dict["height"] = int(m.group(1))
+                continue
+
+            m = re.match(r"d (\d+)", parg, re.IGNORECASE)
+            if m:
+                prompt_dict["seed"] = int(m.group(1))
+                continue
+
+            m = re.match(r"s (\d+)", parg, re.IGNORECASE)
+            if m:  # steps
+                prompt_dict["sample_steps"] = max(1, min(1000, int(m.group(1))))
+                continue
+
+            m = re.match(r"l ([\d\.]+)", parg, re.IGNORECASE)
+            if m:  # scale
+                prompt_dict["scale"] = float(m.group(1))
+                continue
+
+            m = re.match(r"n (.+)", parg, re.IGNORECASE)
+            if m:  # negative prompt
+                prompt_dict["negative_prompt"] = m.group(1)
+                continue
+
+            m = re.match(r"ss (.+)", parg, re.IGNORECASE)
+            if m:
+                prompt_dict["sample_sampler"] = m.group(1)
+                continue
+
+            m = re.match(r"cn (.+)", parg, re.IGNORECASE)
+            if m:
+                prompt_dict["controlnet_image"] = m.group(1)
+                continue
+
+        except ValueError as ex:
+            print(f"Exception in parsing / 解析エラー: {parg}")
+
+    return prompt_dict
+
 
 def sample_images_common(
     pipe_class,
@@ -187,15 +241,30 @@ def sample_images_common(
     args: argparse.Namespace,
     epoch,
     steps,
-    device,
     vae,
     tokenizer,
     text_encoder,
     unet,
     prompt_replacement=None,
     controlnet=None,
-    prompt_dict=None,):
+):
+    """
+    StableDiffusionLongPromptWeightingPipelineの改造版を使うようにしたので、clip skipおよびプロンプトの重みづけに対応した
+    """
 
+    if steps == 0:
+        if not args.sample_at_first:
+            return
+    else:
+        if args.sample_every_n_steps is None and args.sample_every_n_epochs is None:
+            return
+        if args.sample_every_n_epochs is not None:
+            # sample_every_n_steps は無視する
+            if epoch is None or epoch % args.sample_every_n_epochs != 0:
+                return
+        else:
+            if steps % args.sample_every_n_steps != 0 or epoch is not None:  # steps is not divisible or end of epoch
+                return
 
     distributed_state = PartialState()  # for multi gpu distributed inference. this is a singleton, so it's safe to use it here
 
@@ -209,25 +278,49 @@ def sample_images_common(
     else:
         text_encoder = accelerator.unwrap_model(text_encoder)
 
+    # read prompts
+    if args.sample_prompts.endswith(".txt"):
+        with open(args.sample_prompts, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
+    elif args.sample_prompts.endswith(".toml"):
+        with open(args.sample_prompts, "r", encoding="utf-8") as f:
+            data = toml.load(f)
+        prompts = [dict(**data["prompt"], **subset) for subset in data["prompt"]["subset"]]
+    elif args.sample_prompts.endswith(".json"):
+        with open(args.sample_prompts, "r", encoding="utf-8") as f:
+            prompts = json.load(f)
+
     # schedulers: dict = {}  cannot find where this is used
     default_scheduler = get_my_scheduler(sample_sampler=args.sample_sampler,
                                          v_parameterization=args.v_parameterization,)
 
-    # make pipeline, StableDiffusionPipeline
-    pipeline = pipe_class(vae=vae,
-                          text_encoder=text_encoder,
-                          tokenizer=tokenizer,
-                          unet=unet,
-                          scheduler=default_scheduler,
-                          safety_checker=None,
-                          feature_extractor=None,
-                          requires_safety_checker=False,)
+    pipeline = pipe_class(
+        text_encoder=text_encoder,
+        vae=vae,
+        unet=unet,
+        tokenizer=tokenizer,
+        scheduler=default_scheduler,
+        safety_checker=None,
+        feature_extractor=None,
+        requires_safety_checker=False,
+        clip_skip=args.clip_skip,
+    )
     pipeline.to(distributed_state.device)
-
     save_dir = args.output_dir + "/sample"
     os.makedirs(save_dir, exist_ok=True)
 
     # preprocess prompts
+    for i in range(len(prompts)):
+        prompt_dict = prompts[i]
+        if isinstance(prompt_dict, str):
+            prompt_dict = line_to_prompt_dict(prompt_dict)
+            prompts[i] = prompt_dict
+        assert isinstance(prompt_dict, dict)
+
+        # Adds an enumerator to the dict based on prompt position. Used later to name image files. Also cleanup of extra data in original prompt dict.
+        prompt_dict["enum"] = i
+        prompt_dict.pop("subset", None)
 
     # save random state to restore later
     rng_state = torch.get_rng_state()
@@ -237,27 +330,13 @@ def sample_images_common(
     except Exception:
         pass
 
-    #if distributed_state.num_processes <= 1:
+    if distributed_state.num_processes <= 1:
         # If only one device is available, just use the original prompt list. We don't need to care about the distribution of prompts.
-    latents = pipeline(prompt = prompt_dict["prompt"],
-                      num_inference_steps = prompt_dict["sample_steps"],
-                      guidance_scale = prompt_dict["scale"],
-                      negative_prompt = prompt_dict.get("negative_prompt"),
-                      height = prompt_dict.get("height", 512),
-                      width = prompt_dict.get("width", 512))
-    with torch.cuda.device(torch.cuda.current_device()):
-        torch.cuda.empty_cache()
-    image = pipeline.latents_to_image(latents)[0]
-    ts_str = time.strftime("%Y%m%d%H%M%S", time.localtime())
-    num_suffix = f"e{epoch:06d}" if epoch is not None else f"{steps:06d}"
-    seed_suffix = "" if args.seed is None else f"_{args.seed}"
-    i: int = prompt_dict["enum"]
-    img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
-    image.save(os.path.join(save_dir, img_filename))
-
-
-
-    """
+        with torch.no_grad():
+            for prompt_dict in prompts:
+                sample_image_inference(
+                    accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
+                )
     else:
         # Creating list with N elements, where each element is a list of prompt_dicts, and N is the number of processes available (number of devices available)
         # prompt_dicts are assigned to lists based on order of processes, to attempt to time the image creation time to match enum order. Probably only works when steps and sampler are identical.
@@ -271,7 +350,7 @@ def sample_images_common(
                     sample_image_inference(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                     )
-    """
+
     # clear pipeline and cache to reduce vram usage
     del pipeline
 
