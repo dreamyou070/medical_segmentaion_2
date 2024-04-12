@@ -44,6 +44,7 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+
     noise_scheduler = DDPMScheduler(beta_start=0.00085,
                                     beta_end=0.012,
                                     beta_schedule="scaled_linear",
@@ -52,17 +53,15 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = []
-    trainable_params.append({"params": text_encoder.parameters(), "lr": args.text_encoder_lr})
-    trainable_params.append({"params": unet.parameters(), "lr": args.unet_lr})
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 8. model to device')
-    unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler, network = \
+            accelerator.prepare(unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler, network)
 
     print(f'\n step 9. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
@@ -71,8 +70,6 @@ def main(args):
     loss_list = []
 
     print(f'text_encoder device: {text_encoder.device}')
-
-
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
@@ -121,15 +118,10 @@ def main(args):
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
             save_model(args,
-                       saving_folder='pretrain_unet_model',
-                       saving_name=f'unet-{saving_epoch}.safetensors',
-                       unwrapped_nw=accelerator.unwrap_model(unet),
+                       saving_folder='pretrain_model',
+                       saving_name=f'lora-{saving_epoch}.safetensors',
+                       unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
-            save_model(args,
-                      saving_folder='pretrain_text_encoder_model',
-                      saving_name=f'text_encoder-{saving_epoch}.safetensors',
-                      unwrapped_nw=accelerator.unwrap_model(text_encoder),
-                      save_dtype=save_dtype)
 
     accelerator.end_training()
 
