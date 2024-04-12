@@ -211,6 +211,9 @@ def main(args):
             generator_loss = recons_loss + kl_weight * kl_loss
             print(f'generator_loss = {generator_loss}')
 
+            # do am i have to input the random noise ... ?
+            
+
 
 
 
