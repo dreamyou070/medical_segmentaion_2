@@ -204,10 +204,25 @@ def main(args):
                 attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
                 # class_num
                 attn_map = attn_map[:,:,args.n_classes]                          # 1, pix_num, 4
-                # what about use just short length
-                if res not in q_dict:
-                    q_dict[res] = []
-                q_dict[res].append(reshaped_query) # 1, res, res, dim
+                original_res = int(attn_map.shape[1] ** 0.5)                     # trg_res = 64
+                target_res = 64
+                upscale_factor = target_res // original_res
+                # upscaling
+                attn_map = nn.functional.interpolate(attn_map, scale_factor=upscale_factor, mode='bilinear', align_corners=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 attn_map_dict[res] = attn_map
             for k_res in q_dict.keys():
                 query_list = q_dict[k_res]
