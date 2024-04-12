@@ -186,7 +186,8 @@ def main(args):
                         #mean, logvar = posterior.mean, posterior.logvar
                         for i in range(10):
                             x = posterior.sample()
-                            reconstruction = vae.decode(x)
+                            reconstruction = vae.decode(x).sample
+                            print(f'original decoder output = {reconstruction.shape}')
                             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
                             np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
                             pil = Image.fromarray(np_img)
