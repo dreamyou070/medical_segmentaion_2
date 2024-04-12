@@ -125,8 +125,6 @@ def main(args):
     if args.gradient_checkpointing:
         unet.train()
         position_embedder.train()
-        if args.vae_train :
-            vae.train()
         segmentation_head.train()
         for t_enc in text_encoders:
             t_enc.train()
@@ -140,7 +138,7 @@ def main(args):
             t_enc.eval()
     del t_enc
     network.prepare_grad_etc(text_encoder, unet)
-    
+
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
     register_attention_control(unet, controller)
@@ -168,12 +166,9 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            if args.vae_train :
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            else :
-                with torch.no_grad():
+            with torch.no_grad():
                     # how does it do ?
-                    latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type=position_embedder)
