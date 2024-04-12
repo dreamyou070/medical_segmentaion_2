@@ -208,7 +208,9 @@ def main(args):
                 query = reshape_batch_dim_to_heads_3D_3D(query_dict[layer][0])   # 1, pix_num, dim
                 key = key_dict[layer][0]                                         # head, pix_num, dim
                 attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
-                attn_map = attn_map[:,:, :args.n_classes]                        # 1, pix_num, 4
+                # key_word_index ---------------------------------------------------------------------------------------
+                attn_map = attn_map[:, :, key_word_index]
+                # ------------------------------------------------------------------------------------------------------
                 original_res = int(attn_map.shape[1] ** 0.5)                     # trg_res = 64
                 target_res = 64
                 upscale_factor = target_res // original_res
@@ -221,7 +223,12 @@ def main(args):
                 else :
                     attn_maps += attn_map
             # attn_maps = [batch, 4, 64, 64] (without segmentation head)
-            masks_pred = torch.softmax(attn_maps, dim=1) # [1,4,256,256]
+            masks_pred = torch.softmax(attn_maps, dim=1)  # [1,4,256,256]
+            if masks_pred.shape[1] < args.n_classes:
+                remain_num = args.n_classes - masks_pred.shape[1]
+                masks_pred = torch.cat([masks_pred,
+                                        torch.zeros(masks_pred.shape[0], remain_num, masks_pred.shape[2],
+                                                    masks_pred.shape[3])], dim=1)
             print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
             """ using cross attntion """
             if args.use_dice_ce_loss:

@@ -14,7 +14,7 @@ base_prompts = ['this is a picture of ',
                 'this is a picture of an ',
                 'this is a picture of the ',
                 'this picture is of ', ]
-
+"""
 TOKENIZER_PATH = "openai/clip-vit-large-patch14"
 
 def load_tokenizer(args):
@@ -62,4 +62,9 @@ def get_target_index(target_words, caption):
             target_word_index.append(idx)
     return target_word_index
 # list extend
+"""
+attn_maps = torch.randn(1, 2, 256,256)
+n_classes = 4
 
+
+print(masks_pred.shape) # [1,4,256,256]
