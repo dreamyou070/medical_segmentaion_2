@@ -269,7 +269,7 @@ def main(args):
             seg_map_list = []
             for i, head in enumerate(head_list):
                 token_idx = list(class_dict.keys())[i]
-                class_map = class_dict[token_idx].permute(0,3,1,2)     # Batch, 3, res, res
+                class_map = class_dict[token_idx].permute(0,3,1,2).contiguous()     # Batch, 3, res, res
                 seg_map = head(class_map)       # Batch, 3, 128, 128
                 seg_map_dict[token_idx] = seg_map
                 if token_idx < 4 :
