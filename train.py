@@ -136,7 +136,7 @@ def main(args):
         segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
-    
+
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     if args.use_position_embedder:
@@ -167,7 +167,6 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    head_list = [class_0_seg, class_1_seg, class_2_seg, class_3_seg]
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -273,26 +272,6 @@ def main(args):
                     deactivating_loss = torch.stack(deactivating_loss).sum()
                     loss += deactivating_loss
                 loss = loss.mean()
-
-            if args.contrastive_learning :
-                # out = [batch, C, H, W]
-                gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-                class_num = gt.shape[1]
-                model_dim = out.shape[1]
-                class_wise_mean = []
-                for i in range(class_num):
-                    pixel_num = gt[:, i, :, :].sum()
-                    gt_map = gt[:, i, :, :].repeat(1, model_dim, 1, 1)  # 0 = non, 1 = class pixel
-                    classwise_map = gt_map * out
-                    if pixel_num != 0:
-                        class_mean_vector = classwise_map.sum(dim=(-2, -1)) / pixel_num
-                        class_wise_mean.append(class_mean_vector.squeeze())
-                class_matrix = torch.stack(class_wise_mean, dim=0)  # class_num, model_dim
-                contrastive_matrix = torch.matmul(class_matrix, class_matrix.t())
-                class_n = class_matrix.shape[0]
-                negitive_score = ((1 - torch.eye(class_n).to(class_matrix.device)) * contrastive_matrix).mean()
-                loss += negitive_score
-                loss_dict['contrastive_loss'] = negitive_score.item()
 
             loss = loss.to(weight_dtype)
             current_loss = loss.detach().item()
