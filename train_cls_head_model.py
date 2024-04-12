@@ -11,13 +11,13 @@ from model import call_model_package
 from model.segmentation_unet import Segmentation_Head_a, Segmentation_Head_b, Segmentation_Head_c, Segmentation_Head_d
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
+from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate_2 import evaluation_check as evaluation_check_2
+from utils.evaluate import evaluation_check
 from model.pe import AllPositionalEmbedding
 from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
@@ -25,7 +25,6 @@ from utils import get_noise_noisy_latents_and_timesteps
 
 
 def main(args):
-
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -40,7 +39,7 @@ def main(args):
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
-    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
+    train_dataloader, test_dataloader = call_dataset(args)
 
     print(f'\n step 3. preparing accelerator')
     accelerator = prepare_accelerator(args)
@@ -49,14 +48,19 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    position_embedder = None
-    if args.use_position_embedder:
-        position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
-                                                   do_semantic_position=args.do_semantic_position,)
-        if args.position_embedder_weights is not None:
-            position_embedder_state_dict = load_file(args.position_embedder_weights)
-            position_embedder.load_state_dict(position_embedder_state_dict)
-            position_embedder.to(dtype=weight_dtype)
+    noise_scheduler = DDPMScheduler(beta_start=0.00085,
+                                    beta_end=0.012,
+                                    beta_schedule="scaled_linear",
+                                    num_train_timesteps=1000,
+                                    clip_sample=False)
+    # [2] pe
+    position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
+                                               do_semantic_position=args.do_semantic_position,)
+
+    if args.position_embedder_weights is not None:
+        position_embedder_state_dict = load_file(args.position_embedder_weights)
+        position_embedder.load_state_dict(position_embedder_state_dict)
+        position_embedder.to(dtype=weight_dtype)
 
     if args.aggregation_model_a:
         segmentation_head_class = Segmentation_Head_a
@@ -68,25 +72,22 @@ def main(args):
         # total 3 channel all input
         segmentation_head_class = Segmentation_Head_d
 
-    segmentation_head = Segmentation_Head_d()
-    #x = torch.randn(1, 4, 64, 64)
-
-    #print(output.size())
-
-    #segmentation_head = segmentation_head_class(n_classes=args.n_classes,
-    #                                            mask_res=args.mask_res,
-    #                                            use_batchnorm=args.use_batchnorm,
-    #                                            use_instance_norm=args.use_instance_norm,
-    #                                            use_init_query=args.use_init_query,
-    #                                            attn_factor=args.attn_factor,)
+    segmentation_head = segmentation_head_class(n_classes=args.n_classes,
+                                                mask_res=args.mask_res,
+                                                use_batchnorm=args.use_batchnorm,
+                                                use_instance_norm=args.use_instance_norm,
+                                                use_init_query=args.use_init_query,
+                                                attn_factor=args.attn_factor,)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    #trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    if args.vae_train :
+        trainable_params.append({"params": vae.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -129,21 +130,35 @@ def main(args):
 
     print(f'\n step 8. model to device')
     if args.use_position_embedder:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
+        if args.vae_train :
+            vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
+                accelerator.prepare(vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+                                    test_dataloader, lr_scheduler, position_embedder)
+        else :
+            segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler, position_embedder)
     else:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+        if args.vae_train :
+            vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+                accelerator.prepare(vae, segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+                                    test_dataloader, lr_scheduler)
+        else :
+            segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
 
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
+    if args.vae_train :
+        vae = transform_models_if_DDP([vae])[0]
     if args.use_position_embedder:
         position_embedder = transform_models_if_DDP([position_embedder])[0]
     if args.gradient_checkpointing:
         unet.train()
         position_embedder.train()
+        if args.vae_train :
+            vae.train()
         segmentation_head.train()
         for t_enc in text_encoders:
             t_enc.train()
@@ -157,6 +172,8 @@ def main(args):
             t_enc.eval()
     del t_enc
     network.prepare_grad_etc(text_encoder, unet)
+    if not args.vae_train :
+        vae.to(accelerator.device, dtype=weight_dtype)
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -167,6 +184,7 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -175,11 +193,6 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-
-            # [1] get token
-            # torch to list
-            key_word_index = batch['key_word_index'][0]
-
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             if args.aggregation_model_d:
@@ -189,57 +202,55 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            with torch.no_grad():
+            if args.vae_train :
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+            else :
+                with torch.no_grad():
+                    # how does it do ?
+                    latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
+            if args.use_noise_regularization :
+                # For Generalize add small noise
+                noise, noisy_latents, timesteps = get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents, noise = None)
+                latents = noisy_latents
+
             with torch.set_grad_enabled(True):
-                if args.use_position_embedder:
-                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                         noise_type=position_embedder)
-                else:
-                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type=position_embedder)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
-            for i, layer in enumerate(args.trg_layer_list):
-                query = reshape_batch_dim_to_heads_3D_3D(query_dict[layer][0])   # 1, pix_num, dim
-                key = key_dict[layer][0]                                         # head, pix_num, dim
-                attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
-                # key_word_index ---------------------------------------------------------------------------------------
-                attn_map = attn_map[:, :, key_word_index]
-                # ------------------------------------------------------------------------------------------------------
-                original_res = int(attn_map.shape[1] ** 0.5)                     # trg_res = 64
-                target_res = 64
-                upscale_factor = target_res // original_res
-                # upscaling
-                original_map = attn_map.view(attn_map.shape[0], original_res, original_res, attn_map.shape[2]).permute(
-                    0, 3, 1, 2).contiguous()
-                attn_map = nn.functional.interpolate(original_map,
-                                                     scale_factor=upscale_factor,
-                                                     mode='bilinear', align_corners=False)
-                if i == 0 :
-                    attn_maps = attn_map
-                else :
-                    attn_maps += attn_map
-            # attn_maps = [batch, 4, 64, 64] (without segmentation head)
-            masks_pred = torch.softmax(attn_maps, dim=1)  # [1,4,256,256]
-            if masks_pred.shape[1] < args.n_classes:
-                remain_num = args.n_classes - masks_pred.shape[1]
-                masks_pred = torch.cat([masks_pred,
-                                        torch.zeros(masks_pred.shape[0], remain_num, masks_pred.shape[2],
-                                                    masks_pred.shape[3]).to(device=masks_pred.device,
-                                                                            dtype=weight_dtype)], dim=1) # 1,3,64,64
-            # upgrading (from 64 to 256)
-            masks_pred = segmentation_head(masks_pred)
-            """ using cross attntion """
+            q_dict = {}
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                reshaped_query = reshape_batch_dim_to_heads(query)  # 1, res, res, dim
+                if res not in q_dict:
+                    q_dict[res] = []
+                q_dict[res].append(reshaped_query)
+
+            for k_res in q_dict.keys():
+                query_list = q_dict[k_res]
+                q_dict[k_res] = torch.cat(query_list, dim=1)
+
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            if not args.use_init_query:
+                out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
+            else:
+                out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
+
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
+            masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
+
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
                                    target=batch['gt'].to(dtype=weight_dtype))
             else:
                 # [5.1] Multiclassification Loss
-                loss = loss_CE(masks_pred, gt_flat.squeeze().to(torch.long))  # 128*128
+                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
 
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred, gt_flat.squeeze().to(masks_pred.device))  # N
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
                 if args.use_monai_focal_loss:
                     focal_loss = focal_loss.mean()
                 loss += focal_loss
@@ -269,6 +280,26 @@ def main(args):
                     deactivating_loss = torch.stack(deactivating_loss).sum()
                     loss += deactivating_loss
                 loss = loss.mean()
+
+            if args.contrastive_learning :
+                # out = [batch, C, H, W]
+                gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
+                class_num = gt.shape[1]
+                model_dim = out.shape[1]
+                class_wise_mean = []
+                for i in range(class_num):
+                    pixel_num = gt[:, i, :, :].sum()
+                    gt_map = gt[:, i, :, :].repeat(1, model_dim, 1, 1)  # 0 = non, 1 = class pixel
+                    classwise_map = gt_map * out
+                    if pixel_num != 0:
+                        class_mean_vector = classwise_map.sum(dim=(-2, -1)) / pixel_num
+                        class_wise_mean.append(class_mean_vector.squeeze())
+                class_matrix = torch.stack(class_wise_mean, dim=0)  # class_num, model_dim
+                contrastive_matrix = torch.matmul(class_matrix, class_matrix.t())
+                class_n = class_matrix.shape[0]
+                negitive_score = ((1 - torch.eye(class_n).to(class_matrix.device)) * contrastive_matrix).mean()
+                loss += negitive_score
+                loss_dict['contrastive_loss'] = negitive_score.item()
 
             loss = loss.to(weight_dtype)
             current_loss = loss.detach().item()
@@ -311,18 +342,22 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
+            if args.vae_train :
+                save_model(args,
+                           saving_folder='vae',
+                           saving_name=f'vae-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(vae),
+                           save_dtype=save_dtype)
+
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
         loader = test_dataloader
         if args.check_training:
             print(f'test with training data')
             loader = train_dataloader
-
-        score_dict, confusion_matrix, _ = evaluation_check_2(segmentation_head,
-                                                             loader,
-                                                             accelerator.device,
-                                                             text_encoder, unet, vae, controller, weight_dtype,
-                                                             position_embedder, args)
+        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
+                                                           text_encoder, unet, vae, controller, weight_dtype,
+                                                           position_embedder, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')
@@ -458,10 +493,12 @@ if __name__ == "__main__":
     parser.add_argument("--max_timestep", type=int, default=200)
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--use_noise_regularization", action='store_true')
-    parser.add_argument("--use_cls_token", action='store_true')
+    parser.add_argument("--vae_train", action='store_true')
+    parser.add_argument("--contrastive_learning", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
+
     passing_mvtec_argument(args)
     main(args)
