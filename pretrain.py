@@ -70,6 +70,10 @@ def main(args):
     global_step = 0
     loss_list = []
 
+    print(f'text_encoder device: {text_encoder.device}')
+
+
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -79,6 +83,8 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
             with torch.set_grad_enabled(True):
+                input_txt = batch["input_ids"].to(device)
+                print(f'input_txt device: {input_txt.device}')
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             with torch.no_grad():
