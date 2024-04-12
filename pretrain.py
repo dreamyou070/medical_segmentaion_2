@@ -75,7 +75,7 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-
+        """
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
@@ -121,6 +121,22 @@ def main(args):
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
+        """
+        # [evaluation / inference]
+        text_prompt = 'this is a picture of a b, n, e, t'
+        with torch.no_grad():
+            prompt_dict = {'negative_prompt': 'bad, ugly image',
+                           'sample_steps': 30,
+                           'width': 512,
+                           'height': 512,
+                           'scale': 7.5,
+                           'seed': None,
+                           'controlnet_image': None,
+                           'prompt': text_prompt,
+                           'sample_sampler': 'ddim',
+                           'enum': 0}
+            from utils.sampling import sample_images
+            sample_images(args, prompt_dict =prompt_dict)
 
     accelerator.end_training()
 
