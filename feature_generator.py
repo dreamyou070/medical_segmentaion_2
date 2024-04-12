@@ -212,7 +212,7 @@ def main(args):
             print(f'generator_loss = {generator_loss}')
 
             # do am i have to input the random noise ... ?
-            
+
 
 
 
