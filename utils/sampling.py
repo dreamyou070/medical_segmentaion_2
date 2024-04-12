@@ -223,14 +223,22 @@ def sample_images_common(
 
     #if distributed_state.num_processes <= 1:
         # If only one device is available, just use the original prompt list. We don't need to care about the distribution of prompts.
-    output = pipeline(prompt = prompt_dict["prompt"],
+    latents = pipeline(prompt = prompt_dict["prompt"],
                       num_inference_steps = prompt_dict["sample_steps"],
                       guidance_scale = prompt_dict["scale"],
                       negative_prompt = prompt_dict.get("negative_prompt"),
                       height = prompt_dict.get("height", 512),
                       width = prompt_dict.get("width", 512))
-    result_img = output.image
-    print(f'result_img : {type(result_img)}')
+    with torch.cuda.device(torch.cuda.current_device()):
+        torch.cuda.empty_cache()
+    image = pipeline.latents_to_image(latents)[0]
+    ts_str = time.strftime("%Y%m%d%H%M%S", time.localtime())
+    num_suffix = f"e{epoch:06d}" if epoch is not None else f"{steps:06d}"
+    seed_suffix = "" if args.seed is None else f"_{args.seed}"
+    i: int = prompt_dict["enum"]
+    img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
+    image.save(os.path.join(save_dir, img_filename))
+
 
 
     """
