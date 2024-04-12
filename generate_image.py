@@ -18,6 +18,11 @@ from model.pe import AllPositionalEmbedding
 from model.segmentation_unet import SemanticSeg
 from model.autodecoder import AutoencoderKL
 from matplotlib import pyplot as plt
+from diffusers.image_processor import VAEImageProcessor
+
+vae_scale_factor = 0.18215
+image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+
 def main(args):
 
     print(f'\n step 1. accelerator')
@@ -185,13 +190,13 @@ def main(args):
                         posterior = vae.encode(image).latent_dist
                         #mean, logvar = posterior.mean, posterior.logvar
                         for i in range(10):
-                            x = posterior.sample()
-                            reconstruction = vae.decode(x).sample
-                            print(f'original decoder output = {reconstruction.shape}')
-                            reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-                            np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
-                            pil = Image.fromarray(np_img)
-                            pil.save(f'{check_base_folder}/original_vae_{i}.png')
+                            # make many generator
+                            generator = torch.Generator()
+                            generator.manual_seed(i)
+                            reconstruction = vae(sample = image, generator = generator,).sample # [1,3,512,512]
+                            # autoencoder reconstruction image
+                            image = image_processor.postprocess(reconstruction, output_type='pil')
+                            image.save(f'{check_base_folder}/original_vae_{i}.png')
 
                         # ----------------------------------------------------------------------------------------------
                         # [3] stochastic sampling

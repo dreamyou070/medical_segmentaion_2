@@ -160,6 +160,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
     @property
     # Copied from diffusers.models.unets.unet_2d_condition.UNet2DConditionModel.attn_processors
     def attn_processors(self) -> Dict[str, AttentionProcessor]:
+
         r"""
         Returns:
             `dict` of attention processors: A dictionary containing all attention processors used in the model with
