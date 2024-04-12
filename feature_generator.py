@@ -210,8 +210,6 @@ def main(args):
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
 
             generator_loss = recons_loss + kl_weight * kl_loss
-            print(f'generator_loss = {generator_loss}')
-
             # do am i have to input the random noise ... ?
 
 
@@ -260,6 +258,7 @@ def main(args):
                     deactivating_loss = torch.stack(deactivating_loss).sum()
                     loss += deactivating_loss
                 loss = loss.mean()
+            loss = loss + generator_loss
             loss = loss.to(weight_dtype)
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
