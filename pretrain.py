@@ -52,36 +52,19 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
+    trainable_params = []
+    trainable_params.append({"params": text_encoder.parameters(), "lr": args.text_encoder_lr})
+    trainable_params.append({"params": unet.parameters(), "lr": args.unet_lr})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
-    print(f'\n step 7. loss function')
-
     print(f'\n step 8. model to device')
     unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(unet, text_encoder, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    text_encoders = transform_models_if_DDP([text_encoder])
-    unet, network = transform_models_if_DDP([unet, network])
-    if args.gradient_checkpointing:
-        unet.train()
-        for t_enc in text_encoders:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-        if not args.train_text_encoder:  # train U-Net only
-            unet.parameters().__next__().requires_grad_(True)
-    else:
-        unet.eval()
-        for t_enc in text_encoders:
-            t_enc.eval()
-    del t_enc
 
-    print(f'\n step 9. registering saving tensor')
-
-    print(f'\n step 10. Training !')
+    print(f'\n step 9. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
