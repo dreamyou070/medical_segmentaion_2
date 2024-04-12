@@ -170,8 +170,7 @@ class TrainDataset_Seg(Dataset):
         gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
         if self.use_data_aug:
             gt_arr = np.rot90(gt_arr, k=number)
-        if self.caption == 'brain':
-            gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
+        gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
 
         class_es = np.unique(gt_arr)
 
