@@ -60,7 +60,7 @@ def evaluation_check(segmentation_head, dataloader, device,
 
                 plt.imshow(reconstruction_img)
                 # save
-                recon_folder = os.path.join(args.save_dir, 'reconstruct_folder')
+                recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
                 os.makedirs(recon_folder, exist_ok=True)
                 plt.savefig(f'{recon_folder}/reconstruction_epoch{epoch}_{global_num}.png')
 
