@@ -18,6 +18,8 @@ from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils import get_noise_noisy_latents_and_timesteps
 from utils.sampling import sample_images
+# [evaluation / inference]
+from utils.sampling import sample_images
 
 def main(args):
 
@@ -75,12 +77,11 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        """
+
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
             with torch.set_grad_enabled(True):
-                input_txt = batch["input_ids"].to(device)
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             with torch.no_grad():
@@ -121,9 +122,7 @@ def main(args):
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
-        """
-        # [evaluation / inference]
-        from utils.sampling import sample_images
+
         sample_images(accelerator, args, epoch, global_step, vae, tokenizer, text_encoder, unet)
 
     accelerator.end_training()
