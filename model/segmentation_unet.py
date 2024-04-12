@@ -388,19 +388,15 @@ class Segmentation_Head_d(nn.Module):
     def __init__(self,):
         super(Segmentation_Head_d, self).__init__()
 
-
-        self.up1 = Up_conv(in_channels=3,
-                          out_channels=3,
+        self.up1 = Up_conv(in_channels=4,
+                          out_channels=4,
                           kernel_size=2)
-        self.up2 = Up_conv(in_channels=3,
-                            out_channels=1,
+        self.up2 = Up_conv(in_channels=4,
+                            out_channels=4,
                             kernel_size=2)
-
-
 
     def forward(self, x):
         # x = [baatch, 64, 64, 3]
         x = self.up1(x) # [batch, 1, 128, 128]
         x = self.up2(x)
         return x
-

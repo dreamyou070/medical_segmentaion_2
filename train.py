@@ -68,17 +68,17 @@ def main(args):
         # total 3 channel all input
         segmentation_head_class = Segmentation_Head_d
 
-    class_0_seg = Segmentation_Head_d()
-    class_1_seg = Segmentation_Head_d()
-    class_2_seg = Segmentation_Head_d()
-    class_3_seg = Segmentation_Head_d()
+    segmentation_head = Segmentation_Head_d()
+    #x = torch.randn(1, 4, 64, 64)
 
-    segmentation_head = segmentation_head_class(n_classes=args.n_classes,
-                                                mask_res=args.mask_res,
-                                                use_batchnorm=args.use_batchnorm,
-                                                use_instance_norm=args.use_instance_norm,
-                                                use_init_query=args.use_init_query,
-                                                attn_factor=args.attn_factor,)
+    #print(output.size())
+
+    #segmentation_head = segmentation_head_class(n_classes=args.n_classes,
+    #                                            mask_res=args.mask_res,
+    #                                            use_batchnorm=args.use_batchnorm,
+    #                                            use_instance_norm=args.use_instance_norm,
+    #                                            use_init_query=args.use_init_query,
+    #                                            attn_factor=args.attn_factor,)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -86,10 +86,7 @@ def main(args):
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     #trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": class_0_seg.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": class_1_seg.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": class_2_seg.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": class_3_seg.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": upsampling_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -182,9 +179,9 @@ def main(args):
             loss_dict = {}
 
             # [1] get token
-
+            # torch to list
             key_word_index = batch['key_word_index'][0]
-            print(f'key_word_index = {key_word_index}')
+
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             if args.aggregation_model_d:
@@ -217,7 +214,9 @@ def main(args):
                 # upscaling
                 original_map = attn_map.view(attn_map.shape[0], original_res, original_res, attn_map.shape[2]).permute(
                     0, 3, 1, 2).contiguous()
-                attn_map = nn.functional.interpolate(original_map, scale_factor=upscale_factor, mode='bilinear', align_corners=False)
+                attn_map = nn.functional.interpolate(original_map,
+                                                     scale_factor=upscale_factor,
+                                                     mode='bilinear', align_corners=False)
                 if i == 0 :
                     attn_maps = attn_map
                 else :
@@ -229,8 +228,12 @@ def main(args):
                 masks_pred = torch.cat([masks_pred,
                                         torch.zeros(masks_pred.shape[0], remain_num, masks_pred.shape[2],
                                                     masks_pred.shape[3]).to(device=masks_pred.device,
-                                                                            dtype=weight_dtype)], dim=1)
-            print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
+                                                                            dtype=weight_dtype)], dim=1) # 1,3,64,64
+            # upgrading (from 64 to 256)
+            print(f' before masks_pred = {masks_pred.shape}')
+            masks_pred = segmentation_head(masks_pred)
+            print(f' after masks_pred = {masks_pred.shape}')
+
             """ using cross attntion """
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
