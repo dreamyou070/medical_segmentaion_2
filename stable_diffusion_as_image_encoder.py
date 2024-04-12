@@ -22,7 +22,7 @@ from model.pe import AllPositionalEmbedding
 from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
 from utils import get_noise_noisy_latents_and_timesteps
-
+import re
 
 def main(args):
 
@@ -58,70 +58,58 @@ def main(args):
             position_embedder.load_state_dict(position_embedder_state_dict)
             position_embedder.to(dtype=weight_dtype)
 
-    class VisionHead(nn.Module):
-
+    class IdentityMap(nn.Module):
         def __init__(self):
-            self.vision_head = nn.Sequential(
-
-        def forward(self, x):
+            super().__init__()
+        def forward(self, x, *args, **kwargs):
             return x
+        @property
+        def config(self):
+            return {"mm_projector_type": 'identity'}
 
-    vision_head = VisionHead()
+    def build_vision_projector(mm_hidden_size, hidden_size):
+        projector_type = 'mlp2x_gelu'
+        if projector_type == 'linear':
+            return nn.Linear(mm_hidden_size, hidden_size)
+        mlp_gelu_match = re.match(r'^mlp(\d+)x_gelu$', projector_type)
+        if mlp_gelu_match:
+            mlp_depth = int(mlp_gelu_match.group(1))
+            modules = [nn.Linear(mm_hidden_size, hidden_size)]
+            for _ in range(1, mlp_depth):
+                modules.append(nn.GELU())
+                modules.append(nn.Linear(hidden_size, hidden_size))
+            return nn.Sequential(*modules)
+        if projector_type == 'identity':
+            return IdentityMap()
+        raise ValueError(f'Unknown projector type: {projector_type}')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    vision_head = build_vision_projector(mm_hidden_size=320, hidden_size=768)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    #trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    loss_CE = nn.CrossEntropyLoss()
-    loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        from monai.losses import FocalLoss
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
+
+
 
 
 
     print(f'\n step 8. model to device')
     if args.use_position_embedder:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
-                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+        vision_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
+                accelerator.prepare(vision_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler, position_embedder)
     else:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+        vision_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+                accelerator.prepare(vision_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
 
     text_encoders = transform_models_if_DDP([text_encoder])
@@ -131,7 +119,7 @@ def main(args):
     if args.gradient_checkpointing:
         unet.train()
         position_embedder.train()
-        segmentation_head.train()
+        vision_head.train()
         for t_enc in text_encoders:
             t_enc.train()
             if args.train_text_encoder:
@@ -184,7 +172,9 @@ def main(args):
             # [2] get image feature
             image_feature = vision_head(image_feature)
 
-            # [3] aligning learning
+            # text and image feature aligning
+            clip_loss
+
 
 
 

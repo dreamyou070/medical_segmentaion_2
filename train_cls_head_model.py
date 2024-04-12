@@ -140,9 +140,7 @@ def main(args):
             t_enc.eval()
     del t_enc
     network.prepare_grad_etc(text_encoder, unet)
-    if not args.vae_train :
-        vae.to(accelerator.device, dtype=weight_dtype)
-
+    
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
     register_attention_control(unet, controller)
