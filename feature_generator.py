@@ -22,6 +22,7 @@ from model.pe import AllPositionalEmbedding
 from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
 from utils import get_noise_noisy_latents_and_timesteps
+from model.autodecoder import AutoencoderKL
 from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
@@ -52,11 +53,7 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    noise_scheduler = DDPMScheduler(beta_start=0.00085,
-                                    beta_end=0.012,
-                                    beta_schedule="scaled_linear",
-                                    num_train_timesteps=1000,
-                                    clip_sample=False)
+
     # [2] pe
     position_embedder = None
     if args.use_position_embedder:
@@ -70,20 +67,26 @@ def main(args):
 
     segmentation_head = SemanticSeg(n_classes=args.n_classes, mask_res=args.mask_res,)
 
-    from model.autodecoder import AutoencoderKL
-    if args.independent_decoder :
+
+    if args.independent_decoder:
+        latent_dim = 320
+        if not args.high_latent_feature:
+            latent_dim = 4
         decoder_model = AutoencoderKL(spatial_dims=2,
                                       out_channels=3,
                                       num_res_blocks=(2, 2, 2, 2),
                                       num_channels=(32, 64, 64, 64),
                                       attention_levels=(False, False, True, True),
-                                      latent_channels=320,
-                                      norm_num_groups=32, norm_eps=1e-6,
-                                      with_encoder_nonlocal_attn=True, with_decoder_nonlocal_attn=True,
+                                      latent_channels=latent_dim,
+                                      norm_num_groups=32,
+                                      norm_eps=1e-6,
+                                      with_encoder_nonlocal_attn=True,
+                                      with_decoder_nonlocal_attn=True,
                                       use_flash_attention=False,
                                       use_checkpointing=False,
                                       use_convtranspose=False)
-    decoder_model = vae
+    else :
+        decoder_model = vae
 
 
     print(f'\n step 5. optimizer')
@@ -136,7 +139,8 @@ def main(args):
 
     print(f'\n step 8. model to device')
     decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+                                    test_dataloader, lr_scheduler)
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
