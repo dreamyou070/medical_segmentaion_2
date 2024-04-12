@@ -458,7 +458,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_timestep", type=int, default=200)
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--use_noise_regularization", action='store_true')
-    parser.add_argument("--contrastive_learning", action='store_true')
+    parser.add_argument("--use_cls_token", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

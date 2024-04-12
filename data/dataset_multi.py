@@ -195,13 +195,14 @@ class TrainDataset_Seg(Dataset):
             caption += class_map[class_idx][0]
             if i < len(class_es) - 1:
                 caption += ', '
-
-        key_words = [class_map[i][0] for i in class_es if i != 0]
+        if argument.use_cls_token:
+            key_words = [class_map[i][0] for i in class_es if i != 0] # [n,e]
+        else :
+            key_words = [class_map[i][0] for i in class_es] # [b,n,e]
         # final caption = 'this is a picture of b, n, e, t'
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
         attention_mask = caption_token.attention_mask
-
 
         def get_target_index(target_words, caption):
 
@@ -222,9 +223,12 @@ class TrainDataset_Seg(Dataset):
                     target_word_index.append(idx)
             return target_word_index
 
-        default = [0] # cls token index
-        default.extend(get_target_index(key_words, caption))
-        key_word_index = default
+        if argument.use_cls_token:
+            default = [0] # cls token index
+            default.extend(get_target_index(key_words, caption))
+            key_word_index = default
+        else :
+            key_word_index = get_target_index(key_words, caption)
 
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]

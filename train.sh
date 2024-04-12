@@ -1,13 +1,13 @@
 # !/bin/bash
 
-port_number=51264
+port_number=51266
 category="medical"
 obj_name="brain"
 trigger_word="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="FineTuning"
+file_name="FineTuning_without_clstoken"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number train.py --log_with wandb \
