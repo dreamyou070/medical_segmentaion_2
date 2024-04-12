@@ -65,7 +65,9 @@ def main(args):
         position_embedder.load_state_dict(position_embedder_state_dict)
         position_embedder.to(dtype=weight_dtype)
 
-    segmentation_head = SemanticSeg(n_classes=args.n_classes, mask_res=args.mask_res,)
+    segmentation_head = SemanticSeg(n_classes=args.n_classes,
+                                    mask_res=args.mask_res,
+                                    high_latent_feature=args.high_latent_feature,)
 
 
     if args.independent_decoder:
@@ -452,6 +454,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_noise_regularization", action='store_true')
     parser.add_argument("--use_cls_token", action='store_true')
     parser.add_argument("--independent_decoder", action='store_true')
+    parser.add_argument("--high_latent_feature", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

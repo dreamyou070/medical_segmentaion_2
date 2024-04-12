@@ -120,6 +120,7 @@ class SemanticSeg(nn.Module):
             self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2))
+        self.high_latent_feature = high_latent_feature
         if self.high_latent_feature :
             self.feature_generator = nn.Sequential(nn.Sigmoid())
         else :
