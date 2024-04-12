@@ -192,8 +192,11 @@ def main(args):
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type=position_embedder)
+                if args.use_position_embedder:
+                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                         noise_type=position_embedder)
+                else:
+                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
