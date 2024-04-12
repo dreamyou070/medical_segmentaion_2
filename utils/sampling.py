@@ -204,9 +204,7 @@ def sample_images_common(
         scheduler=default_scheduler,
         safety_checker=None,
         feature_extractor=None,
-        requires_safety_checker=False,
-        clip_skip=args.clip_skip,
-    )
+        requires_safety_checker=False,)
     pipeline.to(distributed_state.device)
     save_dir = args.output_dir + "/sample"
     os.makedirs(save_dir, exist_ok=True)
