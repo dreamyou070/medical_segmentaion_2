@@ -188,7 +188,9 @@ def main(args):
                             z = decoder_model.sampling(z_mu, z_sigma)
                             reconstruction = decoder_model.decode(z)
                             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-                            plt.imshow(reconstruction_img)
+                            print(f'original value = {reconstruction_img}')
+                            plt.imshow((reconstruction_img * 255).astype(np.uint8))
+
                             # save
                             recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
                             os.makedirs(recon_folder, exist_ok=True)
