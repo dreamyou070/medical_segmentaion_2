@@ -4,7 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+#x16_out = torch.randn(1, 1280, 16, 16)
+#x32_out = torch.randn(1, 640, 32, 32)
+#x64_out = torch.randn(1, 320, 64, 64)
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
@@ -118,13 +120,15 @@ class SemanticSeg(nn.Module):
             self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2))
+        self.feature_generator = nn.Conv2d(320, 4, kernel_size=3, padding=1)
         self.outc = OutConv(160, n_classes)
+
 
     def forward(self, x16_out, x32_out, x64_out):
 
         x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
-        x = self.up2(x, x64_out)    # 1,320,64,64
+        x = self.up2(x, x64_out)       # 1,320,64,64
+        gen_feature = self.feature_generator(x)
         x = self.segmentation_head(x)
-        logits = self.outc(x)  # 1,4, 128,128
-        return logits
-
+        logits = self.outc(x)  # 1, 4, 128,128
+        return gen_feature, logits
