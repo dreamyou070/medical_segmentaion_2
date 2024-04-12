@@ -8,14 +8,16 @@
 
 port_number=51211
 category="medical"
-obj_name="teeth"
-trigger_word="teeth"
-benchmark="teeth_main"
+obj_name="brain"
+trigger_word="brain"
+benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="Finetune_segment_head"
 # --use_instance_norm
 # --binary_test
+
+
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number train_cls_head_model.py --log_with wandb \
