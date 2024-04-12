@@ -81,7 +81,6 @@ def main(args):
             loss_dict = {}
             with torch.set_grad_enabled(True):
                 input_txt = batch["input_ids"].to(device)
-                print(f'input_txt device: {input_txt.device}')
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             with torch.no_grad():
@@ -90,7 +89,6 @@ def main(args):
             with torch.set_grad_enabled(True):
                 sample_output = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             noise_pred = sample_output.sample
-            print(f'noise_pred = {noise_pred.shape}')
             loss = torch.nn.functional.mse_loss(noise_pred.float(), noise.float(), reduction="none")
             loss = loss.mean([1, 2, 3])
             loss = loss.mean()
