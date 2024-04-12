@@ -173,7 +173,6 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        """
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
@@ -299,7 +298,6 @@ def main(args):
                       saving_name=f'decoder-{saving_epoch}.pt',
                       unwrapped_nw=accelerator.unwrap_model(decoder_model),
                       save_dtype=save_dtype)
-        """
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
