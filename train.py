@@ -49,7 +49,7 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-
+    position_embedder = None
     if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
                                                    do_semantic_position=args.do_semantic_position,)
@@ -319,7 +319,8 @@ def main(args):
             loader = train_dataloader
 
         score_dict, confusion_matrix, _ = evaluation_check_2(segmentation_head,
-                                                             loader, accelerator.device,
+                                                             loader,
+                                                             accelerator.device,
                                                              text_encoder, unet, vae, controller, weight_dtype,
                                                              position_embedder, args)
         # saving

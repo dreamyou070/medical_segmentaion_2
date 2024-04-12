@@ -27,9 +27,6 @@ def evaluation_check(segmentation_head, dataloader, device, text_encoder, unet, 
         dice_coeff_list = []
         for global_num, batch in enumerate(dataloader):
 
-            device = accelerator.device
-            loss_dict = {}
-
             # [1] get token
             # torch to list
             key_word_index = batch['key_word_index'][0]
