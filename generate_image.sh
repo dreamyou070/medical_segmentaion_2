@@ -25,4 +25,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --aggregation_model_c \
  --n_classes 4 \
  --mask_res 256 \
- --use_batchnorm --use_position_embedder --do_train_check
+ --use_batchnorm --do_train_check
