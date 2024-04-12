@@ -778,6 +778,8 @@ class DiagonalGaussianDistribution(object):
             self.var = self.std = torch.zeros_like(
                 self.mean, device=self.parameters.device, dtype=self.parameters.dtype
             )
+        #
+
 
     def sample(self, generator: Optional[torch.Generator] = None) -> torch.FloatTensor:
         # make sure sample is on the same device as the parameters and has same dtype

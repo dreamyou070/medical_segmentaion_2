@@ -6,17 +6,17 @@
 # 4_absolute_pe_segmentation_model_c_cross_focal_use_batch_norm_query
 # 6_absolute_pe_segmentation_model_b_cross_focal_use_batch_norm_query
 
-port_number=51222
+port_number=51233
 category="medical"
 obj_name="brain"
 trigger_word="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_with_featuregenerator"
+file_name="Finetune_segment_head_with_featuregenerator_using_original_vae"
 # --use_instance_norm
 # --binary_test
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

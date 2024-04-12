@@ -25,6 +25,7 @@ from utils import get_noise_noisy_latents_and_timesteps
 from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
+from diffusers import DiagonalGaussianDistribution
 
 def main(args):
 
@@ -57,8 +58,10 @@ def main(args):
                                     num_train_timesteps=1000,
                                     clip_sample=False)
     # [2] pe
-    position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
-                                               do_semantic_position=args.do_semantic_position,)
+    position_embedder = None
+    if args.use_position_embedder:
+        position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
+                                                   do_semantic_position=args.do_semantic_position,)
 
     if args.position_embedder_weights is not None:
         position_embedder_state_dict = load_file(args.position_embedder_weights)
@@ -68,17 +71,19 @@ def main(args):
     segmentation_head = SemanticSeg(n_classes=args.n_classes, mask_res=args.mask_res,)
 
     from model.autodecoder import AutoencoderKL
-    decoder_model = AutoencoderKL(spatial_dims=2,
-                                  in_channels=1,
-                                  out_channels=3,
-                                  num_res_blocks=(2, 2, 2, 2), num_channels=(32, 64, 64, 64),
-                                  attention_levels=(False, False, True, True),
-                                  latent_channels=4,
-                                  norm_num_groups=32, norm_eps=1e-6,
-                                  with_encoder_nonlocal_attn=True, with_decoder_nonlocal_attn=True,
-                                  use_flash_attention=False,
-                                  use_checkpointing=False,
-                                  use_convtranspose=False)
+    if args.independent_decoder :
+        decoder_model = AutoencoderKL(spatial_dims=2,
+                                      in_channels=1,
+                                      out_channels=3,
+                                      num_res_blocks=(2, 2, 2, 2), num_channels=(32, 64, 64, 64),
+                                      attention_levels=(False, False, True, True),
+                                      latent_channels=4,
+                                      norm_num_groups=32, norm_eps=1e-6,
+                                      with_encoder_nonlocal_attn=True, with_decoder_nonlocal_attn=True,
+                                      use_flash_attention=False,
+                                      use_checkpointing=False,
+                                      use_convtranspose=False)
+    decoder_model = vae
 
 
     print(f'\n step 5. optimizer')
@@ -87,7 +92,8 @@ def main(args):
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
+    if args.independent_decoder :
+        trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
 
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -129,21 +135,15 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    if args.use_position_embedder:
-        decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
-                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder)
-    else:
-        decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+    decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     decoder_model = transform_models_if_DDP([decoder_model])[0]
-    if args.use_position_embedder:
-        position_embedder = transform_models_if_DDP([position_embedder])[0]
+
     if args.gradient_checkpointing:
         unet.train()
-        position_embedder.train()
         segmentation_head.train()
         decoder_model.train()
         for t_enc in text_encoders:
@@ -173,6 +173,7 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
@@ -189,7 +190,7 @@ def main(args):
                     # how does it do ?
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type=position_embedder)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -202,7 +203,14 @@ def main(args):
             hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
 
             # [0] generation task # gen_feature = Batch, 4, H, W
-            reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
+            if args.independent_decoder :
+                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
+            else :
+                # [1] get z_mu, z_sigma
+                posterior = DiagonalGaussianDistribution(hidden_latent)
+                z_mu, z_sigma = posterior.mean, posterior.std
+                reconstruction = vae.decode(hidden_latent).sample
+
             recons_loss = l1_loss(reconstruction.float(), image.float())
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
@@ -281,12 +289,6 @@ def main(args):
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
-            if args.use_position_embedder:
-                save_model(args,
-                           saving_folder='position_embedder',
-                           saving_name=f'position_embedder-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
-                           save_dtype=save_dtype)
             save_model(args,
                        saving_folder='segmentation',
                        saving_name=f'segmentation-{saving_epoch}.pt',
@@ -444,8 +446,7 @@ if __name__ == "__main__":
     parser.add_argument("--min_timestep", type=int, default=0)
     parser.add_argument("--use_noise_regularization", action='store_true')
     parser.add_argument("--use_cls_token", action='store_true')
-    parser.add_argument("--contrastive_learning", action='store_true')
-
+    parser.add_argument("--independent_decoder", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
