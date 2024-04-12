@@ -136,8 +136,9 @@ def main(args):
                            'sample_sampler': 'ddim',
                            'enum': 0}
             from utils.sampling import sample_images
-            sample_images(args=args,
-                          epoch = epoch + 1,
+            sample_images(accelerator=accelerator,
+                          args=args,
+                          epoch = epoch ,
                           steps = global_step,
                           device = accelerator.device,
                           vae=vae,
