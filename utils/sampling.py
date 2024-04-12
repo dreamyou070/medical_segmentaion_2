@@ -179,13 +179,17 @@ def sample_image_inference(
         pass
 
 def sample_images(*args, **kwargs):
-    return sample_images_common(StableDiffusionLongPromptWeightingPipeline, *args, **kwargs)
+    return sample_images_common(StableDiffusionLongPromptWeightingPipeline,
+                                *args,
+                                **kwargs)
 
 def line_to_prompt_dict(line: str) -> dict:
     # subset of gen_img_diffusers
     prompt_args = line.split(" --")
     prompt_dict = {}
-    prompt_dict["prompt"] = prompt_args[0]
+    p = prompt_args[0]
+    print(f' prompt = {p}')
+    prompt_dict["prompt"] = p
 
     for parg in prompt_args:
         try:
