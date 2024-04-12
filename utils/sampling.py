@@ -306,6 +306,8 @@ def sample_images_common(
         prompt_dict = prompts[i]
         if isinstance(prompt_dict, str):
             prompt_dict = line_to_prompt_dict(prompt_dict)
+            # prompt_dict = {"prompt": prompt, "width": width, "height": height, "seed": seed, "sample_steps": sample_steps,
+            # "scale": scale, "negative_prompt": negative_prompt, "sample_sampler": sampler_name, "controlnet_image": controlnet_image}
             prompts[i] = prompt_dict
         assert isinstance(prompt_dict, dict)
 
