@@ -197,8 +197,8 @@ def main(args):
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
-            attn_map_dict = {}
-            for layer in args.trg_layer_list:
+
+            for i, layer in enumerate(args.trg_layer_list):
                 query = reshape_batch_dim_to_heads_3D_3D(query_dict[layer][0])   # 1, pix_num, dim
                 key = key_dict[layer][0]                                         # head, pix_num, dim
                 attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
@@ -208,93 +208,18 @@ def main(args):
                 target_res = 64
                 upscale_factor = target_res // original_res
                 # upscaling
-                attn_map = nn.functional.interpolate(attn_map, scale_factor=upscale_factor, mode='bilinear', align_corners=False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                attn_map_dict[res] = attn_map
-            for k_res in q_dict.keys():
-                query_list = q_dict[k_res]
-                q_dict[k_res] = torch.cat(query_list, dim=1).contiguous()
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            attn_map_16, attn_map_32, attn_map_64 = attn_map_dict[16], attn_map_dict[32], attn_map_dict[64]
-            # 1, 16*16, 77
-            # 1, 32*32, 77
-            # 1, 64*64, 77
-
-            def upscaling (attn_map):
-                b, pix_num, sen_len = attn_map.shape
-                res = int(pix_num ** 0.5)
-                attn_map = attn_map.view(b, res, res, sen_len)
-                # 2d upscale
-                attn_map = nn.functional.interpolate(attn_map, scale_factor=2, mode='bilinear', align_corners=False)
-                # [b, res, res, sen_len] -> [b, res*res, sen_len]
-                return attn_map.view(b, -1, sen_len).contiguous()
-            attn_map_16_out = upscaling(upscaling(attn_map_16))
-            attn_map_32_out = upscaling(attn_map_32)
-
-            attn_map_cat = torch.cat([attn_map_16_out, attn_map_32_out, attn_map_64], dim=-1) # batch, pix_num, sen_len*3
-
-            res_group_num = 3
-            chunk = attn_map_cat.shape[-1] // res_group_num # 77
-            class_dict = {}
-
-            for group_idx in range(res_group_num):
-                for chunk_i in range(chunk) :
-                    map_chunk = attn_map_cat[:, :, group_idx * chunk_i].squeeze() # batch, pix_num, 1
-                    if chunk_i not in class_dict.keys() :
-                        class_dict[chunk_i] = []
-                    if map_chunk.dim() == 1 :
-                        map_chunk = map_chunk.unsqueeze(0)
-                    if map_chunk.dim() == 2:
-                        map_chunk = map_chunk.unsqueeze(-1)
-                    class_dict[chunk_i].append(map_chunk)
-
-            for class_idx in class_dict.keys():
-                # 0, ..., 76
-                final = torch.cat(class_dict[class_idx], dim=-1) # batch, pix_num, 3
-                b, pix_num, sen_len = final.shape
-                res = int(pix_num ** 0.5)
-                final = final.view(b, res, res, sen_len)
-                class_dict[class_idx] = final
-
-
-            seg_map_dict = {}
-            seg_map_list = []
-            for i, head in enumerate(head_list):
-                token_idx = list(class_dict.keys())[i]
-                class_map = class_dict[token_idx].permute(0,3,1,2).contiguous()     # Batch, 3, res, res
-                seg_map = head(class_map)       # Batch, 3, 128, 128
-                seg_map_dict[token_idx] = seg_map
-                if token_idx < 4 :
-                    seg_map_list.append(seg_map)
-            masks_pred = torch.cat(seg_map_list, dim=1) # Batch, 4, 128, 128
+                original_map = attn_map.view(attn_map.shape[0], original_res, original_res, attn_map.shape[2]).permute(
+                    0, 3, 1, 2).contiguous()
+                # upscaling ([1,4,64,64])
+                attn_map = nn.functional.interpolate(original_map, scale_factor=upscale_factor, mode='bilinear', align_corners=False)
+                if i == 0 :
+                    attn_maps = attn_map
+                else :
+                    attn_maps += attn_map
+            # attn_maps = [batch, 4, 64, 64] (without segmentation head)
+            masks_pred = torch.softmax(attn_maps, dim=1)
             print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
-
-            # finalize attn_map
-            # x16_out = [1, 16*16, 4]
-            # x32_out = [1, 32*32, 4]
-            # x64_out = [1, 64*64, 4]
-            # segmentation head ... ?
-            # classwise segmentation .. ?
             """ using cross attntion """
-            #if not args.use_init_query:
-            #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # 1,4,128,128
-            #else:
-            #    out, masks_pred = segmentation_head(x16_out, x32_out, x64_out, x_init=latents)  # 1,4,128,128
-            #masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
-            #masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
                                    target=batch['gt'].to(dtype=weight_dtype))
