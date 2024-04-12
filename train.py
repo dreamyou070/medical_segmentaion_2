@@ -86,7 +86,7 @@ def main(args):
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     #trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": upsampling_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
