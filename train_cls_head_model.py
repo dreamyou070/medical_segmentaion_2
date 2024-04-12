@@ -179,8 +179,6 @@ def main(args):
                 query = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                if res not in q_dict:
-                    q_dict[res] = []
                 q_dict[res].append(reshaped_query)
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             masks_pred = segmentation_head(x16_out, x32_out, x64_out)
