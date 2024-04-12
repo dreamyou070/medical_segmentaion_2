@@ -199,14 +199,11 @@ def main(args):
                     unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
-            q_dict = {}
-
             for i, layer in enumerate(args.trg_layer_list):
                 query = reshape_batch_dim_to_heads_3D_3D(query_dict[layer][0])   # 1, pix_num, dim
                 key = key_dict[layer][0]                                         # head, pix_num, dim
                 attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
-                # class_num
-                attn_map = attn_map[:,:,args.n_classes]                          # 1, pix_num, 4
+                attn_map = attn_map[:,:, :args.n_classes]                        # 1, pix_num, 4
                 original_res = int(attn_map.shape[1] ** 0.5)                     # trg_res = 64
                 target_res = 64
                 upscale_factor = target_res // original_res
