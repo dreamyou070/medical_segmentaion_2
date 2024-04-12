@@ -137,12 +137,15 @@ def main(args):
                 accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
+    segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    decoder_model = transform_models_if_DDP([decoder_model])[0]
     if args.use_position_embedder:
         position_embedder = transform_models_if_DDP([position_embedder])[0]
     if args.gradient_checkpointing:
         unet.train()
         position_embedder.train()
         segmentation_head.train()
+        decoder_model.train()
         for t_enc in text_encoders:
             t_enc.train()
             if args.train_text_encoder:
@@ -186,7 +189,6 @@ def main(args):
             with torch.no_grad():
                     # how does it do ?
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type=position_embedder)
             query_dict, key_dict = controller.query_dict, controller.key_dict
@@ -200,33 +202,22 @@ def main(args):
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
 
-            # [0] generation task
-            # gen_feature = Batch, 4, H, W
+            # [0] generation task # gen_feature = Batch, 4, H, W
             reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
-            from torch.nn import functional as F
             recons_loss = l1_loss(reconstruction.float(), image.float())
-
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
-
             generator_loss = recons_loss + kl_weight * kl_loss
             # do am i have to input the random noise ... ?
-
-
-
-
 
             # [1] segmentation task
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
             masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred,
-                                   target=batch['gt'].to(dtype=weight_dtype))
-            else:
-                # [5.1] Multiclassification Loss
+                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
+            else: # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
-
                 # [5.2] Focal Loss
                 focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
                 if args.use_monai_focal_loss:
@@ -258,7 +249,9 @@ def main(args):
                     deactivating_loss = torch.stack(deactivating_loss).sum()
                     loss += deactivating_loss
                 loss = loss.mean()
+
             loss = loss + generator_loss
+
             loss = loss.to(weight_dtype)
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
