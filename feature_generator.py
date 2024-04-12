@@ -87,6 +87,7 @@ def main(args):
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
 
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -129,11 +130,11 @@ def main(args):
 
     print(f'\n step 8. model to device')
     if args.use_position_embedder:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
-                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder)
+        decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder = \
+                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler, position_embedder)
     else:
-        segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+        decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     if args.use_position_embedder:
