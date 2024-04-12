@@ -8,7 +8,7 @@ from attention_store import AttentionStore
 from data import call_dataset
 from diffusers import DDPMScheduler
 from model import call_model_package
-from model.segmentation_unet import segmentation_model
+from model.segmentation_unet import SemanticSeg
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
@@ -64,8 +64,7 @@ def main(args):
         position_embedder.load_state_dict(position_embedder_state_dict)
         position_embedder.to(dtype=weight_dtype)
 
-    segmentation_head = segmentation_model(n_classes=args.n_classes,
-                                           mask_res=args.mask_res,)
+    segmentation_head = SemanticSeg(n_classes=args.n_classes, mask_res=args.mask_res,)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
