@@ -172,7 +172,7 @@ class TrainDataset_Seg(Dataset):
             gt_arr = np.rot90(gt_arr, k=number)
         gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
 
-        class_es = np.unique(gt_arr)
+        class_es = np.unique(gt_arr) # key_words
 
         if argument.binary_test :
             gt_arr = np.where(gt_arr==1, 1, 0)
@@ -195,9 +195,39 @@ class TrainDataset_Seg(Dataset):
             caption += class_map[class_idx][0]
             if i < len(class_es) - 1:
                 caption += ', '
-        input_ids, attention_mask = self.get_input_ids(caption)  # input_ids = [77]
+
+        key_words = [class_map[i][0] for i in class_es if i != 0]
+        # final caption = 'this is a picture of b, n, e, t'
+        caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
+        input_ids = caption_token.input_ids
+        attention_mask = caption_token.attention_mask
+
+
+        def get_target_index(target_words, caption):
+
+            target_word_index = []
+            for target_word in target_words:
+                target_word_token = self.tokenizer(target_word, return_tensors="pt")
+                target_word_input_ids = target_word_token.input_ids[:, 1]
+
+                # [1] get target word index from sentence token
+                sentence_token = self.tokenizer(caption, return_tensors="pt")
+                sentence_token = sentence_token.input_ids
+                batch_size = sentence_token.size(0)
+
+                for i in range(batch_size):
+                    # same number from sentence token to target_word_inpud_ids
+                    s_tokens = sentence_token[i]
+                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
+                    target_word_index.append(idx)
+            return target_word_index
+
+        default = [0] # cls token index
+        default.extend(get_target_index(key_words, caption))
+        key_word_index = default
 
         return {'image': img,  # [3,512,512]
-                "gt": gt,                      # [3,256,256]
-                "gt_flat" : gt_flat,           # [128*128]
-                "input_ids": input_ids,}
+                "gt": gt,                       # [3,256,256]
+                "gt_flat" : gt_flat,            # [128*128]
+                "input_ids": input_ids,
+                "key_word_index":key_word_index} # [0,3,4]

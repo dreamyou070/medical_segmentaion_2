@@ -180,6 +180,11 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
+
+            # [1] get token
+
+            key_word_index = batch['key_word_index'][0]
+            print(f'key_word_index = {key_word_index}')
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             if args.aggregation_model_d:
@@ -210,14 +215,13 @@ def main(args):
                 # upscaling
                 original_map = attn_map.view(attn_map.shape[0], original_res, original_res, attn_map.shape[2]).permute(
                     0, 3, 1, 2).contiguous()
-                # upscaling ([1,4,64,64])
                 attn_map = nn.functional.interpolate(original_map, scale_factor=upscale_factor, mode='bilinear', align_corners=False)
                 if i == 0 :
                     attn_maps = attn_map
                 else :
                     attn_maps += attn_map
             # attn_maps = [batch, 4, 64, 64] (without segmentation head)
-            masks_pred = torch.softmax(attn_maps, dim=1)
+            masks_pred = torch.softmax(attn_maps, dim=1) # [1,4,256,256]
             print(f'masks_pred (batch, 4, 256, 256) = {masks_pred.shape})')
             """ using cross attntion """
             if args.use_dice_ce_loss:
