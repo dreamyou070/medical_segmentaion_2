@@ -17,7 +17,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
+from utils.evaluate_2 import evaluation_check as evaluation_check_2
 from model.pe import AllPositionalEmbedding
 from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
@@ -228,10 +228,7 @@ def main(args):
                                                     masks_pred.shape[3]).to(device=masks_pred.device,
                                                                             dtype=weight_dtype)], dim=1) # 1,3,64,64
             # upgrading (from 64 to 256)
-            print(f' before masks_pred = {masks_pred.shape}')
             masks_pred = segmentation_head(masks_pred)
-            print(f' after masks_pred = {masks_pred.shape}')
-
             """ using cross attntion """
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,
@@ -321,9 +318,10 @@ def main(args):
             print(f'test with training data')
             loader = train_dataloader
 
-        score_dict, confusion_matrix, _ = evaluation_check(head_list, loader, accelerator.device,
-                                                           text_encoder, unet, vae, controller, weight_dtype,
-                                                           position_embedder, args)
+        score_dict, confusion_matrix, _ = evaluation_check_2(segmentation_head,
+                                                             loader, accelerator.device,
+                                                             text_encoder, unet, vae, controller, weight_dtype,
+                                                             position_embedder, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')
