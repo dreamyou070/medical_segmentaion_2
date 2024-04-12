@@ -88,7 +88,7 @@ def main(args):
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
                 noise, noisy_latents, timesteps = get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents)
             with torch.set_grad_enabled(True):
-                sample_output = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                sample_output = unet(noisy_latents, timesteps, encoder_hidden_states)
             noise_pred = sample_output.sample
             loss = torch.nn.functional.mse_loss(noise_pred.float(), noise.float(), reduction="none")
             loss = loss.mean([1, 2, 3])
