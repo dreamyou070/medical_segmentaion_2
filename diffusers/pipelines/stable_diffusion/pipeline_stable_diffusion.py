@@ -955,7 +955,7 @@ class StableDiffusionPipeline(
 
         # 3. Encode input prompt
         lora_scale = (self.cross_attention_kwargs.get("scale", None) if self.cross_attention_kwargs is not None else None)
-        self.do_classifier_free_guidance = self._guidance_scale > 1 and self.unet.config.time_cond_proj_dim is None
+        self.do_classifier_free_guidance = self._guidance_scale > 1 # and self.unet.config.time_cond_proj_dim is None
 
         prompt_embeds, negative_prompt_embeds = self.encode_prompt(
             prompt,

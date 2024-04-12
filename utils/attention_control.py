@@ -48,14 +48,10 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
-                query, key.transpose(-1, -2),
-                beta=0,
-                alpha=self.scale,)
+                query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
-            hidden_states = torch.bmm(attention_probs, value)
-
+            hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-
             hidden_states = self.to_out[0](hidden_states)
 
             return hidden_states

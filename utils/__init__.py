@@ -25,7 +25,7 @@ def prepare_dtype(args):
     return weight_dtype, save_dtype
 
 
-def reshape_batch_dim_to_heads(tensor):
+def reshape_batch_dim_to_heads_3D_4D(tensor):
     batch_size, seq_len, dim = tensor.shape
     head_size = 8
     tensor = tensor.reshape(batch_size // head_size, head_size, seq_len, dim)  # 1,8,pix_num, dim -> 1,pix_nun, 8,dim
@@ -35,6 +35,16 @@ def reshape_batch_dim_to_heads(tensor):
     tensor = tensor.view(batch_size // head_size, res, res, dim * head_size).contiguous()
     tensor = tensor.permute(0, 3, 1, 2).contiguous()  # 1, dim, res,res
     return tensor
+
+def reshape_batch_dim_to_heads_3D_3D(tensor):
+    batch_size, seq_len, dim = tensor.shape
+    head_size = 8
+    tensor = tensor.reshape(batch_size // head_size, head_size, seq_len, dim)  # 1,8,pix_num, dim -> 1,pix_nun, 8,dim
+    tensor = tensor.permute(0, 2, 1, 3).contiguous().reshape(batch_size // head_size,
+                                                             seq_len,
+                                                             dim * head_size)  # 1, pix_num, long_dim
+    return tensor
+
 
 def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents, noise = None):
     # Sample noise that we'll add to the latents

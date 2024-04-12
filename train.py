@@ -11,7 +11,7 @@ from model import call_model_package
 from model.segmentation_unet import Segmentation_Head_a, Segmentation_Head_b, Segmentation_Head_c, Segmentation_Head_d
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads
+from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
@@ -49,19 +49,14 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    noise_scheduler = DDPMScheduler(beta_start=0.00085,
-                                    beta_end=0.012,
-                                    beta_schedule="scaled_linear",
-                                    num_train_timesteps=1000,
-                                    clip_sample=False)
-    # [2] pe
-    position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
-                                               do_semantic_position=args.do_semantic_position,)
 
-    if args.position_embedder_weights is not None:
-        position_embedder_state_dict = load_file(args.position_embedder_weights)
-        position_embedder.load_state_dict(position_embedder_state_dict)
-        position_embedder.to(dtype=weight_dtype)
+    if args.use_position_embedder:
+        position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
+                                                   do_semantic_position=args.do_semantic_position,)
+        if args.position_embedder_weights is not None:
+            position_embedder_state_dict = load_file(args.position_embedder_weights)
+            position_embedder.load_state_dict(position_embedder_state_dict)
+            position_embedder.to(dtype=weight_dtype)
 
     if args.aggregation_model_a:
         segmentation_head_class = Segmentation_Head_a
@@ -204,16 +199,11 @@ def main(args):
             q_dict = {}
             attn_map_dict = {}
             for layer in args.trg_layer_list:
-                query_ = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                res = int(query_.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads(query_)  # 1, res, res, dim
-                _, dim, res, res = reshaped_query.shape
-
-
-                q = reshaped_query.permute(0, 2, 3, 1).contiguous().view(1, res * res, dim).contiguous()
-                key = key_dict[layer][0]      # head, pix_num, dim
-                attn_map = torch.bmm(q,
-                                     key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
+                query = reshape_batch_dim_to_heads_3D_3D(query_dict[layer][0])   # 1, pix_num, dim
+                key = key_dict[layer][0]                                         # head, pix_num, dim
+                attn_map = torch.bmm(query, key.transpose(-1, -2).contiguous())  # 1, pix_num, sen_len
+                # class_num
+                attn_map = attn_map[:,:,args.n_classes]                          # 1, pix_num, 4
                 # what about use just short length
                 if res not in q_dict:
                     q_dict[res] = []
