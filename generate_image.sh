@@ -2,11 +2,11 @@
 
 port_number=50052
 category="medical"
-obj_name="brain"
-benchmark="BraTS2020_Segmentation_256"
+obj_name="cardiac"
+benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_low_feature"
+file_name="Finetune_segment_head_feature_merging"
 # --use_position_embedder \
 # 64 / 4
 # 128 / 64
