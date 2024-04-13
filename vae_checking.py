@@ -69,26 +69,17 @@ def main(args):
     register_attention_control(unet, controller)
 
     print(f'\n step 10. Training !')
-    progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
-                        disable=not accelerator.is_local_main_process, desc="steps")
-    global_step = 0
-    loss_list = []
-    for epoch in range(args.start_epoch, args.max_train_epochs):
+    for step, batch in enumerate(train_dataloader):
 
-        epoch_loss_total = 0
-        accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-
-        for step, batch in enumerate(train_dataloader):
-
-            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            with torch.no_grad():
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-                # reconstruct (torch image)
-                recon_latent = vae.decode(latents / args.vae.config.scaling_factor)[0]
-                from diffusers.image_processor import VaeImageProcessor
-                image_processor = VaeImageProcessor(vae_scale_factor=args.vae.config.scaling_factor)
-                recon_image = image_processor.postprocess(image, output_type='pil')[0]
-                recon_image.save(os.path.join(save_folder, f'{step}.png'))
+        image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+        with torch.no_grad():
+            latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+            # reconstruct (torch image)
+            recon_latent = vae.decode(latents / args.vae.config.scaling_factor)[0]
+            from diffusers.image_processor import VaeImageProcessor
+            image_processor = VaeImageProcessor(vae_scale_factor=args.vae.config.scaling_factor)
+            recon_image = image_processor.postprocess(image, output_type='pil')[0]
+            recon_image.save(os.path.join(save_folder, f'{step}.png'))
 
 
 
