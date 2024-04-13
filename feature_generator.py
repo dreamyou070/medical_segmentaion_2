@@ -196,7 +196,7 @@ def main(args):
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
-            loss = loss + generator_loss
+            loss = loss * args.segmentation_loss_weight + generator_loss * args.generator_loss_weight
             loss = loss.mean()
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
@@ -381,6 +381,8 @@ if __name__ == "__main__":
     parser.add_argument("--high_latent_feature", action='store_true')
     parser.add_argument("--use_patch_discriminator", action='store_true')
     parser.add_argument("--init_latent_p", type=float, default=1)
+    parser.add_argument("--generator_loss_weight", type=float, default=1)
+    parser.add_argument("--segmentation_loss_weight", type=float, default=1)
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

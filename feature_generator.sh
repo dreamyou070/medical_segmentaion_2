@@ -1,13 +1,13 @@
 # !/bin/bash
 
-port_number=51277
+port_number=51288
 category="medical"
 obj_name="abdomen"
 trigger_word="abdomen"
 benchmark="abdomen_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_Finetune_segment_head_merging"
+file_name="2_Finetune_segment_head_merging_high_gen_weight"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -29,4 +29,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --use_batchnorm \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
- --init_latent_p 1.0
+ --init_latent_p 1.0 \
+ --generator_loss_weight 1.0 \
+ --segmentation_loss_weight 0.1

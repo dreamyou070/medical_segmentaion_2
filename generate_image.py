@@ -15,10 +15,13 @@ from model.diffusion_model import load_target_model
 from safetensors.torch import load_file
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
 from model.pe import AllPositionalEmbedding
-from model.segmentation_unet import SemanticSeg
+from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen
 from model.autodecoder import AutoencoderKL
 from matplotlib import pyplot as plt
 from diffusers.image_processor import VaeImageProcessor
+from data import call_dataset
+import random
+from accelerate.utils import set_seed
 
 vae_scale_factor = 0.18215
 image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
@@ -31,6 +34,13 @@ def main(args):
                               log_with=args.log_with,
                               project_dir='log')
 
+    print(f'\n step 2. dataset and dataloader')
+    if args.seed is None:
+        args.seed = random.randint(0, 2 ** 32)
+    set_seed(args.seed)
+    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
+
+
     print(f'\n step 2. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     tokenizer = load_tokenizer(args)
@@ -41,20 +51,10 @@ def main(args):
         position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
                                                    do_semantic_position = args.do_semantic_position)
     print(f' (2.3) segmentation head')
-    segmentation_head = SemanticSeg(n_classes=args.n_classes, mask_res=args.mask_res, )
-
-    print(f' (2.4) decoder')
-    decoder_model = AutoencoderKL(spatial_dims=2,
-                                  out_channels=3,
-                                  num_res_blocks=(2, 2, 2, 2), num_channels=(32, 64, 64, 64),
-                                  attention_levels=(False, False, True, True),
-                                  latent_channels=4,
-                                  norm_num_groups=32, norm_eps=1e-6,
-                                  with_encoder_nonlocal_attn=True, with_decoder_nonlocal_attn=True,
-                                  use_flash_attention=False,
-                                  use_checkpointing=False,
-                                  use_convtranspose=False)
-
+    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
+                                        mask_res=args.mask_res,
+                                        high_latent_feature=args.high_latent_feature,
+                                        init_latent_p=args.init_latent_p)
 
     print(f'\n step 2. accelerator and device')
     vae.requires_grad_(False)
@@ -103,11 +103,6 @@ def main(args):
         segmentation_head.load_state_dict(torch.load(pretrained_seg_dir))
         segmentation_head.to(accelerator.device, dtype=weight_dtype)
 
-        # [3] decoder file
-        decoder_base_dir = os.path.join(parent, f'decoder')
-        pretrained_decoder_dir = os.path.join(decoder_base_dir, f'decoder-{lora_epoch}.pt')
-        decoder_model.load_state_dict(torch.load(pretrained_decoder_dir))
-        decoder_model.to(accelerator.device, dtype=weight_dtype)
 
         # [4] files
         parent, _ = os.path.split(args.network_folder)
@@ -129,6 +124,9 @@ def main(args):
         os.makedirs(check_base_folder, exist_ok=True)
         answer_base_folder = os.path.join(lora_base_folder, f'scoring/{args.obj_name}/test')
         os.makedirs(answer_base_folder, exist_ok=True)
+
+
+
 
         # [1] test path
         test_img_folder = args.data_path
@@ -239,8 +237,14 @@ if __name__ == '__main__':
     parser.add_argument("--mixed_precision", type=str, default="no", choices=["no", "fp16", "bf16"], )
     parser.add_argument("--save_precision", type=str, default=None, choices=[None, "float", "fp16", "bf16"], )
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, )
-    parser.add_argument('--data_path', type=str,
-                        default=r'../../../MyData/anomaly_detection/MVTec3D-AD')
+    # step 2. dataset
+    parser.add_argument("--resize_shape", type=int, default=512)
+    parser.add_argument('--train_data_path', type=str, default=r'../../../MyData/anomaly_detection/MVTec3D-AD')
+    parser.add_argument('--test_data_path', type=str, default=r'../../../MyData/anomaly_detection/MVTec3D-AD')
+    parser.add_argument('--obj_name', type=str, default='bottle')
+    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--trigger_word', type=str)
+    parser.add_argument("--latent_res", type=int, default=64)
     parser.add_argument('--obj_name', type=str, default='bagel')
     # step 6
     parser.add_argument("--log_with", type=str, default=None, choices=["tensorboard", "wandb", "all"], )
@@ -290,7 +294,9 @@ if __name__ == '__main__':
     parser.add_argument("--aggregation_model_c", action='store_true')
     parser.add_argument("--mask_res", type=int, default=128)
     parser.add_argument("--pe_do_concat", action='store_true')
-
+    parser.add_argument("--high_latent_feature", action='store_true')
+    parser.add_argument("--use_patch_discriminator", action='store_true')
+    parser.add_argument("--init_latent_p", type=float, default=1)
     args = parser.parse_args()
     passing_argument(args)
     unet_passing_argument(args)

@@ -204,7 +204,7 @@ class SemanticSeg_Gen(nn.Module):
         gen_feature = self.feature_generator(x) # 1, 4, 64, 64
         # [1] recon
         merged_feature = gen_feature + self.init_latent_p * init_latent
-
+        # why ?
         reconstruction, z_mu, z_sigma = self.reconstruction(merged_feature)
 
         x = self.segmentation_head(x)
