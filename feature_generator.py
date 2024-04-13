@@ -59,7 +59,6 @@ def main(args):
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
                                         init_latent_p=args.init_latent_p)
-    )
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
