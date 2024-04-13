@@ -6,7 +6,7 @@ obj_name="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_with_featuregenerator"
+file_name="Finetune_segment_head_low_feature"
 # --use_position_embedder \
 # 64 / 4
 # 128 / 64
@@ -22,7 +22,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --aggregation_model_c \
  --n_classes 4 \
  --mask_res 256 \
  --use_batchnorm --do_train_check
