@@ -228,20 +228,15 @@ def main(args):
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
-
-            # [0] generation task # gen_feature = Batch, 4, H, W
-            if args.independent_decoder :
-                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
-            else :
-                # [1] get z_mu, z_sigma
-                posterior = DiagonalGaussianDistribution(hidden_latent)
-                z_mu, z_sigma = posterior.mean, posterior.std
-                reconstruction = vae.decode(hidden_latent).sample
-
-            # [3] unet with recon image
+            reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out)
+            # ------------------------------------------------------------------------------------------------------------
+            recons_loss = l1_loss(reconstruction_org.float(), image.float())
+            kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
+            kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
+            generator_loss = recons_loss + kl_weight * kl_loss
+            # ------------------------------------------------------------------------------------------------------------
             with torch.no_grad():
-                latents = vae.encode(reconstruction).latent_dist.sample() * args.vae_scale_factor
+                latents = vae.encode(reconstruction_org).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict = controller.query_dict, controller.key_dict
@@ -253,26 +248,11 @@ def main(args):
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
-            # [0] generation task # gen_feature = Batch, 4, H, W
-            if args.independent_decoder:
-                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
-            else:
-                # [1] get z_mu, z_sigma
-                posterior = DiagonalGaussianDistribution(hidden_latent)
-                z_mu, z_sigma = posterior.mean, posterior.std
-                reconstruction = vae.decode(hidden_latent).sample
-            recons_loss = l1_loss(reconstruction.float(), image.float())
-            # what is this kl loss ?
-            # latent should be standard normal distribution
-            # latent is the output of the encoder with deep semantic feature
-            kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
-            kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
-            generator_loss = recons_loss + kl_weight * kl_loss
-            #
-            # [1] segmentation task
+            reconstruction, z_mu, z_sigma, masks_pred_syn = segmentation_head(x16_out, x32_out, x64_out)
+            # ------------------------------------------------------------------------------------------------------------
+            # [1] synthetic image label matching
             # --------------------------------------------------------------------------------------------------------- #
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
+            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous()
             masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
@@ -313,7 +293,13 @@ def main(args):
 
             loss = loss + generator_loss
             # --------------------------------------------------------------------------------------------------------- #
-
+            # --------------------------------------------------------------------------------------------------------- #
+            masks_pred_syn = masks_pred_syn.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_.shape[-1]).contiguous()
+            # matching loss
+            mask_pred_matching_loss = torch.nn.functional.MSE_loss(masks_pred_syn.float(),
+                                                                   masks_pred_org.float()).mean()
+            loss += mask_pred_matching_loss
+            loss = loss.mean()
             """
             # [3] reconstruction make pseudo label
             # what is the guide ? (not same label)

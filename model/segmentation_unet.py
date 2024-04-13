@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from model.autodecoder import AutoencoderKL
 
 #x16_out = torch.randn(1, 1280, 16, 16)
 #x32_out = torch.randn(1, 640, 32, 32)
@@ -137,3 +138,69 @@ class SemanticSeg(nn.Module):
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
         return gen_feature, logits
+
+class SemanticSeg_Gen(nn.Module):
+    def __init__(self,
+                 n_classes,
+                 bilinear=False,
+                 use_batchnorm=True,
+                 use_instance_norm = True,
+                 mask_res = 128,
+                 high_latent_feature = False):
+
+        super(SemanticSeg, self).__init__()
+
+        factor = 2 if bilinear else 1
+        self.up1 = Up(1280, 640 // factor, bilinear, use_batchnorm, use_instance_norm)
+        self.up2 = Up(640, 320 // factor, bilinear, use_batchnorm, use_instance_norm)
+
+        if mask_res == 128:
+            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2))
+        if mask_res == 256 :
+            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2),
+                                                   Up_conv(in_channels = 160, out_channels = 160, kernel_size=2))
+        if mask_res == 512 :
+            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
+                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2),
+                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2))
+        self.high_latent_feature = high_latent_feature
+        if self.high_latent_feature :
+            self.feature_generator = nn.Sequential(nn.Sigmoid())
+        else :
+            self.feature_generator = nn.Sequential(nn.Conv2d(320, 4, kernel_size=3, padding=1),
+                                                   nn.Sigmoid())
+        self.outc = OutConv(160, n_classes)
+
+        latent_dim = 320
+        if not self.high_latent_feature:
+            latent_dim = 4
+        self.decoder_model = AutoencoderKL(spatial_dims=2,
+                                          out_channels=3,
+                                          num_res_blocks=(2, 2, 2, 2),
+                                          num_channels=(32, 64, 64, 64),
+                                          attention_levels=(False, False, True, True),
+                                          latent_channels=latent_dim,
+                                          norm_num_groups=32,
+                                          norm_eps=1e-6,
+                                          with_encoder_nonlocal_attn=True,
+                                          with_decoder_nonlocal_attn=True,
+                                          use_flash_attention=False,
+                                          use_checkpointing=False,
+                                          use_convtranspose=False)
+
+
+    def reconstruction(self, x):
+        return self.decoder_model(x)
+
+    def forward(self, x16_out, x32_out, x64_out):
+
+        x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
+        x = self.up2(x, x64_out)       # 1,320,64,64
+        gen_feature = self.feature_generator(x) # 1, 4, 64, 64
+        # [1] recon
+        reconstruction, z_mu, z_sigma = self.reconstruction(gen_feature) # 1,3,512,512
+
+        x = self.segmentation_head(x)
+        logits = self.outc(x)  # 1, 4, 128,128
+        #return gen_feature, logits
+        return reconstruction, z_mu, z_sigma, logits
