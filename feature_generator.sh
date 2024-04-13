@@ -7,7 +7,7 @@ trigger_word="cardiac"
 benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_feature_matching"
+file_name="Finetune_segment_head_feature_merging"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -30,5 +30,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --high_latent_feature \
- --independent_decoder \
- --use_patch_discriminator
+ --independent_decoder

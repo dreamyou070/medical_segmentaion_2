@@ -192,16 +192,17 @@ class SemanticSeg_Gen(nn.Module):
     def reconstruction(self, x):
         return self.decoder_model(x)
 
-    def forward(self, x16_out, x32_out, x64_out):
+    def forward(self, x16_out, x32_out, x64_out, init_latent):
 
         x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
         x = self.up2(x, x64_out)       # 1,320,64,64
 
         # ----------------------------------------------------------------------------------------------------
-        # pixel matching
+        # semantic rich feature
         gen_feature = self.feature_generator(x) # 1, 4, 64, 64
         # [1] recon
-        reconstruction, z_mu, z_sigma = self.reconstruction(gen_feature) # 1,3,512,512
+        merged_feature = gen_feature + init_latent
+        reconstruction, z_mu, z_sigma = self.reconstruction(merged_feature)
 
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128

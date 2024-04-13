@@ -167,7 +167,7 @@ def main(args):
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out)
+            reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
             recons_loss = l1_loss(reconstruction_org.float(), image.float())
@@ -175,26 +175,6 @@ def main(args):
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
             generator_loss = recons_loss + kl_weight * kl_loss
 
-
-            # ------------------------------------------------------------------------------------------------------------
-            with torch.no_grad():
-                latents = vae.encode(reconstruction_org).latent_dist.sample() * args.vae_scale_factor
-            with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                q_dict[res] = reshaped_query
-            x16_out_syn, x32_out_syn, x64_out_syn = q_dict[16], q_dict[32], q_dict[64]
-            reconstruction_syn, z_mu_syn, z_sigma_syn, masks_pred_syn = segmentation_head(x16_out_syn, x32_out_syn, x64_out_syn)
-            # ------------------------------------------------------------------------------------------------------------
-            # [3] mask pred matching loss
-            mask_pred_matching_loss = l2_loss(masks_pred_syn.float(),
-                                              masks_pred_org.float()).mean()
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
@@ -216,9 +196,6 @@ def main(args):
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
             loss = loss + generator_loss
-
-
-            loss += mask_pred_matching_loss
             loss = loss.mean()
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
