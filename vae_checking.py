@@ -77,8 +77,8 @@ def main(args):
             # reconstruct (torch image)
             recon_latent = vae.decode(latents / args.vae_scale_factor)[0]
             from diffusers.image_processor import VaeImageProcessor
-            image_processor = VaeImageProcessor(vae_scale_factor=args.vae.config.scaling_factor)
-            recon_image = image_processor.postprocess(image, output_type='pil')[0]
+            image_processor = VaeImageProcessor(vae_scale_factor=args.vae_scale_factor)
+            recon_image = image_processor.postprocess(recon_latent, output_type='pil')[0]
             recon_image.save(os.path.join(save_folder, f'{step}.png'))
 
 
