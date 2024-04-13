@@ -196,6 +196,9 @@ class SemanticSeg_Gen(nn.Module):
 
         x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
         x = self.up2(x, x64_out)       # 1,320,64,64
+
+        # ----------------------------------------------------------------------------------------------------
+        # pixel matching
         gen_feature = self.feature_generator(x) # 1, 4, 64, 64
         # [1] recon
         reconstruction, z_mu, z_sigma = self.reconstruction(gen_feature) # 1,3,512,512
@@ -203,4 +206,4 @@ class SemanticSeg_Gen(nn.Module):
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
         #return gen_feature, logits
-        return reconstruction, z_mu, z_sigma, logits
+        return reconstruction, z_mu, z_sigma, logits #, gen_feature

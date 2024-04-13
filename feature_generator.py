@@ -190,6 +190,11 @@ def main(args):
                 q_dict[res] = reshaped_query
             x16_out_syn, x32_out_syn, x64_out_syn = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_syn, z_mu_syn, z_sigma_syn, masks_pred_syn = segmentation_head(x16_out_syn, x32_out_syn, x64_out_syn)
+            # ------------------------------------------------------------------------------------------------------------
+            # [3] mask pred matching loss
+            print(f' masks_pred_syn = {masks_pred_syn} | masks_pred_org = {masks_pred_org}')
+            mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(),
+                                                       masks_pred_org.float()).mean()
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
@@ -212,11 +217,7 @@ def main(args):
                 loss = loss.mean()
             loss = loss + generator_loss
 
-            # ------------------------------------------------------------------------------------------------------------
-            # [3] mask pred matching loss
-            print(f' masks_pred_syn = {masks_pred_syn.shape} | masks_pred_org = {masks_pred_org.shape}')
-            mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(),
-                                                       masks_pred_org.float()).mean()
+
             loss += mask_pred_matching_loss
             loss = loss.mean()
             current_loss = loss.detach().item()
