@@ -17,7 +17,7 @@ cardiac_class_map = {0: ['b','background'],
                         2: ['m','myocardium'],
                         3: ['r','right ventricle'],}
 abdomen_class_map = {0: ['b','background'],
-                        1: ['a','aorta'],
+                        1: ['x','aorta'],
                         2: ['l','liver'],
                         3: ['k','kidney'],
                         4: ['t','tumor'],
