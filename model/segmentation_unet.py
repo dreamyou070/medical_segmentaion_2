@@ -147,7 +147,8 @@ class SemanticSeg_Gen(nn.Module):
                  use_instance_norm = True,
                  mask_res = 128,
                  high_latent_feature = False,
-                 init_latent_p = 1):
+                 init_latent_p = 1,
+                 decoder = None):
 
         super(SemanticSeg_Gen, self).__init__()
 
@@ -172,22 +173,25 @@ class SemanticSeg_Gen(nn.Module):
                                                    nn.Sigmoid())
         self.outc = OutConv(160, n_classes)
 
-        latent_dim = 320
-        if not self.high_latent_feature:
-            latent_dim = 4
-        self.decoder_model = AutoencoderKL(spatial_dims=2,
-                                          out_channels=3,
-                                          num_res_blocks=(2, 2, 2, 2),
-                                          num_channels=(32, 64, 64, 64),
-                                          attention_levels=(False, False, True, True),
-                                          latent_channels=latent_dim,
-                                          norm_num_groups=32,
-                                          norm_eps=1e-6,
-                                          with_encoder_nonlocal_attn=True,
-                                          with_decoder_nonlocal_attn=True,
-                                          use_flash_attention=False,
-                                          use_checkpointing=False,
-                                          use_convtranspose=False)
+        if decoder is not None :
+            self.decoder_model = decoder
+        else :
+            latent_dim = 320
+            if not self.high_latent_feature:
+                latent_dim = 4
+            self.decoder_model = AutoencoderKL(spatial_dims=2,
+                                              out_channels=3,
+                                              num_res_blocks = (2, 2, 2, 2),
+                                              num_channels = (32, 64, 64, 64),
+                                              attention_levels=(False, False, True, True),
+                                              latent_channels=latent_dim,
+                                              norm_num_groups=32,
+                                              norm_eps=1e-6,
+                                              with_encoder_nonlocal_attn=True,
+                                              with_decoder_nonlocal_attn=True,
+                                              use_flash_attention=False,
+                                              use_checkpointing=False,
+                                              use_convtranspose=False)
         self.init_latent_p = init_latent_p
 
 
@@ -211,3 +215,14 @@ class SemanticSeg_Gen(nn.Module):
         logits = self.outc(x)  # 1, 4, 128,128
         #return gen_feature, logits
         return reconstruction, z_mu, z_sigma, logits #, gen_feature
+
+model = SemanticSeg_Gen(n_classes=14,
+                                        mask_res=256,
+                                        high_latent_feature=False,
+                                        init_latent_p=True)
+x16_out = torch.randn(1, 1280, 16, 16)
+x32_out = torch.randn(1, 640, 32, 32)
+x64_out = torch.randn(1, 320, 64, 64)
+init_latent = torch.randn(1, 4, 64, 64)
+reconstruction, z_mu, z_sigma, logits = model(x16_out, x32_out, x64_out, init_latent)
+print(f'reconstruction: {reconstruction.shape}')
