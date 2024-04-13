@@ -262,12 +262,13 @@ def main(args):
             masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous()
             masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=masks_pred_org,
+                                   target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred_org.device))  # N
                 if args.use_monai_focal_loss:
                     focal_loss = focal_loss.mean()
                 loss += focal_loss
@@ -275,7 +276,7 @@ def main(args):
 
                 # [5.3] Dice Loss
                 if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
+                    dice_loss = loss_Dice(masks_pred_org, gt)
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
 
@@ -285,7 +286,7 @@ def main(args):
                     eps = 1e-15
                     # background have not many to train
                     deactivating_loss = []
-                    pred_prob = torch.softmax(masks_pred, dim=1)
+                    pred_prob = torch.softmax(masks_pred_org, dim=1)
                     pred_prob = pred_prob.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4
                     gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
                     gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
