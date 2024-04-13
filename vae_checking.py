@@ -75,7 +75,7 @@ def main(args):
         with torch.no_grad():
             latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             # reconstruct (torch image)
-            recon_latent = vae.decode(latents / args.vae.config.scaling_factor)[0]
+            recon_latent = vae.decode(latents / args.vae_scale_factor)[0]
             from diffusers.image_processor import VaeImageProcessor
             image_processor = VaeImageProcessor(vae_scale_factor=args.vae.config.scaling_factor)
             recon_image = image_processor.postprocess(image, output_type='pil')[0]
