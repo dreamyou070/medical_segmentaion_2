@@ -194,12 +194,9 @@ def main(args):
                                 generator = torch.Generator()
                                 generator.manual_seed(i)
                                 # image = [1,3,512,512]
-                                reconstruction = vae(sample = image,
-                                                     generator = generator).sample # [1,3,512,512]
-                                # autoencoder reconstruction image
-                                image = image_processor.postprocess(reconstruction, output_type='pil')[0]
-                                print(f'type of image = {type(image)}')
-                                image.save(f'{check_base_folder}/original_vae_{i}.png')
+                                reconstruction = vae(sample = image, generator = generator).sample # [1,3,512,512]
+                                recon_img = image_processor.postprocess(reconstruction, output_type='pil')[0]
+                                recon_img.save(f'{check_base_folder}/original_vae_{i}.png')
 
                             # ----------------------------------------------------------------------------------------------
                             # [3] stochastic sampling
