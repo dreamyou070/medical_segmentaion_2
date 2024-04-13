@@ -149,79 +149,80 @@ def main(args):
             rgb_imgs = os.listdir(rgb_folder)
 
 
-            for rgb_img in rgb_imgs:
-                name, ext = os.path.splitext(rgb_img)
-                rgb_img_dir = os.path.join(rgb_folder, rgb_img)
-                pil_img = Image.open(rgb_img_dir).convert('RGB')
-                org_h, org_w = pil_img.size
+            for idx, rgb_img in enumerate(rgb_imgs):
+                if idx == 0 :
+                    name, ext = os.path.splitext(rgb_img)
+                    rgb_img_dir = os.path.join(rgb_folder, rgb_img)
+                    pil_img = Image.open(rgb_img_dir).convert('RGB')
+                    org_h, org_w = pil_img.size
 
-                # [1] read object mask
-                input_img = pil_img
-                trg_h, trg_w = input_img.size
-                if accelerator.is_main_process:
-                    # [2] Stable Diffusion
-                    with torch.no_grad():
+                    # [1] read object mask
+                    input_img = pil_img
+                    trg_h, trg_w = input_img.size
+                    if accelerator.is_main_process:
+                        # [2] Stable Diffusion
+                        with torch.no_grad():
 
-                        # [2.1] latent
-                        img = np.array(input_img.resize((512, 512))) # [512,512,3]
-                        image = torch.from_numpy(img).float() / 127.5 - 1
-                        image = image.permute(2, 0, 1).unsqueeze(0).to(vae.device, weight_dtype) # [1,3,512,512]
-                        latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                            # [2.1] latent
+                            img = np.array(input_img.resize((512, 512))) # [512,512,3]
+                            image = torch.from_numpy(img).float() / 127.5 - 1
+                            image = image.permute(2, 0, 1).unsqueeze(0).to(vae.device, weight_dtype) # [1,3,512,512]
+                            latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
-                        # [2.2] text encoder
-                        args.prompt = 'a picture of a b, n, e, t'
-                        input_ids, attention_mask = get_input_ids(tokenizer, args.prompt)
-                        encoder_hidden_states = text_encoder(input_ids.to(text_encoder.device))["last_hidden_state"]
+                            # [2.2] text encoder
+                            args.prompt = 'a picture of a b, n, e, t'
+                            input_ids, attention_mask = get_input_ids(tokenizer, args.prompt)
+                            encoder_hidden_states = text_encoder(input_ids.to(text_encoder.device))["last_hidden_state"]
 
-                        # [2.3] Unet
-                        unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-                        query_dict, key_dict = controller.query_dict, controller.key_dict
-                        controller.reset()
-                        q_dict = {}
-                        for layer in args.trg_layer_list:
-                            query = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                            res = int(query.shape[1] ** 0.5)
-                            reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                            q_dict[res] = reshaped_query
-                        x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-                        hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
-                        # ----------------------------------------------------------------------------------------------
-                        # [3.0] vae decode
-                        posterior = vae.encode(image).latent_dist
-                        #mean, logvar = posterior.mean, posterior.logvar
-                        for i in range(10):
-                            # make many generator
-                            generator = torch.Generator()
-                            generator.manual_seed(i)
-                            reconstruction = vae(sample = image, generator = generator,).sample # [1,3,512,512]
-                            # autoencoder reconstruction image
-                            image = image_processor.postprocess(reconstruction, output_type='pil')
-                            image.save(f'{check_base_folder}/original_vae_{i}.png')
+                            # [2.3] Unet
+                            unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                            query_dict, key_dict = controller.query_dict, controller.key_dict
+                            controller.reset()
+                            q_dict = {}
+                            for layer in args.trg_layer_list:
+                                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                                res = int(query.shape[1] ** 0.5)
+                                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                                q_dict[res] = reshaped_query
+                            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+                            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
+                            # ----------------------------------------------------------------------------------------------
+                            # [3.0] vae decode
+                            posterior = vae.encode(image).latent_dist
+                            #mean, logvar = posterior.mean, posterior.logvar
+                            for i in range(10):
+                                # make many generator
+                                generator = torch.Generator()
+                                generator.manual_seed(i)
+                                reconstruction = vae(sample = image, generator = generator,).sample # [1,3,512,512]
+                                # autoencoder reconstruction image
+                                image = image_processor.postprocess(reconstruction, output_type='pil')
+                                image.save(f'{check_base_folder}/original_vae_{i}.png')
 
-                        # ----------------------------------------------------------------------------------------------
-                        # [3] stochastic sampling
-                        z_mu, z_sigma = decoder_model.encode(hidden_latent)
-                        trial_times = 10
-                        for i in range(trial_times) :
+                            # ----------------------------------------------------------------------------------------------
+                            # [3] stochastic sampling
+                            z_mu, z_sigma = decoder_model.encode(hidden_latent)
+                            trial_times = 10
+                            for i in range(trial_times) :
 
-                            z = decoder_model.sampling(z_mu, z_sigma)
-                            reconstruction = decoder_model.decode(z)
-                            # there is even minus value
-                            reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()#.numpy()
-                            # torch to numpy
-                            np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
-                            pil = Image.fromarray(np_img)
+                                z = decoder_model.sampling(z_mu, z_sigma)
+                                reconstruction = decoder_model.decode(z)
+                                # there is even minus value
+                                reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()#.numpy()
+                                # torch to numpy
+                                np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
+                                pil = Image.fromarray(np_img)
 
-                            #print(f'original value = {reconstruction_img}')
-                            #plt.imshow((reconstruction_img * 255).astype(np.uint8))
+                                #print(f'original value = {reconstruction_img}')
+                                #plt.imshow((reconstruction_img * 255).astype(np.uint8))
 
 
-                            # save
-                            recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
-                            os.makedirs(recon_folder, exist_ok=True)
-                            #plt.savefig(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
-                            pil.save(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
-                            #plt.close()
+                                # save
+                                recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
+                                os.makedirs(recon_folder, exist_ok=True)
+                                #plt.savefig(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
+                                pil.save(f'{check_base_folder}/gen_lora_epoch_{lora_epoch}_{i}.png')
+                                #plt.close()
         for k in raw_state_dict_orig.keys():
             raw_state_dict[k] = raw_state_dict_orig[k]
         network.load_state_dict(raw_state_dict)
