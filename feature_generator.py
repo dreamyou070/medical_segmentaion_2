@@ -216,8 +216,14 @@ def main(args):
                 posterior = DiagonalGaussianDistribution(hidden_latent)
                 z_mu, z_sigma = posterior.mean, posterior.std
                 reconstruction = vae.decode(hidden_latent).sample
-
+            # recons_loss is reconstruction loss between original image and reconstruction
+            # how to
             recons_loss = l1_loss(reconstruction.float(), image.float())
+
+            # what is this kl loss ?
+            # latent should be standard normal distribution
+            # latent is the output of the encoder with deep semantic feature
+
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
             generator_loss = recons_loss + kl_weight * kl_loss
