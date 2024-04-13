@@ -13,7 +13,7 @@ trigger_word="abdomen"
 benchmark="abdomen_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="pretrain"
+file_name="vae_checking"
 # --use_instance_norm
 # --binary_test
 #--network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/pretrain/pretrain_model/lora-000012.safetensors" \
