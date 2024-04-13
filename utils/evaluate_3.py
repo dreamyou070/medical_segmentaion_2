@@ -52,7 +52,7 @@ def evaluation_check(segmentation_head, dataloader, device,
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
+            reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
 
             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()  # .numpy()
             if global_num == 0 :
