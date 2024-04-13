@@ -230,6 +230,8 @@ class TrainDataset_Seg(Dataset):
             class_map = cardiac_class_map
         elif argument.obj_name == 'abdomen':
             class_map = abdomen_class_map
+        elif argument.obj_name == 'leader_polyp':
+            class_map = leader_polyp_class_map
 
         caption = base_prompts[np.random.randint(0, len(base_prompts))]
         for i, class_idx in enumerate(class_es):
