@@ -18,7 +18,7 @@ from model.pe import AllPositionalEmbedding
 from model.segmentation_unet import SemanticSeg
 from model.autodecoder import AutoencoderKL
 from matplotlib import pyplot as plt
-from diffusers.image_processor import VAEImageProcessor
+from diffusers.image_processor import VaeImageProcessor
 
 vae_scale_factor = 0.18215
 image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
