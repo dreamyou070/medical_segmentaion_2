@@ -45,7 +45,6 @@ def main(args):
 
     print(f' (2.4) decoder')
     decoder_model = AutoencoderKL(spatial_dims=2,
-                                  in_channels=1,
                                   out_channels=3,
                                   num_res_blocks=(2, 2, 2, 2), num_channels=(32, 64, 64, 64),
                                   attention_levels=(False, False, True, True),
