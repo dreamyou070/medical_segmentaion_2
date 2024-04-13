@@ -197,7 +197,8 @@ def main(args):
                                 reconstruction = vae(sample = image,
                                                      generator = generator).sample # [1,3,512,512]
                                 # autoencoder reconstruction image
-                                image = image_processor.postprocess(reconstruction, output_type='pil')
+                                image = image_processor.postprocess(reconstruction, output_type='pil')[0]
+                                print(f'type of image = {type(image)}')
                                 image.save(f'{check_base_folder}/original_vae_{i}.png')
 
                             # ----------------------------------------------------------------------------------------------
