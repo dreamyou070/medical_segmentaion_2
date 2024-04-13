@@ -57,7 +57,9 @@ def main(args):
 
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
-                                        high_latent_feature=args.high_latent_feature, )
+                                        high_latent_feature=args.high_latent_feature,
+                                        init_latent_p=args.init_latent_p)
+    )
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -379,7 +381,7 @@ if __name__ == "__main__":
     parser.add_argument("--independent_decoder", action='store_true')
     parser.add_argument("--high_latent_feature", action='store_true')
     parser.add_argument("--use_patch_discriminator", action='store_true')
-
+    parser.add_argument("--init_latent_p", type=float, default=1)
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

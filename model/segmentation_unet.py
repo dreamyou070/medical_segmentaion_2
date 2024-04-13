@@ -146,7 +146,8 @@ class SemanticSeg_Gen(nn.Module):
                  use_batchnorm=True,
                  use_instance_norm = True,
                  mask_res = 128,
-                 high_latent_feature = False):
+                 high_latent_feature = False,
+                 init_latent_p = 1):
 
         super(SemanticSeg_Gen, self).__init__()
 
@@ -187,6 +188,7 @@ class SemanticSeg_Gen(nn.Module):
                                           use_flash_attention=False,
                                           use_checkpointing=False,
                                           use_convtranspose=False)
+        self.init_latent_p = init_latent_p
 
 
     def reconstruction(self, x):
@@ -201,7 +203,8 @@ class SemanticSeg_Gen(nn.Module):
         # semantic rich feature
         gen_feature = self.feature_generator(x) # 1, 4, 64, 64
         # [1] recon
-        merged_feature = gen_feature + init_latent
+        merged_feature = gen_feature + self.init_latent_p * init_latent
+
         reconstruction, z_mu, z_sigma = self.reconstruction(merged_feature)
 
         x = self.segmentation_head(x)

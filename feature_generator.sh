@@ -1,13 +1,13 @@
 # !/bin/bash
 
-port_number=51277
+port_number=51288
 category="medical"
-obj_name="abdomen"
-trigger_word="abdomen"
-benchmark="abdomen_256"
+obj_name="cardiac"
+trigger_word="cardiac"
+benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_Finetune_segment_head_feature_merging"
+file_name="2_Finetune_segment_head_only_semantic_latent"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -24,8 +24,9 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 14 \
+ --n_classes 4 \
  --mask_res 256 \
  --use_batchnorm \
  --use_dice_ce_loss \
- --optimizer_args weight_decay=0.00005
+ --optimizer_args weight_decay=0.00005 \
+ --init_latent_p 0.0
