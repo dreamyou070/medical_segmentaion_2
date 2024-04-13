@@ -1,12 +1,14 @@
 from __future__ import annotations
-
 import importlib.util
 import math
 from collections.abc import Sequence
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
+parent = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+import sys
+sys.path.append(parent)
 from monai.networks.blocks import Convolution
 from monai.utils import ensure_tuple_rep
 
@@ -20,7 +22,7 @@ else:
     xformers = None
     has_xformers = False
 
-# TODO: Use MONAI's optional_import
+# TODO: Use MONA's optional_import
 # from monai.utils import optional_import
 # xformers, has_xformers = optional_import("xformers.ops", name="xformers")
 
@@ -519,6 +521,9 @@ class AutoencoderKL(nn.Module):
                                with_nonlocal_attn=with_decoder_nonlocal_attn,
                                use_flash_attention=use_flash_attention,
                                use_convtranspose=use_convtranspose,)
+
+
+
         self.quant_conv_mu = Convolution(spatial_dims=spatial_dims,
                                          in_channels=latent_channels,
                                          out_channels=latent_channels,
@@ -636,3 +641,21 @@ class AutoencoderKL(nn.Module):
         image = self.decode(z)
         return image
 
+latent_dim = 4
+decoder_model = AutoencoderKL(spatial_dims=2,
+                              out_channels=3,
+                              num_res_blocks=(2, 2, 2, 2),
+                              num_channels=(32, 64, 64, 64),
+                              attention_levels=(False, False, True, True),
+                              latent_channels=latent_dim,
+                              norm_num_groups=32,
+                              norm_eps=1e-6,
+                              with_encoder_nonlocal_attn=True,
+                              with_decoder_nonlocal_attn=True,
+                              use_flash_attention=False,
+                              use_checkpointing=False,
+                              use_convtranspose=False)
+input_feature = torch.randn(1,4,64,64)
+reconstruction, z_mu, z_sigma = decoder_model(input_feature)
+# print(reconstruction.shape)
+# also generator pseudo label ?

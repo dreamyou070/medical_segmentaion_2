@@ -27,7 +27,7 @@ from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
-
+from utils.losses import PatchAdversarialLoss
 def main(args):
 
     print(f'\n step 1. setting')
@@ -74,6 +74,8 @@ def main(args):
         latent_dim = 320
         if not args.high_latent_feature:
             latent_dim = 4
+
+        # from 64 to 512
         decoder_model = AutoencoderKL(spatial_dims=2,
                                       out_channels=3,
                                       num_res_blocks=(2, 2, 2, 2),
@@ -90,6 +92,20 @@ def main(args):
     else : # vae decoder training
         decoder_model = vae
 
+    if args.use_patch_discriminator :
+        from model.discriminator import PatchDiscriminator
+        from monai.networks.layers import Act
+        discriminator = PatchDiscriminator(spatial_dims=2,
+                                           num_layers_d=3,
+                                           num_channels=64,
+                                           in_channels=1,
+                                           out_channels=1,
+                                           kernel_size=4,
+                                           activation=(Act.LEAKYRELU, {"negative_slope": 0.2}),
+                                           norm="BATCH",
+                                           bias=False,
+                                           padding=1,)
+
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -99,6 +115,8 @@ def main(args):
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     if args.independent_decoder :
         trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
+    if args.use_patch_discriminator :
+        trainable_params.append({"params": discriminator.parameters(), "lr": args.learning_rate})
 
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -107,6 +125,7 @@ def main(args):
 
     print(f'\n step 7. loss function')
     l1_loss = L1Loss()
+    adv_loss = PatchAdversarialLoss(criterion="least_squares")
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
     if args.use_monai_focal_loss:
@@ -143,6 +162,9 @@ def main(args):
     decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
                 accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
+    if args.use_patch_discriminator :
+        discriminator = accelerator.prepare(discriminator)
+        discriminator = transform_models_if_DDP([discriminator])[0]
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
@@ -216,6 +238,22 @@ def main(args):
                 posterior = DiagonalGaussianDistribution(hidden_latent)
                 z_mu, z_sigma = posterior.mean, posterior.std
                 reconstruction = vae.decode(hidden_latent).sample
+
+            # [3] reconstruction make pseudo label
+            # what is the guide ? (not same label)
+            if args.use_patch_discriminator :
+                logits_fake = discriminator(reconstruction.contiguous().float())[-1]
+                loss_d_fake = adv_loss(logits_fake, target_is_real=False, for_discriminator=True)
+                logits_real = discriminator(image.contiguous().detach())[-1]
+                loss_d_real = adv_loss(logits_real, target_is_real=True, for_discriminator=True)
+                discriminator_loss = (loss_d_fake + loss_d_real) * 0.5
+
+
+
+
+
+
+
             # recons_loss is reconstruction loss between original image and reconstruction
             # how to
             recons_loss = l1_loss(reconstruction.float(), image.float())
@@ -255,7 +293,7 @@ def main(args):
                 # masks_pred = Batch, Class_num, H, W
                 if args.deactivating_loss:
                     eps = 1e-15
-                    # background have not many to train 
+                    # background have not many to train
                     deactivating_loss = []
                     pred_prob = torch.softmax(masks_pred, dim=1)
                     pred_prob = pred_prob.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4
@@ -271,6 +309,8 @@ def main(args):
                 loss = loss.mean()
 
             loss = loss + generator_loss
+            if args.use_patch_discriminator :
+                loss = loss + discriminator_loss
 
             loss = loss.to(weight_dtype)
             current_loss = loss.detach().item()
@@ -461,6 +501,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_cls_token", action='store_true')
     parser.add_argument("--independent_decoder", action='store_true')
     parser.add_argument("--high_latent_feature", action='store_true')
+    parser.add_argument("--use_patch_discriminator", action='store_true')
+
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

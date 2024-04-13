@@ -8,9 +8,9 @@
 
 port_number=51261
 category="medical"
-obj_name="brain"
-trigger_word="brain"
-benchmark="BraTS2020_Segmentation_256"
+obj_name="cardiac"
+trigger_word="cardiac"
+benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="pretrain"
@@ -31,5 +31,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --aggregation_model_c \
  --n_classes 4 \
  --mask_res 256 \
- --sample_prompts "medical.txt" \
+ --sample_prompts "cardiac_medical.txt" \
  --optimizer_args weight_decay=0.00005

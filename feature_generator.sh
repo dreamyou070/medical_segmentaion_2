@@ -1,21 +1,14 @@
 # !/bin/bash
-# brain -> BraTS2020_Segmentation_256
-# abdomen ->
 
-# 2_absolute_pe_segmentation_model_a_cross_focal_use_batch_norm_query
-# 4_absolute_pe_segmentation_model_c_cross_focal_use_batch_norm_query
-# 6_absolute_pe_segmentation_model_b_cross_focal_use_batch_norm_query
-
-port_number=51255
+port_number=51266
 category="medical"
-obj_name="brain"
-trigger_word="brain"
-benchmark="BraTS2020_Segmentation_256"
+obj_name="cardiac"
+trigger_word="cardiac"
+benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_low_feature_from_original_vae"
-# --use_instance_norm
-# --binary_test
+file_name="Finetune_segment_head_high_feature_patch_discriminator"
+
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
@@ -32,9 +25,11 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --aggregation_model_c \
  --n_classes 4 \
  --mask_res 256 \
  --use_batchnorm \
  --use_dice_ce_loss \
- --optimizer_args weight_decay=0.00005
+ --optimizer_args weight_decay=0.00005 \
+ --high_latent_feature \
+ --independent_decoder \
+ --use_patch_discriminator
