@@ -214,6 +214,7 @@ def main(args):
 
             # ------------------------------------------------------------------------------------------------------------
             # [3] mask pred matching loss
+            print(f' masks_pred_syn = {masks_pred_syn.shape} | masks_pred_org = {masks_pred_org.shape}')
             mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(),
                                                        masks_pred_org.float()).mean()
             loss += mask_pred_matching_loss
