@@ -29,5 +29,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --use_batchnorm \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
- --high_latent_feature \
- --independent_decoder
+ --high_latent_feature
