@@ -70,6 +70,7 @@ def main(args):
 
     print(f'\n step 7. loss function')
     l1_loss = L1Loss()
+    l2_loss = nn.MSELoss()
     adv_loss = PatchAdversarialLoss(criterion="least_squares")
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
@@ -192,9 +193,8 @@ def main(args):
             reconstruction_syn, z_mu_syn, z_sigma_syn, masks_pred_syn = segmentation_head(x16_out_syn, x32_out_syn, x64_out_syn)
             # ------------------------------------------------------------------------------------------------------------
             # [3] mask pred matching loss
-            print(f' masks_pred_syn = {masks_pred_syn} | masks_pred_org = {masks_pred_org}')
-            mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(),
-                                                       masks_pred_org.float()).mean()
+            mask_pred_matching_loss = l2_loss(masks_pred_syn.float(),
+                                              masks_pred_org.float()).mean()
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
