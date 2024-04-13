@@ -28,6 +28,7 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
+
 def main(args):
 
     print(f'\n step 1. setting')
@@ -54,74 +55,14 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
-    # [2] pe
-    position_embedder = None
-    if args.use_position_embedder:
-        position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
-                                                   do_semantic_position=args.do_semantic_position,)
-
-    if args.position_embedder_weights is not None:
-        position_embedder_state_dict = load_file(args.position_embedder_weights)
-        position_embedder.load_state_dict(position_embedder_state_dict)
-        position_embedder.to(dtype=weight_dtype)
-
-    #segmentation_head = SemanticSeg(n_classes=args.n_classes,
-    #                                mask_res=args.mask_res,
-    #                                high_latent_feature=args.high_latent_feature,)
-
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
-                                    mask_res=args.mask_res,
-                                    high_latent_feature=args.high_latent_feature, )
+                                        mask_res=args.mask_res,
+                                        high_latent_feature=args.high_latent_feature, )
 
-    """
-    if args.independent_decoder:
-        latent_dim = 320
-        if not args.high_latent_feature:
-            latent_dim = 4
-
-        # from 64 to 512
-        decoder_model = AutoencoderKL(spatial_dims=2,
-                                      out_channels=3,
-                                      num_res_blocks=(2, 2, 2, 2),
-                                      num_channels=(32, 64, 64, 64),
-                                      attention_levels=(False, False, True, True),
-                                      latent_channels=latent_dim,
-                                      norm_num_groups=32,
-                                      norm_eps=1e-6,
-                                      with_encoder_nonlocal_attn=True,
-                                      with_decoder_nonlocal_attn=True,
-                                      use_flash_attention=False,
-                                      use_checkpointing=False,
-                                      use_convtranspose=False)
-    else : # vae decoder training
-        decoder_model = vae
-    
-    if args.use_patch_discriminator :
-        from model.discriminator import PatchDiscriminator
-        from monai.networks.layers import Act
-        discriminator = PatchDiscriminator(spatial_dims=2,
-                                           num_layers_d=3,
-                                           num_channels=512,
-                                           in_channels=3,
-                                           out_channels=3,
-                                           kernel_size=4,
-                                           activation=(Act.LEAKYRELU, {"negative_slope": 0.2}),
-                                           norm="BATCH",
-                                           bias=False,
-                                           padding=1, )
-
-    """
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
-    if args.use_position_embedder:
-        trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    #if args.independent_decoder :
-    #    trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
-    #if args.use_patch_discriminator :
-    #    trainable_params.append({"params": discriminator.parameters(), "lr": args.learning_rate})
-
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -163,24 +104,15 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    #decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-    #            accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
-    #                                test_dataloader, lr_scheduler)
     segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
-                                    test_dataloader, lr_scheduler)
-    #if args.use_patch_discriminator :
-    #    discriminator = accelerator.prepare(discriminator)
-    #    discriminator = transform_models_if_DDP([discriminator])[0]
+      accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-    #decoder_model = transform_models_if_DDP([decoder_model])[0]
 
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
-        #decoder_model.train()
         for t_enc in text_encoders:
             t_enc.train()
             if args.train_text_encoder:
@@ -308,17 +240,7 @@ def main(args):
                                                                    masks_pred_org.float()).mean()
             loss += mask_pred_matching_loss
             loss = loss.mean()
-            """
-            # [3] reconstruction make pseudo label
-            # what is the guide ? (not same label)
-            if args.use_patch_discriminator :
-                # problem
-                logits_fake = discriminator(reconstruction.contiguous().float())[-1]
-                loss_d_fake = adv_loss(logits_fake, target_is_real=False, for_discriminator=True)
-                logits_real = discriminator(image.contiguous().detach())[-1]
-                loss_d_real = adv_loss(logits_real, target_is_real=True, for_discriminator=True)
-                discriminator_loss = (loss_d_fake + loss_d_real) * 0.5
-            """
+
             # [3] unet with recon image
             with torch.no_grad():
                 latents = vae.encode(reconstruction).latent_dist.sample() * args.vae_scale_factor
@@ -387,14 +309,6 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            """
-
-            save_model(args,
-                      saving_folder='decoder',
-                      saving_name=f'decoder-{saving_epoch}.pt',
-                      unwrapped_nw=accelerator.unwrap_model(decoder_model),
-                      save_dtype=save_dtype)
-            """
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -402,10 +316,8 @@ def main(args):
         if args.check_training:
             print(f'test with training data')
             loader = train_dataloader
-        decoder_model = None
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           text_encoder, unet, vae, controller, weight_dtype,
-                                                           position_embedder, decoder_model, epoch, args)
+                                                           text_encoder, unet, vae, controller, weight_dtype, epoch, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')

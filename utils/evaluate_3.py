@@ -23,11 +23,11 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      text_encoder, unet, vae,
-                     controller, weight_dtype,
-                     position_embedder,
-                     decoder_model,
+                     controller,
+                     weight_dtype,
                      epoch,
                      args):
+
     segmentation_head.eval()
 
     with torch.no_grad():
@@ -42,7 +42,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type=position_embedder)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict= controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -54,29 +54,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
 
-            # [0] generation task # gen_feature = Batch, 4, H, W
-            """
-            if args.independent_decoder:
-                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
-            else:
-                # [1] get z_mu, z_sigma
-                posterior = DiagonalGaussianDistribution(hidden_latent)
-                z_mu, z_sigma = posterior.mean, posterior.std
-                reconstruction = vae.decode(hidden_latent).sample
-            """
             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()  # .numpy()
-
-
-
-
-
-
-
-
-
-
-
-
             if global_num == 0 :
                 np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
                 pil = Image.fromarray(np_img)
@@ -110,8 +88,6 @@ def evaluation_check(segmentation_head, dataloader, device,
             total_predict_num = sum(confusion_matrix[:, actual_idx])
             dice_coeff = 2 * confusion_matrix[actual_idx, actual_idx] / (total_actual_num + total_predict_num + eps)
             IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
-
         # [1] WC Score
-
     segmentation_head.train()
     return IOU_dict, confusion_matrix, dice_coeff
