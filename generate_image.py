@@ -100,8 +100,7 @@ def main(args):
         # [3] segmentation model
         seg_base_dir = os.path.join(parent, f'segmentation')
         pretrained_seg_dir = os.path.join(seg_base_dir, f'segmentation-{lora_epoch}.pt')
-        state_dict = torch.load(pretrained_seg_dir)
-        segmentation_head.load_state_dict(state_dict)
+        segmentation_head.load_state_dict(torch.load(pretrained_seg_dir))
         segmentation_head.to(accelerator.device, dtype=weight_dtype)
 
         # [3] decoder file
@@ -148,7 +147,6 @@ def main(args):
             gt_folder = os.path.join(anomal_folder_dir, f'mask_{folder_res}')
             rgb_imgs = os.listdir(rgb_folder)
 
-
             for idx, rgb_img in enumerate(rgb_imgs):
                 if idx == 0 :
                     name, ext = os.path.splitext(rgb_img)
@@ -186,18 +184,20 @@ def main(args):
                                 q_dict[res] = reshaped_query
                             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
                             hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
+
                             # ----------------------------------------------------------------------------------------------
                             # [3.0] vae decode
-                            posterior = vae.encode(image).latent_dist
+                            #posterior = vae.encode(image).latent_dist
                             #mean, logvar = posterior.mean, posterior.logvar
                             for i in range(10):
                                 # make many generator
                                 generator = torch.Generator()
                                 generator.manual_seed(i)
-                                reconstruction = vae(sample = image, generator = generator,).sample # [1,3,512,512]
+                                # image = [1,3,512,512]
+                                reconstruction = vae(sample = image,
+                                                     generator = generator).sample # [1,3,512,512]
                                 # autoencoder reconstruction image
-                                image = image_processor.postprocess(reconstruction,
-                                                                    output_type='pil')[0]
+                                image = image_processor.postprocess(reconstruction, output_type='pil')
                                 image.save(f'{check_base_folder}/original_vae_{i}.png')
 
                             # ----------------------------------------------------------------------------------------------
