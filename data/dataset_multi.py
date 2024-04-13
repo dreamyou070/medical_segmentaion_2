@@ -33,7 +33,7 @@ abdomen_class_map = {0: ['b','background'],
 
 leader_polyp_class_map = {0: ['b','background'],
                           1: ['p','polyp'],
-                          2: ['a','angiodysplasia'],}
+                          2: ['n','neg'],}
 
 """
 cardiac_class_map = {0: ['b','background'],
