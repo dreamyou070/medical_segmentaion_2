@@ -97,7 +97,7 @@ def main(args):
         from monai.networks.layers import Act
         discriminator = PatchDiscriminator(spatial_dims=2,
                                            num_layers_d=3,
-                                           num_channels=64,
+                                           num_channels=512,
                                            in_channels=1,
                                            out_channels=1,
                                            kernel_size=4,
@@ -242,6 +242,7 @@ def main(args):
             # [3] reconstruction make pseudo label
             # what is the guide ? (not same label)
             if args.use_patch_discriminator :
+                # problem
                 logits_fake = discriminator(reconstruction.contiguous().float())[-1]
                 loss_d_fake = adv_loss(logits_fake, target_is_real=False, for_discriminator=True)
                 logits_real = discriminator(image.contiguous().detach())[-1]
