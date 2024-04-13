@@ -148,7 +148,7 @@ class SemanticSeg_Gen(nn.Module):
                  mask_res = 128,
                  high_latent_feature = False):
 
-        super(SemanticSeg, self).__init__()
+        super(SemanticSeg_Gen, self).__init__()
 
         factor = 2 if bilinear else 1
         self.up1 = Up(1280, 640 // factor, bilinear, use_batchnorm, use_instance_norm)

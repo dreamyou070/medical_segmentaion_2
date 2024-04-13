@@ -8,7 +8,7 @@ from attention_store import AttentionStore
 from data import call_dataset
 from diffusers import DDPMScheduler
 from model import call_model_package
-from model.segmentation_unet import SemanticSeg
+from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
@@ -65,11 +65,15 @@ def main(args):
         position_embedder.load_state_dict(position_embedder_state_dict)
         position_embedder.to(dtype=weight_dtype)
 
-    segmentation_head = SemanticSeg(n_classes=args.n_classes,
+    #segmentation_head = SemanticSeg(n_classes=args.n_classes,
+    #                                mask_res=args.mask_res,
+    #                                high_latent_feature=args.high_latent_feature,)
+
+    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                     mask_res=args.mask_res,
-                                    high_latent_feature=args.high_latent_feature,)
+                                    high_latent_feature=args.high_latent_feature, )
 
-
+    """
     if args.independent_decoder:
         latent_dim = 320
         if not args.high_latent_feature:
@@ -91,7 +95,7 @@ def main(args):
                                       use_convtranspose=False)
     else : # vae decoder training
         decoder_model = vae
-
+    
     if args.use_patch_discriminator :
         from model.discriminator import PatchDiscriminator
         from monai.networks.layers import Act
@@ -106,17 +110,17 @@ def main(args):
                                            bias=False,
                                            padding=1, )
 
-
+    """
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    if args.independent_decoder :
-        trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
-    if args.use_patch_discriminator :
-        trainable_params.append({"params": discriminator.parameters(), "lr": args.learning_rate})
+    #if args.independent_decoder :
+    #    trainable_params.append({"params": decoder_model.parameters(), "lr": args.learning_rate})
+    #if args.use_patch_discriminator :
+    #    trainable_params.append({"params": discriminator.parameters(), "lr": args.learning_rate})
 
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -159,21 +163,24 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-                accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+    #decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+    #            accelerator.prepare(decoder_model,segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
+    #                                test_dataloader, lr_scheduler)
+    segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+                accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader,
                                     test_dataloader, lr_scheduler)
-    if args.use_patch_discriminator :
-        discriminator = accelerator.prepare(discriminator)
-        discriminator = transform_models_if_DDP([discriminator])[0]
+    #if args.use_patch_discriminator :
+    #    discriminator = accelerator.prepare(discriminator)
+    #    discriminator = transform_models_if_DDP([discriminator])[0]
     text_encoders = transform_models_if_DDP([text_encoder])
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-    decoder_model = transform_models_if_DDP([decoder_model])[0]
+    #decoder_model = transform_models_if_DDP([decoder_model])[0]
 
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
-        decoder_model.train()
+        #decoder_model.train()
         for t_enc in text_encoders:
             t_enc.train()
             if args.train_text_encoder:
@@ -379,12 +386,14 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
+            """
 
             save_model(args,
                       saving_folder='decoder',
                       saving_name=f'decoder-{saving_epoch}.pt',
                       unwrapped_nw=accelerator.unwrap_model(decoder_model),
                       save_dtype=save_dtype)
+            """
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -392,6 +401,7 @@ def main(args):
         if args.check_training:
             print(f'test with training data')
             loader = train_dataloader
+        decoder_model = None
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            text_encoder, unet, vae, controller, weight_dtype,
                                                            position_embedder, decoder_model, epoch, args)
