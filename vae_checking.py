@@ -8,21 +8,11 @@ from attention_store import AttentionStore
 from data import call_dataset
 from diffusers import DDPMScheduler
 from model import call_model_package
-from model.segmentation_unet import Segmentation_Head_a, Segmentation_Head_b, Segmentation_Head_c, Segmentation_Head_d
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
-from utils.optimizer import get_optimizer, get_scheduler_fix
-from utils.saving import save_model
-from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate_2 import evaluation_check as evaluation_check_2
-from model.pe import AllPositionalEmbedding
-from safetensors.torch import load_file
-from monai.utils import DiceCEReduction, LossReduction
-from utils import get_noise_noisy_latents_and_timesteps
-
 
 def main(args):
 
