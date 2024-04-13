@@ -16,6 +16,21 @@ cardiac_class_map = {0: ['b','background'],
                         1: ['l','left ventricle'],
                         2: ['m','myocardium'],
                         3: ['r','right ventricle'],}
+abdoman_class_map = {0: ['b','background'],
+                        1: ['a','aorta'],
+                        2: ['l','liver'],
+                        3: ['k','kidney'],
+                        4: ['t','tumor'],
+                        5: ['v','vein'],
+                        6: ['s','spleen'],
+                        7: ['p','pancreas'],
+                        8: ['g','gallbladder'],
+                        9: ['f','fat'],
+                        10: ['m','muscle'],
+                        11: ['h','heart'],
+                        12: ['i','intestine'],
+                        13: ['o','other'],}
+
 
 """
 cardiac_class_map = {0: ['b','background'],
@@ -210,6 +225,8 @@ class TrainDataset_Seg(Dataset):
             class_map = brain_class_map
         elif argument.obj_name == 'cardiac':
             class_map = cardiac_class_map
+        elif argument.obj_name == 'abdoman':
+            class_map = abdoman_class_map
 
         caption = base_prompts[np.random.randint(0, len(base_prompts))]
         for i, class_idx in enumerate(class_es):
