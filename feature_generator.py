@@ -98,13 +98,13 @@ def main(args):
         discriminator = PatchDiscriminator(spatial_dims=2,
                                            num_layers_d=3,
                                            num_channels=512,
-                                           in_channels=1,
-                                           out_channels=1,
+                                           in_channels=3,
+                                           out_channels=3,
                                            kernel_size=4,
                                            activation=(Act.LEAKYRELU, {"negative_slope": 0.2}),
                                            norm="BATCH",
                                            bias=False,
-                                           padding=1,)
+                                           padding=1, )
 
 
     print(f'\n step 5. optimizer')
