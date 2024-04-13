@@ -17,6 +17,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from PIL import Image
 import os
+from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 def eval_step(engine, batch):
     return batch
 @torch.inference_mode()
@@ -51,11 +52,30 @@ def evaluation_check(segmentation_head, dataloader, device,
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out) # hidden_latent value between 0 ~ 1
+            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
 
             # [0] generation task # gen_feature = Batch, 4, H, W
-            reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
+            if args.independent_decoder:
+                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
+            else:
+                # [1] get z_mu, z_sigma
+                posterior = DiagonalGaussianDistribution(hidden_latent)
+                z_mu, z_sigma = posterior.mean, posterior.std
+                reconstruction = vae.decode(hidden_latent).sample
+
             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()  # .numpy()
+
+
+
+
+
+
+
+
+
+
+
+
             if global_num == 0 :
                 np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
                 pil = Image.fromarray(np_img)

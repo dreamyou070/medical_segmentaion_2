@@ -87,7 +87,7 @@ def main(args):
                                       use_flash_attention=False,
                                       use_checkpointing=False,
                                       use_convtranspose=False)
-    else :
+    else : # vae decoder training
         decoder_model = vae
 
 
