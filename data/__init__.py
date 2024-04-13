@@ -22,6 +22,7 @@ def call_dataset(args) :
                                     n_classes=args.n_classes,
                                     mask_res = args.mask_res,
                                     use_data_aug = False)
+
     train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                    batch_size=args.batch_size,
                                                    shuffle=True)

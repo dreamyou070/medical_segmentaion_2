@@ -108,13 +108,13 @@ class TrainDataset_Seg(Dataset):
         # [1] base image
         self.root_dir = root_dir
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir)
+        folders = os.listdir(self.root_dir) # anomal
         for folder in folders :
-            folder_dir = os.path.join(self.root_dir, folder)
+            folder_dir = os.path.join(self.root_dir, folder) # anomal
             folder_res = folder.split('_')[-1]
-            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}')
-            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}') # [128,128]
-            files = os.listdir(rgb_folder)
+            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}') # anomal / image_256
+            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')    # [128,128]
+            files = os.listdir(rgb_folder) #
             for file in files:
                 name, ext = os.path.splitext(file)
                 image_paths.append(os.path.join(rgb_folder, file))
