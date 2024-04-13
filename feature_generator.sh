@@ -2,9 +2,9 @@
 
 port_number=51266
 category="medical"
-obj_name="cardiac"
-trigger_word="cardiac"
-benchmark="acdc"
+obj_name="brain"
+trigger_word="brain"
+benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="Finetune_segment_head_high_feature_patch_discriminator"

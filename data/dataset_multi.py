@@ -8,16 +8,16 @@ from torchvision import transforms
 import cv2
 from tensorflow.keras.utils import to_categorical
 
-brain_class_map = {0: ['b','brain'],
+class_map = {0: ['b','brain'],
                      1: ['n','non-enhancing tumor core'],
                      2: ['e','edema'],
                      3: ['t','enhancing tumor'],}
-
+"""
 cardiac_class_map = {0: ['b','background'],
                      1: ['l','left ventricle'],
                      2: ['m','myocardium'],
                      3: ['r','right ventricle'],}
-
+"""
 # (i) normal- NOR,
 # (ii) patients with previous myocardial infarction- MINF,
 # (iii) patients with dilated cardiomyopathy- DCM,
