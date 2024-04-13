@@ -196,7 +196,8 @@ def main(args):
                                 generator.manual_seed(i)
                                 reconstruction = vae(sample = image, generator = generator,).sample # [1,3,512,512]
                                 # autoencoder reconstruction image
-                                image = image_processor.postprocess(reconstruction, output_type='pil')
+                                image = image_processor.postprocess(reconstruction,
+                                                                    output_type='pil')[0]
                                 image.save(f'{check_base_folder}/original_vae_{i}.png')
 
                             # ----------------------------------------------------------------------------------------------
