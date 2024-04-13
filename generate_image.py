@@ -100,7 +100,10 @@ def main(args):
         # [3] segmentation model
         seg_base_dir = os.path.join(parent, f'segmentation')
         pretrained_seg_dir = os.path.join(seg_base_dir, f'segmentation-{lora_epoch}.pt')
-        segmentation_head.load_state_dict(torch.load(pretrained_seg_dir))
+        state_dict = torch.load(pretrained_seg_dir)
+        for k in state_dict.keys():
+            print(f'original key = {k}')
+        segmentation_head.load_state_dict(state_dict)
         segmentation_head.to(accelerator.device, dtype=weight_dtype)
 
         # [3] decoder file
