@@ -154,7 +154,6 @@ def main(args):
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
             with torch.no_grad():
-                    # how does it do ?
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
@@ -169,10 +168,13 @@ def main(args):
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out)
             # ------------------------------------------------------------------------------------------------------------
+            # [1] generator loss
             recons_loss = l1_loss(reconstruction_org.float(), image.float())
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
             generator_loss = recons_loss + kl_weight * kl_loss
+
+
             # ------------------------------------------------------------------------------------------------------------
             with torch.no_grad():
                 latents = vae.encode(reconstruction_org).latent_dist.sample() * args.vae_scale_factor
@@ -186,98 +188,36 @@ def main(args):
                 res = int(query.shape[1] ** 0.5)
                 reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = reshaped_query
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            reconstruction, z_mu, z_sigma, masks_pred_syn = segmentation_head(x16_out, x32_out, x64_out)
+            x16_out_syn, x32_out_syn, x64_out_syn = q_dict[16], q_dict[32], q_dict[64]
+            reconstruction_syn, z_mu_syn, z_sigma_syn, masks_pred_syn = segmentation_head(x16_out_syn, x32_out_syn, x64_out_syn)
+
             # ------------------------------------------------------------------------------------------------------------
-            # [1] synthetic image label matching
-            # --------------------------------------------------------------------------------------------------------- #
-            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous()
-            masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
+            # [2] origin loss
+            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred_org,
-                                   target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=masks_pred_org, target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
                 focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred_org.device))  # N
-                if args.use_monai_focal_loss:
-                    focal_loss = focal_loss.mean()
+                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
                 loss += focal_loss
                 loss_dict['focal_loss'] = focal_loss.item()
-
                 # [5.3] Dice Loss
                 if args.use_dice_loss:
                     dice_loss = loss_Dice(masks_pred_org, gt)
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
-
-                # [5.4] Deactivating Loss
-                # masks_pred = Batch, Class_num, H, W
-                if args.deactivating_loss:
-                    eps = 1e-15
-                    # background have not many to train
-                    deactivating_loss = []
-                    pred_prob = torch.softmax(masks_pred_org, dim=1)
-                    pred_prob = pred_prob.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4
-                    gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-                    gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-                    for i in range(args.n_classes):
-                        prob_map = pred_prob[..., i]  # 1,128,128
-                        gt_map = (1 - gt[..., i])  # 1,128,128
-                        loss = (prob_map * gt_map) / (gt_map.sum() + eps)
-                        deactivating_loss.append(loss.sum())
-                    deactivating_loss = torch.stack(deactivating_loss).sum()
-                    loss += deactivating_loss
                 loss = loss.mean()
-
             loss = loss + generator_loss
-            # --------------------------------------------------------------------------------------------------------- #
-            # --------------------------------------------------------------------------------------------------------- #
-            masks_pred_syn = masks_pred_syn.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_.shape[-1]).contiguous()
-            # matching loss
-            print(f'masks_pred_syn = {masks_pred_syn}')
-            print(f'masks_pred_org = {masks_pred_org}')
 
+            # ------------------------------------------------------------------------------------------------------------
+            # [3] mask pred matching loss
             mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(),
                                                        masks_pred_org.float()).mean()
             loss += mask_pred_matching_loss
             loss = loss.mean()
-
-            # [3] unet with recon image
-            with torch.no_grad():
-                latents = vae.encode(reconstruction).latent_dist.sample() * args.vae_scale_factor
-            with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                q_dict[res] = reshaped_query
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
-            masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
-            if args.use_dice_ce_loss:
-                re_loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
-            else:  # [5.1] Multiclassification Loss
-                re_loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss:
-                    focal_loss = focal_loss.mean()
-                re_loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-
-                # [5.3] Dice Loss
-                if args.use_dice_loss:
-                    re_loss += loss_Dice(masks_pred, gt)
-                re_loss = re_loss.mean()
-
-            loss = (loss + re_loss).to(weight_dtype)
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
