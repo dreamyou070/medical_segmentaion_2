@@ -28,8 +28,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
  --obj_name "${obj_name}" \
- --aggregation_model_c \
  --n_classes 14 \
- --mask_res 256 \
- --sample_prompts "abdomen_medical.txt" \
- --optimizer_args weight_decay=0.00005
+ --mask_res 256
