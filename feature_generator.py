@@ -193,7 +193,7 @@ def main(args):
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
-            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_.shape[-1]).contiguous()
+            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_org.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred_org, target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
