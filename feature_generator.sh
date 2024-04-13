@@ -7,7 +7,7 @@ trigger_word="brain"
 benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="Finetune_segment_head_high_feature_patch_discriminator"
+file_name="Finetune_segment_head_pseudo_labeler"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \

@@ -239,42 +239,44 @@ def main(args):
                 z_mu, z_sigma = posterior.mean, posterior.std
                 reconstruction = vae.decode(hidden_latent).sample
 
-            # [3] reconstruction make pseudo label
-            # what is the guide ? (not same label)
-            if args.use_patch_discriminator :
-                # problem
-                logits_fake = discriminator(reconstruction.contiguous().float())[-1]
-                loss_d_fake = adv_loss(logits_fake, target_is_real=False, for_discriminator=True)
-                logits_real = discriminator(image.contiguous().detach())[-1]
-                loss_d_real = adv_loss(logits_real, target_is_real=True, for_discriminator=True)
-                discriminator_loss = (loss_d_fake + loss_d_real) * 0.5
-
-
-
-
-
-
-
-            # recons_loss is reconstruction loss between original image and reconstruction
-            # how to
+            # [3] unet with recon image
+            with torch.no_grad():
+                latents = vae.encode(reconstruction).latent_dist.sample() * args.vae_scale_factor
+            with torch.set_grad_enabled(True):
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+            query_dict, key_dict = controller.query_dict, controller.key_dict
+            controller.reset()
+            q_dict = {}
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                q_dict[res] = reshaped_query
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
+            # [0] generation task # gen_feature = Batch, 4, H, W
+            if args.independent_decoder:
+                reconstruction, z_mu, z_sigma = decoder_model(hidden_latent)  # reconstruction = [1,3,512,512]
+            else:
+                # [1] get z_mu, z_sigma
+                posterior = DiagonalGaussianDistribution(hidden_latent)
+                z_mu, z_sigma = posterior.mean, posterior.std
+                reconstruction = vae.decode(hidden_latent).sample
             recons_loss = l1_loss(reconstruction.float(), image.float())
-
             # what is this kl loss ?
             # latent should be standard normal distribution
             # latent is the output of the encoder with deep semantic feature
-
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
             kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
             generator_loss = recons_loss + kl_weight * kl_loss
-            # do am i have to input the random noise ... ?
-            # [2] discriminator task
-
+            #
             # [1] segmentation task
+            # --------------------------------------------------------------------------------------------------------- #
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
             masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
-            else: # [5.1] Multiclassification Loss
+            else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
@@ -310,10 +312,53 @@ def main(args):
                 loss = loss.mean()
 
             loss = loss + generator_loss
-            if args.use_patch_discriminator :
-                loss = loss + discriminator_loss
+            # --------------------------------------------------------------------------------------------------------- #
 
-            loss = loss.to(weight_dtype)
+            """
+            # [3] reconstruction make pseudo label
+            # what is the guide ? (not same label)
+            if args.use_patch_discriminator :
+                # problem
+                logits_fake = discriminator(reconstruction.contiguous().float())[-1]
+                loss_d_fake = adv_loss(logits_fake, target_is_real=False, for_discriminator=True)
+                logits_real = discriminator(image.contiguous().detach())[-1]
+                loss_d_real = adv_loss(logits_real, target_is_real=True, for_discriminator=True)
+                discriminator_loss = (loss_d_fake + loss_d_real) * 0.5
+            """
+            # [3] unet with recon image
+            with torch.no_grad():
+                latents = vae.encode(reconstruction).latent_dist.sample() * args.vae_scale_factor
+            with torch.set_grad_enabled(True):
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+            query_dict, key_dict = controller.query_dict, controller.key_dict
+            controller.reset()
+            q_dict = {}
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                q_dict[res] = reshaped_query
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            hidden_latent, masks_pred = segmentation_head(x16_out, x32_out, x64_out)
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous()  # 1,128,128,4 # mask_pred_ = [1,4,512,512]
+            masks_pred_ = masks_pred_.view(-1, masks_pred_.shape[-1]).contiguous()
+            if args.use_dice_ce_loss:
+                re_loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
+            else:  # [5.1] Multiclassification Loss
+                re_loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
+                # [5.2] Focal Loss
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                if args.use_monai_focal_loss:
+                    focal_loss = focal_loss.mean()
+                re_loss += focal_loss
+                loss_dict['focal_loss'] = focal_loss.item()
+
+                # [5.3] Dice Loss
+                if args.use_dice_loss:
+                    re_loss += loss_Dice(masks_pred, gt)
+                re_loss = re_loss.mean()
+
+            loss = (loss + re_loss).to(weight_dtype)
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
