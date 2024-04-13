@@ -2,9 +2,9 @@
 
 port_number=51277
 category="medical"
-obj_name="cardiac"
-trigger_word="cardiac"
-benchmark="acdc"
+obj_name="abdoman"
+trigger_word="abdoman"
+benchmark="abdoman_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="2_Finetune_segment_head_only_semantic_latent"
