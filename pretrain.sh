@@ -29,7 +29,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --trigger_word "${trigger_word}" \
  --obj_name "${obj_name}" \
  --aggregation_model_c \
- --n_classes 4 \
+ --n_classes 14 \
  --mask_res 256 \
- --sample_prompts "cardiac_medical.txt" \
+ --sample_prompts "abdomen_medical.txt" \
  --optimizer_args weight_decay=0.00005
