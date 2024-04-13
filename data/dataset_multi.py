@@ -8,10 +8,15 @@ from torchvision import transforms
 import cv2
 from tensorflow.keras.utils import to_categorical
 
-class_map = {0: ['b','brain'],
-                     1: ['n','non-enhancing tumor core'],
-                     2: ['e','edema'],
-                     3: ['t','enhancing tumor'],}
+brain_class_map = {0: ['b','brain'],
+                   1: ['n','non-enhancing tumor core'],
+                   2: ['e','edema'],
+                   3: ['t','enhancing tumor'],}
+cardiac_class_map = {0: ['b','background'],
+                        1: ['l','left ventricle'],
+                        2: ['m','myocardium'],
+                        3: ['r','right ventricle'],}
+
 """
 cardiac_class_map = {0: ['b','background'],
                      1: ['l','left ventricle'],
@@ -201,6 +206,11 @@ class TrainDataset_Seg(Dataset):
         gt_flat = gt_arr.flatten() # 128*128
 
         # [3] caption
+        if argument.obj_name == 'brain':
+            class_map = brain_class_map
+        elif argument.obj_name == 'cardiac':
+            class_map = cardiac_class_map
+
         caption = base_prompts[np.random.randint(0, len(base_prompts))]
         for i, class_idx in enumerate(class_es):
             caption += class_map[class_idx][0]

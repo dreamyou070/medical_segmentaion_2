@@ -236,8 +236,7 @@ def main(args):
             # --------------------------------------------------------------------------------------------------------- #
             masks_pred_syn = masks_pred_syn.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_.shape[-1]).contiguous()
             # matching loss
-            mask_pred_matching_loss = torch.nn.functional.MSE_loss(masks_pred_syn.float(),
-                                                                   masks_pred_org.float()).mean()
+            mask_pred_matching_loss = torch.nn.MSELoss(masks_pred_syn.float(), masks_pred_org.float()).mean()
             loss += mask_pred_matching_loss
             loss = loss.mean()
 
