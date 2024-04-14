@@ -158,7 +158,7 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            key_word_index = batch['key_word_index'] # torch([10,14])
+            key_word_index = batch['key_word_index'][0] # torch([10,14])
             print(f'key_word_index = {key_word_index}')
             # target key word should intense
             # how can i increase the alignment between image and text ?
