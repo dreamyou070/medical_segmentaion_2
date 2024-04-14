@@ -6,14 +6,14 @@
 # 4_absolute_pe_segmentation_model_c_cross_focal_use_batch_norm_query
 # 6_absolute_pe_segmentation_model_b_cross_focal_use_batch_norm_query
 
-port_number=56589
+port_number=58702
 category="medical"
-obj_name="abdomen"
-trigger_word="abdomen"
-benchmark="abdomen_256"
+obj_name="leader_polyp"
+trigger_word="leader_polyp"
+benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="pretrain"
+file_name="pretrain" #
 # --use_instance_norm
 # --binary_test
 #--network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/pretrain/pretrain_model/lora-000012.safetensors" \
@@ -31,5 +31,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --aggregation_model_c \
  --n_classes 14 \
  --mask_res 256 \
- --sample_prompts "abdomen_medical.txt" \
- --optimizer_args weight_decay=0.00005
+ --sample_prompts "bkai-igh-neopolyp_medical.txt" \
+ --optimizer_args weight_decay=0.00005 \
+ --use_image_by_caption \
+ --do_text_attn
