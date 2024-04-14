@@ -29,20 +29,13 @@ abdomen_class_map = {0: ['b','background'],
                         10: ['m','muscle'],
                         11: ['h','heart'],
                         12: ['i','intestine'],
-                        13: ['o','other'],}
-
+                        13: ['o','other'], }
 leader_polyp_class_map = {0: ['b','background'],
                           1: ['p','polyp'],
                           2: ['n','neg'],}
 teeth_class_map = {0: ['b','background'],
                      1: ['t','anomal']}
 
-"""
-cardiac_class_map = {0: ['b','background'],
-                     1: ['l','left ventricle'],
-                     2: ['m','myocardium'],
-                     3: ['r','right ventricle'],}
-"""
 # (i) normal- NOR,
 # (ii) patients with previous myocardial infarction- MINF,
 # (iii) patients with dilated cardiomyopathy- DCM,
