@@ -55,7 +55,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
 
             reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()  # .numpy()
-            if global_num == 0 :
+            if args.generation and global_num == 0 :
                 np_img = np.array(((reconstruction_img + 1) / 2) * 255).astype(np.uint8)
                 pil = Image.fromarray(np_img)
                 recon_folder = os.path.join(args.output_dir, 'reconstruct_folder')
