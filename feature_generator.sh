@@ -37,4 +37,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --segmentation_loss_weight 1.0 \
  --use_image_by_caption \
  --test_like_train \
- --generation
+ --generation \
+ --gt_ext_npy
