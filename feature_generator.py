@@ -177,6 +177,9 @@ def main(args):
                 res = int(query.shape[1] ** 0.5)
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                else :
+                    # original = batch, pix_num, dim -> 1, res, res, dim
+                    query = query.reshape(1, res, res, -1)
                 q_dict[res] = query
                 #
                 attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
