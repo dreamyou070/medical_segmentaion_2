@@ -34,4 +34,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --sample_prompts "bkai-igh-neopolyp_medical.txt" \
  --optimizer_args weight_decay=0.00005 \
  --use_image_by_caption \
- --do_text_attn
+ --do_text_attn --gt_ext_npy
