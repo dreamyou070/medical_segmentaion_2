@@ -60,7 +60,8 @@ def main(args):
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
                                         init_latent_p=args.init_latent_p,
-                                        decoder = decoder,)
+                                        decoder = decoder,
+                                        generation = args.generation,)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -173,12 +174,11 @@ def main(args):
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
-            recons_loss = l1_loss(reconstruction_org.float(), image.float())
-            kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
-            kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
-            generator_loss = recons_loss + kl_weight * kl_loss
-
-
+            if args.generation:
+                recons_loss = l1_loss(reconstruction_org.float(), image.float())
+                kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
+                kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
+                generator_loss = recons_loss + kl_weight * kl_loss
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
             masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_org.shape[-1]).contiguous()
@@ -198,7 +198,9 @@ def main(args):
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
-            loss = loss * args.segmentation_loss_weight + generator_loss * args.generator_loss_weight
+            loss = loss * args.segmentation_loss_weight
+            if args.generation :
+                loss += generator_loss * args.generator_loss_weight
             loss = loss.mean()
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
@@ -387,10 +389,10 @@ if __name__ == "__main__":
     parser.add_argument("--segmentation_loss_weight", type=float, default=1)
     parser.add_argument("--use_image_by_caption", action='store_true')
     parser.add_argument("--gt_ext_npy", action='store_true')
+    parser.add_argument("--generation", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
-
     passing_mvtec_argument(args)
     main(args)

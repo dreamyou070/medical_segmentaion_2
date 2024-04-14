@@ -1,13 +1,14 @@
 # !/bin/bash
+# language 가 분명 작용하는듯 하다.
 
-port_number=54153
+port_number=54166
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_Finetune_segment_head_merging_general_caption"
+file_name="3_Finetune_segment_not_gen_per_image_caption"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -31,4 +32,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --optimizer_args weight_decay=0.00005 \
  --init_latent_p 1.0 \
  --generator_loss_weight 1.0 \
- --segmentation_loss_weight 1.0
+ --segmentation_loss_weight 1.0 \
+ --use_image_by_caption
