@@ -192,7 +192,7 @@ class TrainDataset_Seg(Dataset):
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
                 caption += class_map[class_idx][0]
-                if i < len(class_es) - 1:
+                if i != len(class_es) - 1: # not 2
                     caption += ', '
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
