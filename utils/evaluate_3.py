@@ -39,19 +39,36 @@ def evaluation_check(segmentation_head, dataloader, device,
             image = batch['image'].to(dtype=weight_dtype)                                   # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)                               # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)                                         # 1,4,128,128
+            key_word_index = batch['key_word_index'][0]  # torch([10,14])
+
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict= controller.query_dict, controller.key_dict
+            attention_dict = controller.attention_dict
             controller.reset()
             q_dict = {}
             for layer in args.trg_layer_list:
-                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                query = query_dict[layer][0]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                else:
+                    # original = batch, pix_num, dim -> 1, res, res, dim
+                    query = query.reshape(1, res, res, -1)
+                    # -> 1, dim, res, res
+                    query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
+                #
+                attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
+                trg_attention = attention_probs[:, :, key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
+                max_prob = torch.max(trg_attention, dim=0).values
+                gt_max_prob = torch.ones_like(max_prob)
+            text_predict = torch.where(max_prob> 0.5, 1, 0)
+            key_word_index = key_word_index * text_predict
+            print(f'key_word_index {key_word_index}')
+
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
 

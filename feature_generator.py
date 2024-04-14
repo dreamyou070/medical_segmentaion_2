@@ -149,6 +149,7 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
+            """
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             if args.aggregation_model_d:
@@ -190,9 +191,6 @@ def main(args):
                 gt_max_prob = torch.ones_like(max_prob)
                 attn_loss = l2_loss(max_prob, gt_max_prob)
                 attention_loss += attn_loss
-            print(f'attention_loss = {attention_loss.mean()}')
-
-
 
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
@@ -226,6 +224,8 @@ def main(args):
             loss = loss * args.segmentation_loss_weight
             if args.generation :
                 loss += generator_loss * args.generator_loss_weight
+            if args.do_text_attn :
+                loss += attention_loss
             loss = loss.mean()
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
@@ -247,6 +247,7 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
+            """
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
