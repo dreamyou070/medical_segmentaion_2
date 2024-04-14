@@ -158,11 +158,18 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
+            key_word_index = batch['key_word_index'] # torch([10,14])
+            print(f'key_word_index = {key_word_index}')
+            # target key word should intense
+            # how can i increase the alignment between image and text ?
+
+
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
             query_dict, key_dict = controller.query_dict, controller.key_dict
+            attention_dict = controller.attention_dict
             controller.reset()
             q_dict = {}
             for layer in args.trg_layer_list:
@@ -171,6 +178,14 @@ def main(args):
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = query
+                #
+                attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
+                trg_attention = attention_probs[:,:,key_word_index]
+                print(f'trg_attention = {trg_attention}')
+
+
+
+
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
             # ------------------------------------------------------------------------------------------------------------
