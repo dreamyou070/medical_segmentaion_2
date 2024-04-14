@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=58804
+port_number=58803
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp" #
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="4_Finetune_segment_gen_per_image_caption_all_caption_test" #
+file_name="3_Finetune_segment_not_gen_per_image_caption_all_caption_test" #
 # 3
 # except generation
 
@@ -36,4 +36,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_config \
  --generator_loss_weight 1.0 \
  --segmentation_loss_weight 1.0 \
  --use_image_by_caption \
- --gt_ext_npy --generation
+ --gt_ext_npy
