@@ -386,6 +386,7 @@ if __name__ == "__main__":
     parser.add_argument("--generator_loss_weight", type=float, default=1)
     parser.add_argument("--segmentation_loss_weight", type=float, default=1)
     parser.add_argument("--use_image_by_caption", action='store_true')
+    parser.add_argument("--gt_ext_npy", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

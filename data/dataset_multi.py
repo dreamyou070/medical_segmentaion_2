@@ -137,7 +137,10 @@ class TrainDataset_Seg(Dataset):
             for file in files:
                 name, ext = os.path.splitext(file)
                 image_paths.append(os.path.join(rgb_folder, file))
-                gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
+                if argument.gt_ext_npy :
+                    gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
+                else :
+                    gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
@@ -202,15 +205,17 @@ class TrainDataset_Seg(Dataset):
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
-        gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
-        if self.use_data_aug:
-            gt_arr = np.rot90(gt_arr, k=number)
-        gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
+        if argument.gt_ext_npy :
+            gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_arr, k=number)
+            gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
+        else :
+            gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            gt_arr = np.array(gt_img) # 128,128
+            gt_arr = np.where(gt_arr>100, 1, 0)
 
         class_es = np.unique(gt_arr) # key_words
-
-        if argument.binary_test :
-            gt_arr = np.where(gt_arr==1, 1, 0)
 
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
