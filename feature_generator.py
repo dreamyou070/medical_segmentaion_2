@@ -56,8 +56,6 @@ def main(args):
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
     decoder = None
-    if args.reuse_vae :
-        decoder = vae.decoder
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
@@ -174,9 +172,6 @@ def main(args):
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
             # ------------------------------------------------------------------------------------------------------------
-            # why cannot reconstruct ..? because latent is not sufficient
-            # how can I sufficiently training latent ?
-            # just needs time .. ?
             # [1] generator loss
             recons_loss = l1_loss(reconstruction_org.float(), image.float())
             kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
@@ -390,7 +385,7 @@ if __name__ == "__main__":
     parser.add_argument("--init_latent_p", type=float, default=1)
     parser.add_argument("--generator_loss_weight", type=float, default=1)
     parser.add_argument("--segmentation_loss_weight", type=float, default=1)
-    parser.add_argument("--reuse_vae", action='store_true')
+    parser.add_argument("--use_image_by_caption", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

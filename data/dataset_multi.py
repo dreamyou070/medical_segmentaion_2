@@ -34,6 +34,8 @@ abdomen_class_map = {0: ['b','background'],
 leader_polyp_class_map = {0: ['b','background'],
                           1: ['p','polyp'],
                           2: ['n','neg'],}
+teeth_class_map = {0: ['b','background'],
+                     1: ['t','anomal']}
 
 """
 cardiac_class_map = {0: ['b','background'],
@@ -55,7 +57,6 @@ base_prompts = ['this is a picture of ',
 
 def passing_mvtec_argument(args):
     global argument
-
     argument = args
 
 
@@ -223,58 +224,32 @@ class TrainDataset_Seg(Dataset):
         # [3] gt flatten
         gt_flat = gt_arr.flatten() # 128*128
 
-        # [3] caption
-        if argument.obj_name == 'brain':
-            class_map = brain_class_map
-        elif argument.obj_name == 'cardiac':
-            class_map = cardiac_class_map
-        elif argument.obj_name == 'abdomen':
-            class_map = abdomen_class_map
-        elif argument.obj_name == 'leader_polyp':
-            class_map = leader_polyp_class_map
+        if argument.use_image_by_caption :
 
-        caption = base_prompts[np.random.randint(0, len(base_prompts))]
-        for i, class_idx in enumerate(class_es):
-            caption += class_map[class_idx][0]
-            if i < len(class_es) - 1:
-                caption += ', '
-        if argument.use_cls_token:
-            key_words = [class_map[i][0] for i in class_es if i != 0] # [n,e]
+            # [3] caption
+            if argument.obj_name == 'brain':
+                class_map = brain_class_map
+            elif argument.obj_name == 'cardiac':
+                class_map = cardiac_class_map
+            elif argument.obj_name == 'abdomen':
+                class_map = abdomen_class_map
+            elif argument.obj_name == 'leader_polyp':
+                class_map = leader_polyp_class_map
+
+            caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            for i, class_idx in enumerate(class_es):
+                caption += class_map[class_idx][0]
+                if i < len(class_es) - 1:
+                    caption += ', '
         else :
-            key_words = [class_map[i][0] for i in class_es] # [b,n,e]
-        # final caption = 'this is a picture of b, n, e, t'
+            base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            caption = f'{base_prompt}{argument.obj_name}'
+
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
-        attention_mask = caption_token.attention_mask
 
-        def get_target_index(target_words, caption):
-
-            target_word_index = []
-            for target_word in target_words:
-                target_word_token = self.tokenizer(target_word, return_tensors="pt")
-                target_word_input_ids = target_word_token.input_ids[:, 1]
-
-                # [1] get target word index from sentence token
-                sentence_token = self.tokenizer(caption, return_tensors="pt")
-                sentence_token = sentence_token.input_ids
-                batch_size = sentence_token.size(0)
-
-                for i in range(batch_size):
-                    # same number from sentence token to target_word_inpud_ids
-                    s_tokens = sentence_token[i]
-                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
-                    target_word_index.append(idx)
-            return target_word_index
-
-        if argument.use_cls_token:
-            default = [0] # cls token index
-            default.extend(get_target_index(key_words, caption))
-            key_word_index = default
-        else :
-            key_word_index = get_target_index(key_words, caption)
 
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
-                "input_ids": input_ids,
-                "key_word_index":key_word_index} # [0,3,4]
+                "input_ids": input_ids,} # [0,3,4]
