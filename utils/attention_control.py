@@ -41,8 +41,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             """ Second Trial """
             if trg_layer_list is not None and layer_name in trg_layer_list and argument.text_before_query :
                 controller.save_query((query * self.scale), layer_name) # query = batch, seq_len, dim
-
-
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]

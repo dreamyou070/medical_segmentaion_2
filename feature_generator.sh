@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="attn_text" #
+file_name="7_segment_per_image_caption_query_after_text_text_attn" #
 # 3
 # except generation
 
