@@ -36,4 +36,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --generator_loss_weight 1.0 \
  --segmentation_loss_weight 1.0 \
  --use_image_by_caption \
- --gt_ext_npy
+ --gt_ext_npy --do_text_attn

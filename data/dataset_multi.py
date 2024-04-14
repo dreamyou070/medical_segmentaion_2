@@ -51,7 +51,6 @@ cardiac_class_map = {0: ['b','background'],
 
 base_prompts = ['this is a picture of ',
                 'this is a picture of a ',
-                'this is a picture of an ',
                 'this is a picture of the ',
                 'this picture is of ',]
 
