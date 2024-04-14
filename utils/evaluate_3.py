@@ -72,7 +72,7 @@ def evaluation_check(segmentation_head, dataloader, device,
 
 
 
-            if args.text_predict:
+            if args.do_text_attn:
                 text_predict = torch.where(max_prob < 0.5, 1, 0) # if max_prob big,
                 erase_index = key_word_index * text_predict   # erase index
                 erase_idx = int(erase_index.item())
