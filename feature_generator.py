@@ -181,7 +181,7 @@ def main(args):
                 #
                 attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
                 trg_attention = attention_probs[:,:,key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
-                max_prob = torch.max(trg_attention, dim=0)
+                max_prob = torch.max(trg_attention, dim=0).values
                 gt_max_prob = torch.ones_like(max_prob)
                 attn_loss = l2_loss(max_prob, gt_max_prob)
                 attention_loss += attn_loss
