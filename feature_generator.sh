@@ -1,10 +1,10 @@
 # !/bin/bash
 
-port_number=54152
+port_number=54153
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="Kvasir-SEG"
+benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="1_Finetune_segment_head_merging_general_caption"
