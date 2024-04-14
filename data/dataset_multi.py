@@ -334,10 +334,18 @@ class TestDataset_Seg(Dataset):
                 class_map = leader_polyp_class_map
 
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            for i, k in enumerate(class_map.keys()):
-                caption += class_map[k][0]
-                if i < len(class_es) - 1:
-                    caption += ', '
+
+            if argument.test_like_train :
+                for i, class_idx in enumerate(class_es):
+                    caption += class_map[class_idx][0]
+                    if i < len(class_es) - 1:
+                        caption += ', '
+
+            else :
+                for i, k in enumerate(class_map.keys()):
+                    caption += class_map[k][0]
+                    if i < len(class_es) - 1:
+                        caption += ', '
 
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]

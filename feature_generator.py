@@ -390,6 +390,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_image_by_caption", action='store_true')
     parser.add_argument("--gt_ext_npy", action='store_true')
     parser.add_argument("--generation", action='store_true')
+    parser.add_argument("--test_like_train", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

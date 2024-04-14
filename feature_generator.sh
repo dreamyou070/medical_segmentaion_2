@@ -5,14 +5,14 @@ port_number=58806
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="Pranet" # bkai-igh-neopolyp
+benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_Finetune_segment_gen_per_image_caption_all_caption_test" #
+file_name="5_Finetune_segment_gen_per_image_caption_all_caption_test" #
 # 3
 # except generation
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
@@ -27,7 +27,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 2 \
+ --n_classes 3 \
  --mask_res 256 \
  --use_batchnorm \
  --use_dice_ce_loss \
@@ -36,4 +36,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --generator_loss_weight 1.0 \
  --segmentation_loss_weight 1.0 \
  --use_image_by_caption \
+ --test_like_train \
  --generation
