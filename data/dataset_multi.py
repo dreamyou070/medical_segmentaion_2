@@ -228,7 +228,7 @@ class TrainDataset_Seg(Dataset):
             key_word_index = default
         else:
             key_word_index = get_target_index(key_words, caption)
-        
+
 
 
         return {'image': img,  # [3,512,512]
@@ -382,11 +382,12 @@ class TestDataset_Seg(Dataset):
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
             caption = f'{base_prompt}{argument.obj_name}'
-
+        print(f'test text = {caption}')
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
 
         key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
+        print(f'key_words = {key_words}')
 
         def get_target_index(target_words, caption):
 
@@ -403,7 +404,7 @@ class TestDataset_Seg(Dataset):
                 for i in range(batch_size):
                     # same number from sentence token to target_word_inpud_ids
                     s_tokens = sentence_token[i]
-                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
+                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item() # here problem
                     target_word_index.append(idx)
             return target_word_index
 
