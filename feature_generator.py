@@ -180,6 +180,8 @@ def main(args):
                 else :
                     # original = batch, pix_num, dim -> 1, res, res, dim
                     query = query.reshape(1, res, res, -1)
+                    # -> 1, dim, res, res
+                    query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
                 #
                 attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
