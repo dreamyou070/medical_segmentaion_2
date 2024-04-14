@@ -168,8 +168,9 @@ def main(args):
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0].squeeze()  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
-                reshaped_query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                q_dict[res] = reshaped_query
+                if args.text_before_query:
+                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                q_dict[res] = query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
             # ------------------------------------------------------------------------------------------------------------
@@ -391,6 +392,7 @@ if __name__ == "__main__":
     parser.add_argument("--gt_ext_npy", action='store_true')
     parser.add_argument("--generation", action='store_true')
     parser.add_argument("--test_like_train", action='store_true')
+    parser.add_argument("--text_before_query", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

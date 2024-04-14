@@ -26,8 +26,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 if argument.use_position_embedder :
                     hidden_states = position_embedder(hidden_states, layer_name)
 
-
-
             query = self.to_q(hidden_states)
             context = context if context is not None else hidden_states
             key_ = self.to_k(context)
@@ -41,17 +39,19 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 query = query.float()
                 key = key.float()
             """ Second Trial """
-            if trg_layer_list is not None and layer_name in trg_layer_list :
+            if trg_layer_list is not None and layer_name in trg_layer_list and argument.text_before_query :
                 controller.save_query((query * self.scale), layer_name) # query = batch, seq_len, dim
-                controller.save_key(key_, layer_name) # key = batch, seq_len, dim
-
 
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
-            hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
+            hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
+
+            if not argument.text_before_query and trg_layer_list is not None and layer_name in trg_layer_list:
+                controller.save_attention(hidden_states, layer_name)
+
             hidden_states = self.to_out[0](hidden_states)
 
             return hidden_states

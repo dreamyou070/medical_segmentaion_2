@@ -343,7 +343,7 @@ class TestDataset_Seg(Dataset):
 
             else :
                 for i, k in enumerate(class_map.keys()):
-                    caption += class_map[k][0]
+                    caption += class_map[k][0] # add key word
                     if i < len(class_es) - 1:
                         caption += ', '
 
