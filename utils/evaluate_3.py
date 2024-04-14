@@ -69,8 +69,32 @@ def evaluation_check(segmentation_head, dataloader, device,
                 gt_max_prob = torch.ones_like(max_prob)
             text_predict = torch.where(max_prob < 0.5, 1, 0) # if max_prob big,
             erase_index = key_word_index * text_predict   # erase index
-            print(f' erase_index {erase_index}')
-
+            erase_idx = int(erase_index.item())
+            re_pre_index = origin_sentence_ids[:, :, :erase_idx]
+            re_post_index = origin_sentence_ids[:, :, erase_idx + 1:]
+            re_index = torch.cat((re_pre_index, re_post_index), dim=-1)
+            #
+            with torch.set_grad_enabled(True):
+                encoder_hidden_states = text_encoder(re_index.to(device))["last_hidden_state"]
+            with torch.no_grad():
+                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+            with torch.set_grad_enabled(True):
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+            query_dict, key_dict = controller.query_dict, controller.key_dict
+            attention_dict = controller.attention_dict
+            controller.reset()
+            q_dict = {}
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0]  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                if args.text_before_query:
+                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                else:
+                    # original = batch, pix_num, dim -> 1, res, res, dim
+                    query = query.reshape(1, res, res, -1)
+                    # -> 1, dim, res, res
+                    query = query.permute(0, 3, 1, 2).contiguous()
+                q_dict[res] = query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
 
