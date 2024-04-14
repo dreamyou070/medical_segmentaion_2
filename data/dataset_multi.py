@@ -198,7 +198,6 @@ class TrainDataset_Seg(Dataset):
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
             caption = f'{base_prompt}{argument.obj_name}'
-        print(f'training, caption : {caption}')
 
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
