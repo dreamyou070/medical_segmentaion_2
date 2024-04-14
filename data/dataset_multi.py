@@ -192,7 +192,9 @@ class TrainDataset_Seg(Dataset):
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
                 caption += class_map[class_idx][0]
-                if i != len(class_es) - 1: # not 2
+                if i == len(class_map.keys()) - 1:
+                    caption += ''
+                else:
                     caption += ', '
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
@@ -370,7 +372,9 @@ class TestDataset_Seg(Dataset):
             if argument.test_like_train :
                 for i, class_idx in enumerate(class_es):
                     caption += class_map[class_idx][0]
-                    if i != len(class_es) - 1:
+                    if i == len(class_map.keys()) - 1:
+                        caption += ''
+                    else:
                         caption += ', '
 
             else :
@@ -381,7 +385,6 @@ class TestDataset_Seg(Dataset):
                         caption += ''
                     else :
                         caption += ', '
-                    print(f'caption = {caption}')
 
 
         else :
@@ -391,7 +394,7 @@ class TestDataset_Seg(Dataset):
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
 
-        key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
+        key_words = [class_map[i][0] for i in class_es]  # [b,p]
         print(f'key_words = {key_words}')
 
         def get_target_index(target_words, caption):
@@ -400,6 +403,7 @@ class TestDataset_Seg(Dataset):
             for target_word in target_words:
                 target_word_token = self.tokenizer(target_word, return_tensors="pt")
                 target_word_input_ids = target_word_token.input_ids[:, 1]
+                print(f'target_word = {target_word} | target_word_input_ids = {target_word_input_ids}')
 
                 # [1] get target word index from sentence token
                 sentence_token = self.tokenizer(caption, return_tensors="pt")
@@ -410,6 +414,7 @@ class TestDataset_Seg(Dataset):
                     # same number from sentence token to target_word_inpud_ids
                     s_tokens = sentence_token[i]
                     idx = (torch.where(s_tokens == target_word_input_ids))[0].item() # here problem
+                    print(f'idx = {idx}')
                     target_word_index.append(idx)
             return target_word_index
 
@@ -419,6 +424,7 @@ class TestDataset_Seg(Dataset):
             key_word_index = default
         else:
             key_word_index = get_target_index(key_words, caption)
+        print(f'key_word_index = {key_word_index}')
 
 
         return {'image': img,  # [3,512,512]
