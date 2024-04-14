@@ -374,11 +374,15 @@ class TestDataset_Seg(Dataset):
                         caption += ', '
 
             else :
+
                 for i, k in enumerate(class_map.keys()):
                     caption += class_map[k][0] # add key word
-                    print(f'caption = {caption}')
-                    if i != len(class_es) - 1:
+                    if i == len(class_map.keys()) - 1:
+                        caption += ''
+                    else :
                         caption += ', '
+                    print(f'caption = {caption}')
+
 
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
