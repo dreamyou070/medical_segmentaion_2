@@ -35,7 +35,6 @@ def evaluation_check(segmentation_head, dataloader, device,
         dice_coeff_list = []
         for global_num, batch in enumerate(dataloader):
             origin_sentence_ids = batch["input_ids"]
-            print(f'origin_sentence_ids {origin_sentence_ids}')
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             image = batch['image'].to(dtype=weight_dtype)                                   # 1,3,512,512
