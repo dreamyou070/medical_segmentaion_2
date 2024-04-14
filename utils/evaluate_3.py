@@ -34,6 +34,8 @@ def evaluation_check(segmentation_head, dataloader, device,
         y_true_list, y_pred_list = [], []
         dice_coeff_list = []
         for global_num, batch in enumerate(dataloader):
+            origin_sentence_ids = batch["input_ids"]
+            print(f'origin_sentence_ids {origin_sentence_ids}')
             with torch.set_grad_enabled(True):
                 encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
             image = batch['image'].to(dtype=weight_dtype)                                   # 1,3,512,512
@@ -65,9 +67,9 @@ def evaluation_check(segmentation_head, dataloader, device,
                 trg_attention = attention_probs[:, :, key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
                 max_prob = torch.max(trg_attention, dim=0).values
                 gt_max_prob = torch.ones_like(max_prob)
-            text_predict = torch.where(max_prob> 0.5, 1, 0)
-            key_word_index = key_word_index * text_predict
-            print(f'key_word_index {key_word_index}')
+            text_predict = torch.where(max_prob < 0.5, 1, 0) # if max_prob big,
+            erase_index = key_word_index * text_predict   # erase index
+            print(f' erase_index {erase_index}')
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
