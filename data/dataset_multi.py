@@ -228,6 +228,7 @@ class TrainDataset_Seg(Dataset):
             key_word_index = default
         else:
             key_word_index = get_target_index(key_words, caption)
+        print(f'key_word_index {key_word_index}')
 
 
         return {'image': img,  # [3,512,512]
