@@ -159,7 +159,6 @@ def main(args):
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
             key_word_index = batch['key_word_index'][0] # torch([10,14])
-            print(f'key_word_index = {key_word_index}')
             # target key word should intense
             # how can i increase the alignment between image and text ?
 
@@ -172,17 +171,21 @@ def main(args):
             attention_dict = controller.attention_dict
             controller.reset()
             q_dict = {}
+            attention_loss = 0
             for layer in args.trg_layer_list:
-                query = query_dict[layer][0].squeeze()  # head, pix_num, dim
+                query = query_dict[layer][0]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = query
-                print(f'res = {res}')
                 #
                 attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
                 trg_attention = attention_probs[:,:,key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
-                print(f'trg_attention = {trg_attention.shape}')
+                max_prob = torch.max(trg_attention, dim=0)
+                gt_max_prob = torch.ones_like(max_prob)
+                attn_loss = l2_loss(max_prob, gt_max_prob)
+                attention_loss += attn_loss
+            print(f'attention_loss = {attention_loss.mean()}')
 
 
 
