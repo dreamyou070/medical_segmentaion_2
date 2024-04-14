@@ -370,14 +370,14 @@ class TestDataset_Seg(Dataset):
             if argument.test_like_train :
                 for i, class_idx in enumerate(class_es):
                     caption += class_map[class_idx][0]
-                    print(f'test text = {caption}')
                     if i != len(class_es) - 1:
                         caption += ', '
 
             else :
                 for i, k in enumerate(class_map.keys()):
                     caption += class_map[k][0] # add key word
-                    if i < len(class_es) - 1:
+                    print(f'caption = {caption}')
+                    if i != len(class_es) - 1:
                         caption += ', '
 
         else :
