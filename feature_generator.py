@@ -178,10 +178,11 @@ def main(args):
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 q_dict[res] = query
+                print(f'res = {res}')
                 #
                 attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
-                trg_attention = attention_probs[:,:,key_word_index]
-                print(f'trg_attention = {trg_attention}')
+                trg_attention = attention_probs[:,:,key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
+                print(f'trg_attention = {trg_attention.shape}')
 
 
 
