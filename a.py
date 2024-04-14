@@ -17,4 +17,8 @@ erase_idx = int(torch.Tensor([6]).item())
 re_pre_index = origin_sentence_ids[:,:,:erase_idx]
 re_post_index = origin_sentence_ids[:,:,erase_idx+1:]
 re_index = torch.cat((re_pre_index, re_post_index), dim=-1)
-print(re_index)
+
+import numpy as np
+
+a = np.array([1,2])
+print(a.shape[0])

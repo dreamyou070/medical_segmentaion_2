@@ -416,6 +416,7 @@ if __name__ == "__main__":
     parser.add_argument("--generation", action='store_true')
     parser.add_argument("--test_like_train", action='store_true')
     parser.add_argument("--text_before_query", action='store_true')
+    parser.add_argument("--do_text_attn", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

@@ -164,7 +164,6 @@ class TrainDataset_Seg(Dataset):
 
         # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
-        print(f'class_es : {class_es}')
 
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
@@ -193,8 +192,7 @@ class TrainDataset_Seg(Dataset):
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
                 caption += class_map[class_idx][0]
-                print(f'i : {i}, len(class_map.keys()) : {len(class_map.keys())}')
-                if i == len(class_map.keys()) - 1:
+                if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
                     caption += ', '
