@@ -54,6 +54,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
             if not argument.text_before_query and trg_layer_list is not None and layer_name in trg_layer_list:
+                print(f'saving hidden states for layer {hidden_states.shape} {layer_name} {hidden_states.device}')
                 controller.save_query(hidden_states, layer_name)
 
             hidden_states = self.to_out[0](hidden_states)
