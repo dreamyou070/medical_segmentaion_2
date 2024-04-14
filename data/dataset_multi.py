@@ -334,10 +334,11 @@ class TestDataset_Seg(Dataset):
                 class_map = leader_polyp_class_map
 
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            for i, class_idx in enumerate(class_es):
-                caption += class_map[class_idx][0]
+            for i, k in enumerate(class_es.keys()):
+                caption += class_map[k][0]
                 if i < len(class_es) - 1:
                     caption += ', '
+
         else :
             base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
             caption = f'{base_prompt}{argument.obj_name}'
