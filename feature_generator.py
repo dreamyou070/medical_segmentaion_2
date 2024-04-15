@@ -56,7 +56,8 @@ def main(args):
     elif args.image_processor == 'vit':
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
-    image_model.eval()
+    if not args.image_model_training :
+        image_model.eval()
 
 
     decoder = None
@@ -77,6 +78,8 @@ def main(args):
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    if args.image_model_training:
+        trainable_params.append({"params": image_model.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -125,6 +128,8 @@ def main(args):
 
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    if args.image_model_training:
+        image_model = accelerator.prepare(image_model)
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
@@ -165,13 +170,23 @@ def main(args):
             loss_dict = {}
 
             if args.use_image_condition :
-                with torch.no_grad():
-                    cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
+                if not args.image_model_training:
+                    with torch.no_grad():
+                        cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
+                        if args.image_processor == 'clip':
+                            encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                        elif args.image_processor == 'vit':
+                            encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                else:
+                    cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
                     if args.image_processor == 'clip':
-                        encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                        encoder_hidden_states = image_model.get_image_features(
+                            **batch["image_condition"])  # [Batch, 1, 768]
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                     elif args.image_processor == 'vit':
-                        encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                        encoder_hidden_states = image_model(
+                            **batch["image_condition"]).last_hidden_state  # [batch, 197, 768]
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
@@ -435,6 +450,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_image_condition", action='store_true')
     parser.add_argument("--use_text_condition", action='store_true')
     parser.add_argument("--image_processor", default = 'vit', type = str)
+    parser.add_argument("--image_model_training", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
