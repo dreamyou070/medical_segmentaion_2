@@ -6,7 +6,8 @@ import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.activations import ACT2FN
-from transformers.modeling_outputs import (BaseModelOutput,BaseModelOutputWithPooling,ImageClassifierOutput,MaskedImageModelingOutput,)
+from transformers.modeling_outputs import (BaseModelOutput,BaseModelOutputWithPooling,ImageClassifierOutput,
+                                           MaskedImageModelingOutput,)
 from transformers.modeling_utils import PreTrainedModel
 from transformers.pytorch_utils import find_pruneable_heads_and_indices, prune_linear_layer
 from transformers.utils import (add_code_sample_docstrings, add_start_docstrings,add_start_docstrings_to_model_forward,
@@ -18,7 +19,6 @@ logger = logging.get_logger(__name__)
 
 # General docstring
 _CONFIG_FOR_DOC = "ViTConfig"
-
 # Base docstring
 _CHECKPOINT_FOR_DOC = "google/vit-base-patch16-224-in21k"
 _EXPECTED_OUTPUT_SHAPE = [1, 197, 768]
@@ -468,14 +468,16 @@ VIT_INPUTS_DOCSTRING = r"""
             Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
 """
 
-
+#
 @add_start_docstrings(
     "The bare ViT Model transformer outputting raw hidden-states without any specific head on top.",
     VIT_START_DOCSTRING,
 )
 class ViTModel(ViTPreTrainedModel):
     def __init__(self, config: ViTConfig, add_pooling_layer: bool = True, use_mask_token: bool = False):
+
         super().__init__(config)
+
         self.config = config
 
         self.embeddings = ViTEmbeddings(config, use_mask_token=use_mask_token)

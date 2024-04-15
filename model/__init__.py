@@ -26,7 +26,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-        img_patch_embedding = image_model.patch_embeddings
+        img_patch_embedding = image_model.embeddings.patch_embeddings
         print(f' * img_patch_embedding : {img_patch_embedding}')
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
