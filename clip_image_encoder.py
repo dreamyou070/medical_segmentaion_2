@@ -12,7 +12,7 @@ inputs = processor(images=image, return_tensors="pt", padding=True).data['pixel_
 print(f'image_inputs = {inputs.shape}')
 
 model.to("cuda:0")
-#image_inputs = image_inputs.to("cuda:0")
+image_inputs = inputs.to("cuda:0")
 
-#output = model(pixel_values=image_inputs.pixel_values)
-#image_features = model.get_image_features(**inputs)
+image_features = model.get_image_features(**inputs)
+print(f'image_features = {image_features.shape}')
