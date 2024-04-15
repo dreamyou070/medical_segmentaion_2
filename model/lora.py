@@ -951,6 +951,7 @@ def create_network_from_weights(multiplier, file, block_wise,
 
 
 class LoRANetwork(torch.nn.Module):
+    #
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
 
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"]
@@ -1106,10 +1107,10 @@ class LoRANetwork(torch.nn.Module):
                 index = None
                 print(f"create LoRA for Text Encoder:") # Here is the problem
             if condition_modality == 'image':
-                prefix_ = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
+                prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
                 target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
             else :
-                prefix_ = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
+                prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
                 target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
             text_encoder_loras, skipped = create_modules(False,
                                                          index,
