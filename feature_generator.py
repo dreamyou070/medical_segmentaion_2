@@ -62,8 +62,8 @@ def main(args):
                                         init_latent_p=args.init_latent_p,
                                         decoder = decoder,
                                         generation = args.generation,)
-    """
-    print(f'\n step 2. dataset and dataloader')
+
+    print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
@@ -73,8 +73,8 @@ def main(args):
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    if args.image_model_training:
-        trainable_params.append({"params": image_model.parameters(), "lr": args.learning_rate})
+    #if args.image_model_training:
+    #    trainable_params.append({"params": image_model.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -320,7 +320,6 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
-    """
 
 
 if __name__ == "__main__":
