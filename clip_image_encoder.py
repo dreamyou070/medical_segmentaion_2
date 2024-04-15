@@ -20,16 +20,19 @@ image_features = clip_image_model.get_image_features(**inputs) # [1, 768] (why n
 
 from transformers import AutoImageProcessor, ViTModel
 import torch
+# HOW TO ALIGNING TWO MODALITY ?
 
 image_processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
 # [2] img
-image_path = 'data_sample/image/sample_200.jpg'
-image = Image.open(image_path)
-image_condition = image_processor(image, return_tensors="pt")
+#image_path = 'data_sample/image/sample_200.jpg'
+#image = Image.open(image_path)
+#image_condition = image_processor(image, return_tensors="pt")
 #image_condition['pixel_values'] = (image_condition['pixel_values']).squeeze()
 #print(image_condition)
-p_value = image_condition['pixel_values'] # [1,3,224,224]
+image_condition = {}
+image_condition['pixel_values'] = torch.randn(1,4,64,64)
+#p_value = image_condition['pixel_values'] # [1,3,224,224]
 # add processor output
 #pixel_values = inputs['data'].pixel_values
 with torch.no_grad():
