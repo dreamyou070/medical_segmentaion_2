@@ -1114,7 +1114,7 @@ class LoRANetwork(torch.nn.Module):
             text_encoder_loras, skipped = create_modules(False,
                                                          index,
                                                          text_encoder,
-                                                         target_replace_module = target_replace_module_condition,
+                                                         target_replace_modules = target_replace_module_condition,
                                                          prefix = prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
@@ -1127,7 +1127,7 @@ class LoRANetwork(torch.nn.Module):
         self.unet_loras, skipped_un = create_modules(True,
                                                      None,
                                                      unet,
-                                                     target_replace_module_condition = target_modules,
+                                                     target_replace_modules = target_modules,
                                                      prefix = LoRANetwork.LORA_PREFIX_UNET)
         skipped = skipped_te + skipped_un
         # ------------------------------------------------------------------------------------------------------------------------
