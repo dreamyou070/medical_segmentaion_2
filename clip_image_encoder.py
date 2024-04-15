@@ -9,10 +9,10 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 image_path = 'data_sample/image/sample_200.jpg'
 image = Image.open(image_path)
 inputs = processor(images=image, return_tensors="pt", padding=True).data
-print(f'image_inputs = {image_inputs}')
+print(f'image_inputs = {inputs}')
 
 model.to("cuda:0")
-image_inputs = image_inputs.to("cuda:0")
+#image_inputs = image_inputs.to("cuda:0")
 
 #output = model(pixel_values=image_inputs.pixel_values)
-image_features = model.get_image_features(**inputs)
+#image_features = model.get_image_features(**inputs)
