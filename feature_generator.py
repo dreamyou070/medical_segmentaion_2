@@ -246,7 +246,6 @@ def main(args):
 
             if args.generation :
                 loss += generator_loss * args.generator_loss_weight
-            print(f'loss = {loss}')
 
             loss = loss.mean()
 
