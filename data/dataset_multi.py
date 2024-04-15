@@ -424,8 +424,9 @@ class TestDataset_Seg(Dataset):
 
         # [3] image pixel
         image_condition = self.imagee_processor(images=Image.open(img_path),
-                                                 return_tensors="pt",
-                                                 padding=True)  # .data['pixel_values'] # [1,3,224,224]
+                                                return_tensors="pt",
+                                                padding=True)  # .data['pixel_values'] # [1,3,224,224]
+        image_condition["pixel_values"] = (image_condition["pixel_values"]).squeeze()
 
 
         return {'image': img,  # [3,512,512]
