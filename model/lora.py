@@ -546,6 +546,7 @@ def create_network(
     text_encoder: Union[CLIPTextModel, List[CLIPTextModel]],
     unet,
     neuron_dropout: Optional[float] = None,
+    condition_modality = 'text',
     **kwargs,):
     if network_dim is None:
         network_dim = 4  # default
@@ -612,7 +613,8 @@ def create_network(
         conv_block_dims=conv_block_dims,
         conv_block_alphas=conv_block_alphas,
         varbose=True,
-        net_key_names=net_key_names,)
+        net_key_names=net_key_names,
+    condition_modality=condition_modality,)
 
     if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
@@ -956,8 +958,11 @@ class LoRANetwork(torch.nn.Module):
     UNET_TEXT_PART = 'attentions_0'
 
     TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
+    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention"]
+
     LORA_PREFIX_UNET = "lora_unet"
     LORA_PREFIX_TEXT_ENCODER = "lora_te"
+    LORA_PREFIX_IMAGE_ENCODER = 'lora_im'
 
     def __init__(
         self,
@@ -981,7 +986,9 @@ class LoRANetwork(torch.nn.Module):
         # LoRAInfModule
         module_class: Type[object] = LoRAModule,
         varbose: Optional[bool] = False,
-        net_key_names: Optional[bool] = False,) -> None:
+        net_key_names: Optional[bool] = False,
+         condition_modality='text',
+    ) -> None:
 
         super().__init__()
         self.multiplier = multiplier
@@ -1015,13 +1022,15 @@ class LoRANetwork(torch.nn.Module):
                            target_replace_modules: List[torch.nn.Module],) -> List[LoRAModule]:
             prefix = (self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None
                     else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2)))
+            if target_replace_modules == self.UNET_TARGET_REPLACE_MODULE:
+                prefix = self.LORA_PREFIX_IMAGE_ENCODER
             loras = []
             skipped = []
             for name, module in root_module.named_modules():
-                print(f'create_modules: {module.__class__.__name__}')
                 if module.__class__.__name__ in target_replace_modules:
 
                     for child_name, child_module in module.named_modules():
+                        # named module
                         is_linear = child_module.__class__.__name__ == "Linear"
                         is_conv2d = child_module.__class__.__name__ == "Conv2d"
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
@@ -1054,6 +1063,7 @@ class LoRANetwork(torch.nn.Module):
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
                                 continue
+
                             if block_wise == None :
                                 lora = module_class(lora_name,
                                                     child_module,
@@ -1064,6 +1074,7 @@ class LoRANetwork(torch.nn.Module):
                                                     rank_dropout=rank_dropout,
                                                     module_dropout=module_dropout,)
                                 loras.append(lora)
+
                             else :
                                 for i, block in enumerate(BLOCKS) :
                                     if block in lora_name and block_wise[i] == 1:
@@ -1078,6 +1089,7 @@ class LoRANetwork(torch.nn.Module):
                                         loras.append(lora)
             return loras, skipped
 
+
         text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
 
         # create LoRA for text encoder
@@ -1091,7 +1103,12 @@ class LoRANetwork(torch.nn.Module):
             else:
                 index = None
                 print(f"create LoRA for Text Encoder:")
-            text_encoder_loras, skipped = create_modules(False, index, text_encoder, LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
+            if condition_modality == 'text':
+                text_encoder_loras, skipped = create_modules(False, index, text_encoder,
+                                                             LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
+            else :
+                text_encoder_loras, skipped = create_modules(False, index, text_encoder,
+                                                             LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
 
