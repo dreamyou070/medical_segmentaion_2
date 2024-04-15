@@ -229,6 +229,8 @@ class TrainDataset_Seg(Dataset):
         image_condition = self.imagee_processor(images=Image.open(img_path),
                                 return_tensors="pt",
                                 padding=True)  # .data['pixel_values'] # [1,3,224,224]
+        image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
+        pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
 
 
@@ -427,8 +429,7 @@ class TestDataset_Seg(Dataset):
                                                 return_tensors="pt",
                                                 padding=True)  # .data['pixel_values'] # [1,3,224,224]
         image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
-        pixel_value = image_condition.data["pixel_values"]
-        print(f'pixel_value = {pixel_value.shape}')
+        pixel_value = image_condition.data["pixel_values"] # [3,224,224]
 
 
         return {'image': img,  # [3,512,512]
