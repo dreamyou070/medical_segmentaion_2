@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="10_segment_with_image_condition_vit_image_model_training_erase_position_embeddings" #
+file_name="9_segment_with_image_condition_vit_image_model_training" #
 # 3
 # except generation
 
@@ -39,4 +39,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --gt_ext_npy \
  --use_image_condition \
  --image_processor 'vit' \
- --image_model_training --erase_position_embeddings
+ --image_model_training
