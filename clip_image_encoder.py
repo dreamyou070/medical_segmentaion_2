@@ -12,5 +12,5 @@ inputs = processor(images=image, return_tensors="pt", padding=True)#.data['pixel
 model.to("cuda:0")
 image_inputs = inputs.to("cuda:0")
 
-image_features = model.get_image_features(**inputs)
-print(f'image_features = {type(image_features)}')
+image_features = model.get_image_features(**inputs) # [batch, pix_num, dim = 784]
+print(f'image_features = {image_features.shape}')
