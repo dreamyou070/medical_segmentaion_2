@@ -1248,9 +1248,8 @@ class LoRANetwork(torch.nn.Module):
 
     def prepare_optimizer_params(self, text_encoder_lr, unet_lr, default_lr):
 
-        print(f' *** prepare optimizer params *** ')
         self.requires_grad_(True)
-        all_params = []
+        all_params = [] # list
 
         def enumerate_params(loras):
             params = []
@@ -1259,27 +1258,21 @@ class LoRANetwork(torch.nn.Module):
             return params
 
         if self.text_encoder_loras:
-            print(f'condition model, ')
             param_data = {"params": enumerate_params(self.text_encoder_loras)}
-            print(f'param_data: {param_data}')
             if text_encoder_lr is not None:
                 param_data["lr"] = text_encoder_lr
-            all_params.append(param_data)
+            all_params.append(param_data) # len 2 (unet, image_encoder)
 
         if self.unet_loras:
 
             if self.block_lr:
-                # 学習率のグラフをblockごとにしたいので、blockごとにloraを分類
                 block_idx_to_lora = {}
                 for lora in self.unet_loras:
                     idx = get_block_index(lora.lora_name)
                     if idx not in block_idx_to_lora:
                         block_idx_to_lora[idx] = []
                     block_idx_to_lora[idx].append(lora)
-                # blockごとにパラメータを設定する
                 for idx, block_loras in block_idx_to_lora.items():
-                    # block_loras = [modules, ... ]
-                    # every 16 blocks
                     param_data = {"params": enumerate_params(block_loras)}
                     if unet_lr is not None:
                         final_lr = unet_lr * self.get_lr_weight(block_loras[0])
@@ -1298,26 +1291,6 @@ class LoRANetwork(torch.nn.Module):
 
         return all_params
 
-
-    def prepare_optimizer_unet_params(self, unet_lr):
-        self.requires_grad_(True)
-
-        if self.unet_loras:
-            params = []
-            for unet_lora in self.unet_loras:
-                lora_name = unet_lora.lora_name
-                if 'attn2' and 'to_k' in lora_name :
-                    trainable = False
-                elif 'attn2' and 'to_v' in lora_name :
-                    trainable = False
-                else :
-                    trainable = True
-                if trainable :
-                    params.extend(unet_lora.parameters())
-        param_data = {"params": params}
-        if unet_lr is not None:
-            param_data["lr"] = unet_lr
-        return [param_data]
 
     def enable_gradient_checkpointing(self):
         # not supported
