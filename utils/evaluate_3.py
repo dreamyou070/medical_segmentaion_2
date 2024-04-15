@@ -26,7 +26,7 @@ def evaluation_check(segmentation_head, dataloader, device,
                      controller,
                      weight_dtype,
                      epoch,
-                     clip_image_model,
+                     image_model,
                      args):
 
     segmentation_head.eval()
@@ -36,13 +36,16 @@ def evaluation_check(segmentation_head, dataloader, device,
         dice_coeff_list = []
         for global_num, batch in enumerate(dataloader):
 
-            if args.use_image_condition:
+            if args.use_image_condition :
                 with torch.no_grad():
-                    encoder_hidden_states = clip_image_model.get_image_features(
-                        **batch["image_condition"])  # [Batch, 1, 768]
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                    cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
+                    if args.image_processor == 'clip':
+                        encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                    elif args.image_processor == 'vit':
+                        encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
 
-            if args.use_text_condition:
+            if args.use_text_condition :
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
 

@@ -172,7 +172,6 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                     elif args.image_processor == 'vit':
                         encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
-                    print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
@@ -284,7 +283,7 @@ def main(args):
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            text_encoder, unet, vae, controller, weight_dtype, epoch,
-                                                           clip_image_model, args)
+                                                           image_model, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')
