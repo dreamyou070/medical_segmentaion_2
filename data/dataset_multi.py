@@ -58,6 +58,7 @@ class TrainDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
+                 imagee_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -83,6 +84,7 @@ class TrainDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
+        self.process = imagee_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -223,13 +225,19 @@ class TrainDataset_Seg(Dataset):
         else:
             key_word_index = get_target_index(key_words, caption)
 
+        # [3] image pixel
+        image_condition = self.processor(images=Image.open(img_path),
+                                return_tensors="pt",
+                                padding=True)  # .data['pixel_values'] # [1,3,224,224]
+
 
 
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                'key_word_index' : torch.tensor(key_word_index)} # [0,3,4]
+                'key_word_index' : torch.tensor(key_word_index),
+                "image_condition" : image_condition} # [0,3,4]
 
 class TestDataset_Seg(Dataset):
 
@@ -237,6 +245,7 @@ class TestDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
+                 imagee_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -261,6 +270,7 @@ class TestDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
+        self.process = imagee_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -412,9 +422,15 @@ class TestDataset_Seg(Dataset):
         else:
             key_word_index = get_target_index(key_words, caption) # [7,11]
 
+        # [3] image pixel
+        image_condition = self.processor(images=Image.open(img_path),
+                                         return_tensors="pt",
+                                         padding=True)  # .data['pixel_values'] # [1,3,224,224]
+
 
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                'key_word_index':key_word_index} # [0,3,4]
+                'key_word_index':key_word_index,
+                "image_condition" : image_condition} # [0,3,4]

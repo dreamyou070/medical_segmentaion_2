@@ -28,6 +28,7 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
+from transformers import CLIPModel
 
 def main(args):
 
@@ -54,6 +55,9 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+    clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+    clip_image_model = clip_image_model.to(accelerator.device, dtype=weight_dtype)
+    clip_image_model.eval()
 
     decoder = None
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
@@ -109,9 +113,13 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, text_encoder, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    text_encoders = transform_models_if_DDP([text_encoder])
+    if args.use_text_condition :
+        text_encoder = accelerator.prepare(text_encoder)
+        text_encoders = transform_models_if_DDP([text_encoder])
+
+    segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
 
@@ -150,10 +158,18 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
 
-            with torch.set_grad_enabled(True):
-                encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
-            if args.aggregation_model_d:
-                encoder_hidden_states = encoder_hidden_states[:, :args.n_classes, :]
+            if args.use_image_condition :
+                with torch.no_grad():
+                    encoder_hidden_states = clip_image_model(batch["image_condition"]) # [Batch, 1, 768]
+
+
+
+            if args.use_text_condition :
+                with torch.set_grad_enabled(True):
+                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
+
+
+
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
@@ -170,7 +186,6 @@ def main(args):
             attention_dict = controller.attention_dict
             controller.reset()
             q_dict = {}
-            attention_loss = 0
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
@@ -182,14 +197,6 @@ def main(args):
                     # -> 1, dim, res, res
                     query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
-                #
-                attention_probs = attention_dict[layer][0].squeeze()  # 1, pix_num, sen_len
-                trg_attention = attention_probs[:,:,key_word_index].mean(dim=0)  # 1, pix_num, key_word_num
-                max_prob = torch.max(trg_attention, dim=0).values
-                gt_max_prob = torch.ones_like(max_prob)
-                attn_loss = l2_loss(max_prob, gt_max_prob)
-                attention_loss += attn_loss
-
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
@@ -222,8 +229,6 @@ def main(args):
             loss = loss * args.segmentation_loss_weight
             if args.generation :
                 loss += generator_loss * args.generator_loss_weight
-            if args.do_text_attn :
-                loss += attention_loss
             loss = loss.mean()
             current_loss = loss.detach().item()
             if epoch == args.start_epoch:
@@ -417,6 +422,8 @@ if __name__ == "__main__":
     parser.add_argument("--test_like_train", action='store_true')
     parser.add_argument("--text_before_query", action='store_true')
     parser.add_argument("--do_text_attn", action='store_true')
+    parser.add_argument("--use_image_condition", action='store_true')
+    parser.add_argument("--use_text_condition", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
