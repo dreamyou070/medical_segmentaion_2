@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="9_segment_with_image_condition_vit_image_model_training" #
+file_name="11_segment_with_image_condition_vit_image_model_training" #
 # 3
 # except generation
 
@@ -19,7 +19,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/test" \
- --network_dim 64 --network_alpha 4 \
+ --network_dim 144 --network_alpha 4 \
  --resize_shape 512 \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
