@@ -122,7 +122,6 @@ def main(args):
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
@@ -134,10 +133,13 @@ def main(args):
             unet.parameters().__next__().requires_grad_(True)
     else:
         unet.eval()
-        for t_enc in text_encoders:
-            t_enc.eval()
-    del t_enc
-    network.prepare_grad_etc(text_encoder, unet)
+        if args.use_text_condition :
+            for t_enc in text_encoders:
+                t_enc.eval()
+            del t_enc
+            network.prepare_grad_etc(text_encoder, unet)
+        else :
+            network.prepare_grad_etc(unet)
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -161,8 +163,6 @@ def main(args):
             if args.use_image_condition :
                 with torch.no_grad():
                     encoder_hidden_states = clip_image_model(batch["image_condition"]) # [Batch, 1, 768]
-
-
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
@@ -273,7 +273,8 @@ def main(args):
             print(f'test with training data')
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           text_encoder, unet, vae, controller, weight_dtype, epoch, args)
+                                                           text_encoder, unet, vae, controller, weight_dtype, epoch,
+                                                           clip_image_model, args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')

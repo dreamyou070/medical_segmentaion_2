@@ -7,7 +7,6 @@ from model.unet import TimestepEmbedding
 
 def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True, unet_lora = True ):
 
-
     # [1] diffusion
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
 
@@ -28,7 +27,10 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
             net_kwargs[key] = value
     network = create_network(1.0, args.network_dim, args.network_alpha,
                              vae, text_encoder, unet, neuron_dropout=args.network_dropout, **net_kwargs, )
-    network.apply_to(text_encoder, unet, text_encoder_lora, unet_lora)
+    if args.use_text_condition :
+        network.apply_to(text_encoder, unet, text_encoder_lora, unet_lora)
+    else :
+        network.apply_to(unet, text_encoder_lora, apply_text_encoder=False, apply_unet=True)
 
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
