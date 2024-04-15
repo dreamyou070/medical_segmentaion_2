@@ -41,9 +41,9 @@ def call_dataset(args, clip_image_model) :
                                      use_data_aug = args.use_data_aug,)
     test_dataset = TestDataset_Seg(root_dir=args.test_data_path,
                                     resize_shape=[args.resize_shape,args.resize_shape],
-                                    tokenizer=tokenizer,
-                                    imagee_processor=processor,
-                                    clip_image_model=clip_image_model,
+                                   tokenizer=tokenizer,
+                                   imagee_processor=processor,
+                                   clip_image_model=clip_image_model,
                                     latent_res=args.latent_res,
                                     n_classes=args.n_classes,
                                     mask_res = args.mask_res,

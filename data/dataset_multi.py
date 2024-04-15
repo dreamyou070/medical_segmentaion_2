@@ -250,6 +250,7 @@ class TestDataset_Seg(Dataset):
                  resize_shape=(240, 240),
                  tokenizer=None,
                  imagee_processor=None,
+                 clip_image_model=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -275,6 +276,7 @@ class TestDataset_Seg(Dataset):
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
         self.imagee_processor = imagee_processor
+        self.clip_image_model = clip_image_model
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
