@@ -3,8 +3,8 @@
 
 port_number=58705
 category="medical"
-obj_name="leaeder_polyp"
-trigger_word="leaeder_polyp"
+obj_name="leader_polyp"
+trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
