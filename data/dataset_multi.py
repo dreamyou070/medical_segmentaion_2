@@ -84,7 +84,7 @@ class TrainDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.process = imagee_processor
+        self.imagee_processor = imagee_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -226,7 +226,7 @@ class TrainDataset_Seg(Dataset):
             key_word_index = get_target_index(key_words, caption)
 
         # [3] image pixel
-        image_condition = self.processor(images=Image.open(img_path),
+        image_condition = self.imagee_processor(images=Image.open(img_path),
                                 return_tensors="pt",
                                 padding=True)  # .data['pixel_values'] # [1,3,224,224]
 
@@ -270,7 +270,7 @@ class TestDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.process = imagee_processor
+        self.imagee_processor = imagee_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -423,7 +423,7 @@ class TestDataset_Seg(Dataset):
             key_word_index = get_target_index(key_words, caption) # [7,11]
 
         # [3] image pixel
-        image_condition = self.processor(images=Image.open(img_path),
+        image_condition = self.imagee_processor(images=Image.open(img_path),
                                          return_tensors="pt",
                                          padding=True)  # .data['pixel_values'] # [1,3,224,224]
 
