@@ -1290,7 +1290,7 @@ class LoRANetwork(torch.nn.Module):
         # not supported
         pass
 
-    def prepare_grad_etc(self, text_encoder, unet):
+    def prepare_grad_etc(self):
         self.requires_grad_(True)
 
     def on_epoch_start(self, text_encoder, unet):

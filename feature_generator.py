@@ -137,9 +137,7 @@ def main(args):
             for t_enc in text_encoders:
                 t_enc.eval()
             del t_enc
-            network.prepare_grad_etc(text_encoder, unet)
-        else :
-            network.prepare_grad_etc(unet)
+        network.prepare_grad_etc()
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
