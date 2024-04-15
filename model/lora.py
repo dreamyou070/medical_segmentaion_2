@@ -958,7 +958,7 @@ class LoRANetwork(torch.nn.Module):
     UNET_TEXT_PART = 'attentions_0'
 
     TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
-    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention"]
+    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention","ViTPooler","ViTSelfOutput","ViTIntermediate"]
 
     LORA_PREFIX_UNET = "lora_unet"
     LORA_PREFIX_TEXT_ENCODER = "lora_te"
@@ -1037,6 +1037,9 @@ class LoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
+                            if not is_unet:
+                                print(f'lora_name : {lora_name}')
+
                             dim = None
                             alpha = None
                             if modules_dim is not None:

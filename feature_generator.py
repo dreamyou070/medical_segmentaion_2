@@ -185,23 +185,18 @@ def main(args):
                         elif args.image_processor == 'vit':
                             encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
                 else:
-                    cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [1, 3, 224,224]
-                    print(f'cond_input = {cond_input.shape}')
-                    if args.image_processor == 'clip':
-                        encoder_hidden_states = image_model.get_image_features(
-                            **batch["image_condition"])  # [Batch, 1, 768]
-                        encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                    elif args.image_processor == 'vit':
-                        img_con = batch["image_condition"]
-
-                        encoder_hidden_states = image_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-
+                    with torch.set_grad_enabled(True):
+                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
+                        if args.image_processor == 'clip':
+                            encoder_hidden_states = image_model.get_image_features(
+                                **batch["image_condition"])  # [Batch, 1, 768]
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                        elif args.image_processor == 'vit':
+                            img_con = batch["image_condition"]
+                            encoder_hidden_states = image_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
-
-
-
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
