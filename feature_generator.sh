@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="8_segment_with_image_condition" #
+file_name="9_segment_with_image_condition_vit" #
 # 3
 # except generation
 
@@ -37,4 +37,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --generator_loss_weight 1.0 \
  --segmentation_loss_weight 1.0 \
  --gt_ext_npy \
- --use_image_condition
+ --use_image_condition \
+ --image_processor 'vit'

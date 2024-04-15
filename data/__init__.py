@@ -5,7 +5,7 @@ from data.dataset_multi import TrainDataset_Seg, TestDataset_Seg
 from PIL import Image
 import requests
 
-from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 
 
 
@@ -27,7 +27,10 @@ def call_dataset(args) :
     tokenizer = load_tokenizer(args)
     # [1.2] image_processor
     #clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    if args.image_processor == 'clip':
+        processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    elif args.image_processor == 'vit':
+        processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
     # [2] train & test dataset
     train_dataset = TrainDataset_Seg(root_dir=args.train_data_path,

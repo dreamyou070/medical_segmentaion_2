@@ -28,7 +28,7 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
-from transformers import CLIPModel
+from transformers import CLIPModel, ViTModel
 
 def main(args):
 
@@ -51,9 +51,13 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    clip_image_model = clip_image_model.to(accelerator.device, dtype=weight_dtype)
-    clip_image_model.eval()
+    if args.image_processor == 'clip':
+        image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+    elif args.image_processor == 'vit':
+        model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
+    image_model.eval()
+
 
     decoder = None
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
@@ -163,8 +167,12 @@ def main(args):
             if args.use_image_condition :
                 with torch.no_grad():
                     cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
-                    encoder_hidden_states = clip_image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                    if args.image_processor == 'clip':
+                        encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                    elif args.image_processor == 'vit':
+                        encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                    print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
@@ -427,6 +435,7 @@ if __name__ == "__main__":
     parser.add_argument("--do_text_attn", action='store_true')
     parser.add_argument("--use_image_condition", action='store_true')
     parser.add_argument("--use_text_condition", action='store_true')
+    parser.add_argument("--image_processor", default = 'vit', type = str)
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
