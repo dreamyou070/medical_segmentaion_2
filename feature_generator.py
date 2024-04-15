@@ -175,8 +175,7 @@ def main(args):
                         elif args.image_processor == 'vit':
                             img_con = batch["image_condition"]
                             encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-                            if args.use_image_head :
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :].unsqueeze(1)
+
 
 
             if args.use_text_condition :
@@ -450,6 +449,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_text_condition", action='store_true')
     parser.add_argument("--image_processor", default = 'vit', type = str)
     parser.add_argument("--image_model_training", action='store_true')
+    parser.add_argument("--erase_position_embeddings", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

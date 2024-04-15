@@ -26,10 +26,11 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-        img_position_embeddings = image_model.embeddings.position_embeddings
-
-        print(f' * img_position_embeddings : {img_position_embeddings}')
-        print(f' * img_position_embeddings shape : {img_position_embeddings.weight.shape}')
+        if args.erase_position_embeddings:
+            img_position_embeddings = image_model.embeddings.position_embeddings
+            image_model.embeddings.position_embeddings.weight = image_model.embeddings.position_embeddings.weight * 0
+            print(f' * img_position_embeddings : {img_position_embeddings}')
+            print(f' * img_position_embeddings shape : {img_position_embeddings.weight.shape}')
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
 
