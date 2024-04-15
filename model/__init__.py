@@ -33,7 +33,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
                 child.weight.data.fill_(0) # parameter containing
         img_position_embeddings = image_model.embeddings.position_embeddings
         print(f' * img_position_embeddings : {img_position_embeddings}')
-        image_model.embeddings.position_embeddings.weight.data.fill_(0)
+        image_model.embeddings.position_embeddings.data.fill_(0)
         print(f' * img_position_embeddings : {img_position_embeddings}')
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
