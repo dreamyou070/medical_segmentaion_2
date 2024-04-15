@@ -50,14 +50,7 @@ def main(args):
 
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    if args.use_text_condition :
-        text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    else :
-        image_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-
-    print(f'Check network.text_encoder_loras = {network.text_encoder_loras}')  # len 61
-
-
+    condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
     decoder = None
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
@@ -74,13 +67,9 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
-                                                        args.unet_lr,
-                                                        args.learning_rate) # all trainable params
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
-
-
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
@@ -123,32 +112,27 @@ def main(args):
 
     print(f'\n step 8. model to device')
     if args.use_text_condition :
-        text_encoder = accelerator.prepare(text_encoder)
-        text_encoders = transform_models_if_DDP([text_encoder])
+        condition_model = accelerator.prepare(condition_model)
+        condition_models = transform_models_if_DDP([condition_model])
 
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    if args.image_model_training:
-        image_model = accelerator.prepare(image_model)
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
-        if args.use_text_condition :
-            for t_enc in text_encoders:
-                t_enc.train()
-                if args.train_text_encoder:
-                    t_enc.text_model.embeddings.requires_grad_(True)
-        else :
-            image_model.train()
+        for t_enc in condition_models:
+            t_enc.train()
+            if args.train_text_encoder:
+                t_enc.text_model.embeddings.requires_grad_(True)
+
     else:
         unet.eval()
-        if args.use_text_condition :
-            for t_enc in text_encoders:
-                t_enc.eval()
-            del t_enc
+        for t_enc in condition_models:
+            t_enc.eval()
+        del t_enc
         network.prepare_grad_etc()
 
 
@@ -178,28 +162,28 @@ def main(args):
                     with torch.no_grad():
                         cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
                         if args.image_processor == 'clip':
-                            encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                            encoder_hidden_states = condition_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                            encoder_hidden_states = condition_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
 
                 else:
 
                     with torch.set_grad_enabled(True):
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
                         if args.image_processor == 'clip':
-                            encoder_hidden_states = image_model.get_image_features(
+                            encoder_hidden_states = condition_model.get_image_features(
                                 **batch["image_condition"])  # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
                             img_con = batch["image_condition"]
-                            encoder_hidden_states = image_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
+                            encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
                             print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
 
             if args.use_text_condition :
 
                 with torch.set_grad_enabled(True):
-                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
+                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"]
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
@@ -259,11 +243,15 @@ def main(args):
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
             loss = loss * args.segmentation_loss_weight
+
             if args.generation :
                 loss += generator_loss * args.generator_loss_weight
             print(f'loss = {loss}')
+
             loss = loss.mean()
+
             current_loss = loss.detach().item()
+
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
             else:
@@ -333,8 +321,8 @@ def main(args):
             print(f'test with training data')
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           text_encoder, unet, vae, controller, weight_dtype, epoch,
-                                                           image_model, args)
+                                                           condition_model, unet, vae, controller, weight_dtype, epoch,
+                                                           args)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')
