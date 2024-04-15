@@ -55,7 +55,7 @@ def main(args):
     else :
         image_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
-    print(f'Check network.text_encoder_loras = {network.text_encoder_loras}')
+    print(f'Check network.text_encoder_loras = {network.text_encoder_loras}')  # len 61
 
 
     decoder = None

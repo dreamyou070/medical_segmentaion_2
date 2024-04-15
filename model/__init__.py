@@ -52,7 +52,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     if args.use_text_condition :
         network.apply_to(text_encoder, unet, text_encoder_lora, unet_lora)
     else :
-        network.apply_to(image_model, unet, apply_text_encoder=False, apply_unet=True)
+        network.apply_to(image_model, unet, apply_text_encoder=True, apply_unet=True)
 
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
