@@ -233,7 +233,6 @@ class TrainDataset_Seg(Dataset):
         pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
 
-
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
