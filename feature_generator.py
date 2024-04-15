@@ -67,7 +67,7 @@ def main(args):
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
-    train_dataloader, test_dataloader, tokenizer = call_dataset(args, clip_image_model=clip_image_model)
+    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -163,9 +163,8 @@ def main(args):
             if args.use_image_condition :
                 with torch.no_grad():
                     cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
-                    print(f'cond_input (batch,3,224,224) = {cond_input.shape}')
                     encoder_hidden_states = clip_image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
-                    print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
+                    encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):

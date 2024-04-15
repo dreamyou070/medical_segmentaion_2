@@ -21,7 +21,7 @@ from transformers import CLIPProcessor, CLIPModel
 #print(f'image_features = {image_features.shape}')
 
 
-def call_dataset(args, clip_image_model) :
+def call_dataset(args) :
 
     # [1.1] load tokenizer
     tokenizer = load_tokenizer(args)
@@ -34,7 +34,6 @@ def call_dataset(args, clip_image_model) :
                                      resize_shape=[args.resize_shape,args.resize_shape],
                                      tokenizer=tokenizer,
                                      imagee_processor=processor,
-                                     clip_image_model=clip_image_model,
                                      latent_res=args.latent_res,
                                      n_classes = args.n_classes,
                                      mask_res = args.mask_res,
@@ -43,11 +42,10 @@ def call_dataset(args, clip_image_model) :
                                     resize_shape=[args.resize_shape,args.resize_shape],
                                    tokenizer=tokenizer,
                                    imagee_processor=processor,
-                                   clip_image_model=clip_image_model,
-                                    latent_res=args.latent_res,
-                                    n_classes=args.n_classes,
-                                    mask_res = args.mask_res,
-                                    use_data_aug = False)
+                                   latent_res=args.latent_res,
+                                   n_classes=args.n_classes,
+                                   mask_res = args.mask_res,
+                                   use_data_aug = False)
 
     train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                    batch_size=args.batch_size,

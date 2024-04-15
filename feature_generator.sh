@@ -29,7 +29,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 14 \
  --mask_res 256 \
- --batch_size 2 \
+ --batch_size 1 \
  --use_batchnorm \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
