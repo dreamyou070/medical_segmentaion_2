@@ -1148,7 +1148,6 @@ class LoRANetwork(torch.nn.Module):
         names = set()
         for lora in self.text_encoder_loras + self.unet_loras:
             assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
-            print(f"lora_name: {lora.lora_name}")
             names.add(lora.lora_name)
 
     def set_multiplier(self, multiplier):
@@ -1252,8 +1251,11 @@ class LoRANetwork(torch.nn.Module):
     # 二つのText Encoderに別々の学習率を設定できるようにするといいかも
 
     def prepare_optimizer_params(self, text_encoder_lr, unet_lr, default_lr):
+
+        print(f' *** prepare optimizer params *** ')
         self.requires_grad_(True)
         all_params = []
+
         def enumerate_params(loras):
             params = []
             for lora in loras:
