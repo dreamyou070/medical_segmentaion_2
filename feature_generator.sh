@@ -12,7 +12,7 @@ file_name="9_segment_with_image_condition_vit_image_model_training" #
 # 3
 # except generation
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

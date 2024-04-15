@@ -55,6 +55,9 @@ def main(args):
     else :
         image_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
+    print(network.text_encoder_loras)
+
+
     decoder = None
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
@@ -72,10 +75,16 @@ def main(args):
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate)
+
+
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+
+
     #if args.image_model_training:
     #    trainable_params.append({"params": image_model.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
+
+
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
@@ -131,12 +140,13 @@ def main(args):
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
-        for t_enc in text_encoders:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-        if not args.train_text_encoder:  # train U-Net only
-            unet.parameters().__next__().requires_grad_(True)
+        if args.use_text_condition :
+            for t_enc in text_encoders:
+                t_enc.train()
+                if args.train_text_encoder:
+                    t_enc.text_model.embeddings.requires_grad_(True)
+        else :
+            image_model.train()
     else:
         unet.eval()
         if args.use_text_condition :
@@ -144,6 +154,7 @@ def main(args):
                 t_enc.eval()
             del t_enc
         network.prepare_grad_etc()
+    """
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -320,6 +331,7 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
+    """
 
 
 if __name__ == "__main__":

@@ -1252,7 +1252,9 @@ class LoRANetwork(torch.nn.Module):
             return params
 
         if self.text_encoder_loras:
+            print(f'condition model, ')
             param_data = {"params": enumerate_params(self.text_encoder_loras)}
+            print(f'param_data: {param_data}')
             if text_encoder_lr is not None:
                 param_data["lr"] = text_encoder_lr
             all_params.append(param_data)
