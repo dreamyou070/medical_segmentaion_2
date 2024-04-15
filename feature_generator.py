@@ -55,7 +55,7 @@ def main(args):
     else :
         image_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
-    print(network.text_encoder_loras)
+    print(f'Check network.text_encoder_loras = {network.text_encoder_loras}')
 
 
     decoder = None
@@ -76,8 +76,7 @@ def main(args):
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
                                                         args.unet_lr,
-                                                        args.learning_rate)
-    print(f'trainable_params = {trainable_params}')
+                                                        args.learning_rate) # all trainable params
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 

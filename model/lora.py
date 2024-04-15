@@ -1039,10 +1039,6 @@ class LoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
-
-                            if not is_unet:
-                                print(f'lora_name : {lora_name}')
-
                             dim = None
                             alpha = None
                             if modules_dim is not None:
@@ -1105,7 +1101,7 @@ class LoRANetwork(torch.nn.Module):
                 print(f"create LoRA for Text Encoder {index}:")
             else:
                 index = None
-                print(f"create LoRA for Text Encoder:") # Here is the problem
+                #print(f"create LoRA for Text Encoder:") # Here is the problem
             if condition_modality == 'image':
                 prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
                 target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
@@ -1119,6 +1115,8 @@ class LoRANetwork(torch.nn.Module):
                                                          prefix = prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
+
+
         print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
         # ------------------------------------------------------------------------------------------------------------------------
         # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
@@ -1133,9 +1131,7 @@ class LoRANetwork(torch.nn.Module):
         skipped = skipped_te + skipped_un
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
-            print(
-                f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:"
-            )
+            print(f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:")
             for name in skipped:
                 print(f"\t{name}")
 
