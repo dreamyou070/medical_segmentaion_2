@@ -481,6 +481,7 @@ class ViTModel(ViTPreTrainedModel):
         self.config = config
 
         self.embeddings = ViTEmbeddings(config, use_mask_token=use_mask_token)
+
         self.encoder = ViTEncoder(config)
 
         self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
