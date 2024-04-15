@@ -22,11 +22,7 @@ def eval_step(engine, batch):
     return batch
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
-                     text_encoder, unet, vae,
-                     controller,
-                     weight_dtype,
-                     epoch,
-                     image_model,
+                     condition_model, unet, vae, controller, weight_dtype, epoch,
                      args):
 
     segmentation_head.eval()
@@ -40,14 +36,14 @@ def evaluation_check(segmentation_head, dataloader, device,
                 with torch.no_grad():
                     cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
                     if args.image_processor == 'clip':
-                        encoder_hidden_states = image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                        encoder_hidden_states = condition_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                     elif args.image_processor == 'vit':
-                        encoder_hidden_states = image_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                        encoder_hidden_states = condition_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
 
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
-                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]
+                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"]
 
             image = batch['image'].to(dtype=weight_dtype)                                   # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)                               # 1,128*128
@@ -73,7 +69,7 @@ def evaluation_check(segmentation_head, dataloader, device,
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            reconstruction, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
+            reconstruction, z_mu, z_sigma, masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
 
             if args.generation and global_num == 0 :
                 reconstruction_img = reconstruction.squeeze(0).permute(1, 2, 0).detach().cpu()  # .numpy()
