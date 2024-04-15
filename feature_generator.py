@@ -28,7 +28,6 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
-from transformers import CLIPModel, ViTModel
 
 def main(args):
 
@@ -46,11 +45,7 @@ def main(args):
 
     print(f'\n step 3. preparing accelerator')
 
-
     accelerator = prepare_accelerator(args)
-
-
-
     is_main_process = accelerator.is_main_process
 
     print(f'\n step 4. model')
@@ -73,8 +68,9 @@ def main(args):
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
-    trainable_params.append({"params": segmentation_head.parameters(),
-                             "lr": args.learning_rate})
+    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+
+
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -179,6 +175,9 @@ def main(args):
                         elif args.image_processor == 'vit':
                             img_con = batch["image_condition"]
                             encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
+                            if args.use_image_head :
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :].unsqueeze(1)
+
 
             if args.use_text_condition :
 
