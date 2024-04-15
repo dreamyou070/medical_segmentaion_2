@@ -42,11 +42,7 @@ def main(args):
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
         json.dump(vars(args), f, indent=4)
 
-    print(f'\n step 2. dataset and dataloader')
-    if args.seed is None:
-        args.seed = random.randint(0, 2 ** 32)
-    set_seed(args.seed)
-    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
+
 
     print(f'\n step 3. preparing accelerator')
     accelerator = prepare_accelerator(args)
@@ -66,6 +62,12 @@ def main(args):
                                         init_latent_p=args.init_latent_p,
                                         decoder = decoder,
                                         generation = args.generation,)
+
+    print(f'\n step 2. dataset and dataloader')
+    if args.seed is None:
+        args.seed = random.randint(0, 2 ** 32)
+    set_seed(args.seed)
+    train_dataloader, test_dataloader, tokenizer = call_dataset(args, clip_image_model=clip_image_model)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
