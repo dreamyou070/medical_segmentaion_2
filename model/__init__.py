@@ -28,9 +28,9 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
         if args.erase_position_embeddings:
             img_position_embeddings = image_model.embeddings.position_embeddings
-            image_model.embeddings.position_embeddings.weight = image_model.embeddings.position_embeddings.weight * 0
+            image_model.embeddings.position_embeddings = image_model.embeddings.position_embeddings * 0
             print(f' * img_position_embeddings : {img_position_embeddings}')
-            print(f' * img_position_embeddings shape : {img_position_embeddings.weight.shape}')
+            print(f' * img_position_embeddings shape : {image_model.embeddings.position_embeddings.shape}')
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
 
