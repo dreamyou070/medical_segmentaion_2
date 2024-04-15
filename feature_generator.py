@@ -154,7 +154,7 @@ def main(args):
                 t_enc.eval()
             del t_enc
         network.prepare_grad_etc()
-    """
+
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -331,7 +331,6 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
-    """
 
 
 if __name__ == "__main__":
