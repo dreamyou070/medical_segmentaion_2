@@ -196,7 +196,7 @@ class TrainDataset_Seg(Dataset):
 
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
-
+        """
         key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
 
         def get_target_index(target_words, caption):
@@ -217,14 +217,14 @@ class TrainDataset_Seg(Dataset):
                     idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
                     target_word_index.append(idx)
             return target_word_index
-
+        
         if argument.use_cls_token:
             default = [0]  # cls token index
             default.extend(get_target_index(key_words, caption))
             key_word_index = default
         else:
             key_word_index = get_target_index(key_words, caption)
-
+        """
         # [3] image pixel
         image_condition = self.imagee_processor(images=Image.open(img_path),
                                 return_tensors="pt",
@@ -238,7 +238,7 @@ class TrainDataset_Seg(Dataset):
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                'key_word_index' : torch.tensor(key_word_index),
+                #'key_word_index' : torch.tensor(key_word_index),
                 "image_condition" : image_condition} # [0,3,4]
 
 class TestDataset_Seg(Dataset):
@@ -397,8 +397,8 @@ class TestDataset_Seg(Dataset):
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
 
+        """
         key_words = [class_map[i][0] for i in class_es]  # [b,p]
-
         def get_target_index(target_words, caption):
 
             target_word_index = []
@@ -423,7 +423,7 @@ class TestDataset_Seg(Dataset):
             key_word_index = default
         else:
             key_word_index = get_target_index(key_words, caption) # [7,11]
-
+        """
         # [3] image pixel
         image_condition = self.imagee_processor(images=Image.open(img_path),
                                                 return_tensors="pt",
@@ -436,5 +436,5 @@ class TestDataset_Seg(Dataset):
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                'key_word_index':key_word_index,
+                #'key_word_index':key_word_index,
                 "image_condition" : image_condition} # [0,3,4]

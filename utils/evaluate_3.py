@@ -49,7 +49,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             image = batch['image'].to(dtype=weight_dtype)                                   # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)                               # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)                                         # 1,4,128,128
-            key_word_index = batch['key_word_index'][0]  # torch([10,14])
+            #key_word_index = batch['key_word_index'][0]  # torch([10,14])
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
