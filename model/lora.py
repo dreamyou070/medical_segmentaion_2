@@ -1037,8 +1037,8 @@ class LoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
-                            #if not is_unet:
-                            #    print(f'lora_name : {lora_name}')
+                            if not is_unet:
+                                print(f'lora_name : {lora_name}')
 
                             dim = None
                             alpha = None
@@ -1099,27 +1099,20 @@ class LoRANetwork(torch.nn.Module):
         # 毎回すべてのモジュールを作るのは無駄なので要検討
         self.text_encoder_loras = []
         skipped_te = []
+        print(f'len of text_encoders : {len(text_encoders)}')
         for i, text_encoder in enumerate(text_encoders):
             if len(text_encoders) > 1:
                 index = i + 1
                 print(f"create LoRA for Text Encoder {index}:")
             else:
                 index = None
-                print(f"create LoRA for Text Encoder:")
-            if condition_modality == 'text':
-                text_encoder_loras, skipped = create_modules(False, index, text_encoder,
-                                                             LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
-            else :
-                text_encoder_loras, skipped = create_modules(False, index, text_encoder,
-                                                             LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE)
+                print(f"create LoRA for Text Encoder:") # Here is the problem
+            text_encoder_loras, skipped = create_modules(False, index, text_encoder,
+                                                         LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
 
-
-
-
-
-        print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.")
+        print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.") # Here (61 modules)
 
         # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
         target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
@@ -1143,6 +1136,7 @@ class LoRANetwork(torch.nn.Module):
         names = set()
         for lora in self.text_encoder_loras + self.unet_loras:
             assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+            print(f"lora_name: {lora.lora_name}")
             names.add(lora.lora_name)
 
     def set_multiplier(self, multiplier):
