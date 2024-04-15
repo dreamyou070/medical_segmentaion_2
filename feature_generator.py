@@ -50,15 +50,10 @@ def main(args):
 
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    if args.image_processor == 'clip':
-        image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    elif args.image_processor == 'vit':
-        image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
-    if not args.image_model_training :
-        image_model.eval()
-
+    if args.use_text_condition :
+        text_encoder, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+    else :
+        image_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
     decoder = None
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
@@ -67,7 +62,7 @@ def main(args):
                                         init_latent_p=args.init_latent_p,
                                         decoder = decoder,
                                         generation = args.generation,)
-
+    """
     print(f'\n step 2. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -325,6 +320,7 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
+    """
 
 
 if __name__ == "__main__":
