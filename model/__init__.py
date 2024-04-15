@@ -33,12 +33,16 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
             key, value = net_arg.split("=")
             net_kwargs[key] = value
     if args.use_image_condition :
-        network = create_network(1.0, args.network_dim, args.network_alpha,
+        network = create_network(1.0,
+                                 args.network_dim,
+                                 args.network_alpha,
                                  vae,
-                                 image_model, unet,
+                                 image_model,
+                                 unet,
                                  neuron_dropout=args.network_dropout,
                                  condition_modality='image',
                                  **net_kwargs, )
+
     else :
         network = create_network(1.0, args.network_dim, args.network_alpha,
                                  vae, text_encoder, unet, neuron_dropout=args.network_dropout,

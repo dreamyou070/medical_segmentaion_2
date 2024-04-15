@@ -538,16 +538,16 @@ def parse_block_lr_kwargs(nw_kwargs):
     return down_lr_weight, mid_lr_weight, up_lr_weight
 
 
-def create_network(
-    multiplier: float,
-    network_dim: Optional[int],
-    network_alpha: Optional[float],
-    vae: AutoencoderKL,
-    text_encoder: Union[CLIPTextModel, List[CLIPTextModel]],
-    unet,
-    neuron_dropout: Optional[float] = None,
-    condition_modality = 'text',
-    **kwargs,):
+def create_network(multiplier: float,
+                   network_dim: Optional[int],
+                   network_alpha: Optional[float],
+                   vae: AutoencoderKL,
+                   condition_model: Union[CLIPTextModel, List[CLIPTextModel]],
+                   unet,
+                   neuron_dropout: Optional[float] = None,
+                   condition_modality = 'text',
+                   **kwargs,):
+
     if network_dim is None:
         network_dim = 4  # default
     if network_alpha is None:
@@ -597,24 +597,23 @@ def create_network(
 
     net_key_names = kwargs.get('key_layers', None)
     # すごく引数が多いな ( ^ω^)･･･
-    network = LoRANetwork(
-        text_encoder,
-        unet,
-        multiplier=multiplier,
-        lora_dim=network_dim,
-        alpha=network_alpha,
-        dropout=neuron_dropout,
-        rank_dropout=rank_dropout,
-        module_dropout=module_dropout,
-        conv_lora_dim=conv_dim,
-        conv_alpha=conv_alpha,
-        block_dims=block_dims,
-        block_alphas=block_alphas,
-        conv_block_dims=conv_block_dims,
-        conv_block_alphas=conv_block_alphas,
-        varbose=True,
-        net_key_names=net_key_names,
-    condition_modality=condition_modality,)
+    network = LoRANetwork(text_encoder=condition_model,
+                          unet=unet,
+                          multiplier=multiplier,
+                          lora_dim=network_dim,
+                          alpha=network_alpha,
+                          dropout=neuron_dropout,
+                          rank_dropout=rank_dropout,
+                          module_dropout=module_dropout,
+                          conv_lora_dim=conv_dim,
+                          conv_alpha=conv_alpha,
+                          block_dims=block_dims,
+                          block_alphas=block_alphas,
+                          conv_block_dims=conv_block_dims,
+                          conv_block_alphas=conv_block_alphas,
+                          varbose=True,
+                          net_key_names=net_key_names,
+                          condition_modality=condition_modality,)
 
     if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
@@ -953,6 +952,7 @@ def create_network_from_weights(multiplier, file, block_wise,
 
 class LoRANetwork(torch.nn.Module):
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
+
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"]
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
     UNET_TEXT_PART = 'attentions_0'
@@ -987,7 +987,7 @@ class LoRANetwork(torch.nn.Module):
         module_class: Type[object] = LoRAModule,
         varbose: Optional[bool] = False,
         net_key_names: Optional[bool] = False,
-         condition_modality='text',
+        condition_modality='text',
     ) -> None:
 
         super().__init__()
@@ -1019,24 +1019,26 @@ class LoRANetwork(torch.nn.Module):
         def create_modules(is_unet: bool,
                            text_encoder_idx: Optional[int],  # None, 1, 2
                            root_module: torch.nn.Module,
-                           target_replace_modules: List[torch.nn.Module],) -> List[LoRAModule]:
-            prefix = (self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None
-                    else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2)))
-            if condition_modality == 'image' and not is_unet :
-                prefix = self.LORA_PREFIX_IMAGE_ENCODER
+                           target_replace_modules : List[torch.nn.Module],) -> List[LoRAModule]:
+
+            prefix = target_replace_modules
             loras = []
             skipped = []
+
             for name, module in root_module.named_modules():
+
                 if module.__class__.__name__ in target_replace_modules:
 
                     for child_name, child_module in module.named_modules():
-                        # named module
+
                         is_linear = child_module.__class__.__name__ == "Linear"
                         is_conv2d = child_module.__class__.__name__ == "Conv2d"
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
+
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
+
                             if not is_unet:
                                 print(f'lora_name : {lora_name}')
 
@@ -1092,14 +1094,10 @@ class LoRANetwork(torch.nn.Module):
                                         loras.append(lora)
             return loras, skipped
 
-
+        # ------------------------------------------------------------------------------------------------------------------------
         text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
-
-        # create LoRA for text encoder
-        # 毎回すべてのモジュールを作るのは無駄なので要検討
         self.text_encoder_loras = []
-        skipped_te = []
-        print(f'len of text_encoders : {len(text_encoders)}')
+        skipped_te = [] # 1 model
         for i, text_encoder in enumerate(text_encoders):
             if len(text_encoders) > 1:
                 index = i + 1
@@ -1107,19 +1105,28 @@ class LoRANetwork(torch.nn.Module):
             else:
                 index = None
                 print(f"create LoRA for Text Encoder:") # Here is the problem
-            text_encoder_loras, skipped = create_modules(False, index, text_encoder,
-                                                         LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
+            if condition_modality == 'image':
+                prefix_ = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
+            else :
+                prefix_ = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
+            text_encoder_loras, skipped = create_modules(False,
+                                                         index,
+                                                         text_encoder,
+                                                         prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
-
-        print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.") # Here (61 modules)
-
+        print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
+        # ------------------------------------------------------------------------------------------------------------------------
         # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
         target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
         if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
             target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
-        self.unet_loras, skipped_un = create_modules(True, None, unet, target_modules)
+        self.unet_loras, skipped_un = create_modules(True,
+                                                     None,
+                                                     unet,
+                                                     target_modules)
         skipped = skipped_te + skipped_un
+        # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
             print(
                 f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:"
