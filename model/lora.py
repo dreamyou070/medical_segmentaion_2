@@ -1009,7 +1009,8 @@ class LoRANetwork(torch.nn.Module):
                 print(f"apply LoRA to Conv2d with kernel size (3,3). dim (rank): {self.conv_lora_dim}, alpha: {self.conv_alpha}")
 
         # create module instances
-        def create_modules(is_unet: bool,text_encoder_idx: Optional[int],  # None, 1, 2
+        def create_modules(is_unet: bool,
+                           text_encoder_idx: Optional[int],  # None, 1, 2
                            root_module: torch.nn.Module,
                            target_replace_modules: List[torch.nn.Module],) -> List[LoRAModule]:
             prefix = (self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None
@@ -1017,6 +1018,7 @@ class LoRANetwork(torch.nn.Module):
             loras = []
             skipped = []
             for name, module in root_module.named_modules():
+                print(f'create_modules: {module.__class__.__name__}')
                 if module.__class__.__name__ in target_replace_modules:
 
                     for child_name, child_module in module.named_modules():
@@ -1092,6 +1094,11 @@ class LoRANetwork(torch.nn.Module):
             text_encoder_loras, skipped = create_modules(False, index, text_encoder, LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
+
+
+
+
+
         print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.")
 
         # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
