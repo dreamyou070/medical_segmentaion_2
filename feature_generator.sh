@@ -1,7 +1,7 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=58705
+port_number=50000
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
