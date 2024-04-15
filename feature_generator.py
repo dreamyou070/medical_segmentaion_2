@@ -111,13 +111,10 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    if args.use_text_condition :
-        condition_model = accelerator.prepare(condition_model)
-        condition_models = transform_models_if_DDP([condition_model])
-
+    condition_model = accelerator.prepare(condition_model)
+    condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -127,14 +124,12 @@ def main(args):
             t_enc.train()
             if args.train_text_encoder:
                 t_enc.text_model.embeddings.requires_grad_(True)
-
     else:
         unet.eval()
         for t_enc in condition_models:
             t_enc.eval()
         del t_enc
         network.prepare_grad_etc()
-
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
