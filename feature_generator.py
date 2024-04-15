@@ -160,10 +160,7 @@ def main(args):
 
             if args.use_image_condition :
                 with torch.no_grad():
-                    cond_input = batch["image_condition"]
-                    print(f'cond_input = {cond_input}')
-                    import time
-                    time.sleep(100)
+                    #cond_input = batch["image_condition"]
                     encoder_hidden_states = clip_image_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
                     print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
 
