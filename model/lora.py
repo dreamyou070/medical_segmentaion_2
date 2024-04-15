@@ -1022,7 +1022,7 @@ class LoRANetwork(torch.nn.Module):
                            target_replace_modules: List[torch.nn.Module],) -> List[LoRAModule]:
             prefix = (self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None
                     else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2)))
-            if target_replace_modules == self.UNET_TARGET_REPLACE_MODULE:
+            if condition_modality == 'image' and not is_unet :
                 prefix = self.LORA_PREFIX_IMAGE_ENCODER
             loras = []
             skipped = []
@@ -1037,8 +1037,8 @@ class LoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
-                            if not is_unet:
-                                print(f'lora_name : {lora_name}')
+                            #if not is_unet:
+                            #    print(f'lora_name : {lora_name}')
 
                             dim = None
                             alpha = None
