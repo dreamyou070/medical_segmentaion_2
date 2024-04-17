@@ -37,7 +37,7 @@ from transformers.utils import logging
 from transformers.models.bert.configuration_bert import BertConfig
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from transformers.generation import utils
-from utils import BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput, BeamSampleEncoderDecoderOutput, BeamSampleDecoderOnlyOutput, GenerationMode
+from transformers.generation.utils import BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput, BeamSampleEncoderDecoderOutput, BeamSampleDecoderOnlyOutput, GenerationMode
 import copy
 import inspect
 
