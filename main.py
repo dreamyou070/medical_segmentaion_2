@@ -73,7 +73,6 @@ def main(args):
                                text_condition = blip_decoder,
                                unet = unet,
                                neuron_dropout=args.network_dropout,
-                               condition_modality='image',
                                **net_kwargs, )
     network.apply_to(blip_text_model, blip_image_model, unet, True, True, True)
 

@@ -546,7 +546,6 @@ def create_network_2(multiplier: float,
                      text_condition = None,
                      unet=None,
                      neuron_dropout: Optional[float] = None,
-                     condition_modality = 'text',
                      **kwargs,):
 
     if network_dim is None:
@@ -614,8 +613,7 @@ def create_network_2(multiplier: float,
                           conv_block_dims=conv_block_dims,
                           conv_block_alphas=conv_block_alphas,
                           varbose=True,
-                          net_key_names=net_key_names,
-                          condition_modality=condition_modality,)
+                          net_key_names=net_key_names)
 
     if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
@@ -992,8 +990,7 @@ class LoRANetwork(torch.nn.Module):
                  # LoRAInfModule
                  module_class: Type[object] = LoRAModule,
                  varbose: Optional[bool] = False,
-                 net_key_names: Optional[bool] = False,
-                 condition_modality='text',) -> None:
+                 net_key_names: Optional[bool] = False) -> None:
 
         super().__init__()
         self.multiplier = multiplier
