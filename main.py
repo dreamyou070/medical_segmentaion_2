@@ -225,35 +225,28 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
 
-            # how to make lm loss ?
+            # -----------------------------------------------------------------------------------------------------------------------------
             # [1] lm_loss
             caption = batch['caption']       # ['this picture is of b n']
             image = batch['image_condition'] # [batch, 3, 384, 384]
             lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
 
-
+            # -----------------------------------------------------------------------------------------------------------------------------
             if args.use_image_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = image_feature
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
-
-            
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            # key_word_index = batch['key_word_index'][0] # torch([10,14])
-            # target key word should intense
-            # how can i increase the alignment between image and text ?
-
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -290,8 +283,8 @@ def main(args):
             loss = loss.mean()
             loss_dict['lm_loss'] = lm_loss.item()
 
+            # -----------------------------------------------------------------------------------------------------------------------------
             total_loss = loss + lm_loss
-
             current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
