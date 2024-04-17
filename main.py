@@ -58,6 +58,8 @@ def main(args):
     model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
     blip_model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
     blip_image_model, blip_text_model = blip_model.visual_encoder, blip_model.text_decoder
+    print(f' blip imag emodel = {blip_image_model.__class__.__name__}')
+    print(f' blip text model = {blip_text_model.__class__.__name__}')
 
     # [3] lora network
     net_kwargs = {}

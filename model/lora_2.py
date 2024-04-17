@@ -567,7 +567,7 @@ def create_network_2(multiplier: float,
     block_dims = kwargs.get("block_dims", None)
     down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
 
-    # 以上のいずれかに指定があればblockごとのdim(rank)を有効にする
+    """
     if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
         block_alphas = kwargs.get("block_alphas", None)
         conv_block_dims = kwargs.get("conv_block_dims", None)
@@ -594,7 +594,7 @@ def create_network_2(multiplier: float,
     module_dropout = kwargs.get("module_dropout", None)
     if module_dropout is not None:
         module_dropout = float(module_dropout)
-
+    """
     net_key_names = kwargs.get('key_layers', None)
     # すごく引数が多いな ( ^ω^)･･･
     network = LoRANetwork(image_condition = image_condition,
@@ -619,7 +619,7 @@ def create_network_2(multiplier: float,
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
 
     return network
-
+"""
 def create_network_blockwise(
     multiplier: float,
     network_dim: Optional[int],
@@ -949,7 +949,7 @@ def create_network_from_weights(multiplier, file, block_wise,
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
 
     return network, weights_sd
-
+"""
 
 class LoRANetwork(torch.nn.Module):
     #
@@ -1102,15 +1102,19 @@ class LoRANetwork(torch.nn.Module):
                 print(f"create LoRA for Image Encoder {index}:")
             else:
                 index = None
+
+            # ---------------------------------------------------------------------------------------------------------------------
+            # create image encoder LoRA
             prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
             target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
             image_encoder_loras, skipped = create_modules(False,
                                                           index,
-                                                          image_encoder,
+                                                          root_module = image_encoder,
                                                           target_replace_modules = target_replace_module_condition,
                                                           prefix = prefix_)
             self.image_encoder_loras.extend(image_encoder_loras)
             skipped_ie += skipped
+        print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
 
         # --------------------------------------------------------------------------------------------------------------------- #
         text_encoders = text_condition if type(text_condition) == list else [text_condition]
@@ -1126,7 +1130,7 @@ class LoRANetwork(torch.nn.Module):
             target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
             text_encoder_loras, skipped = create_modules(False,
                                                          index,
-                                                         text_encoder,
+                                                         root_module = text_encoder,
                                                          target_replace_modules = target_replace_module_condition,
                                                          prefix = prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
@@ -1139,7 +1143,7 @@ class LoRANetwork(torch.nn.Module):
             target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
         self.unet_loras, skipped_un = create_modules(True,
                                                      None,
-                                                     unet,
+                                                     root_module = unet,
                                                      target_replace_modules = target_modules,
                                                      prefix = LoRANetwork.LORA_PREFIX_UNET)
         skipped = skipped_te + skipped_un
