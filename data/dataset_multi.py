@@ -249,7 +249,7 @@ class TrainDataset_Seg(Dataset):
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                #'key_word_index' : torch.tensor(key_word_index),
+                'caption' : caption,
                 "image_condition" : image_condition} # [0,3,4]
 
 class TestDataset_Seg(Dataset):
@@ -447,5 +447,5 @@ class TestDataset_Seg(Dataset):
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
-                #'key_word_index':key_word_index,
+                'caption': caption,
                 "image_condition" : image_condition} # [0,3,4]

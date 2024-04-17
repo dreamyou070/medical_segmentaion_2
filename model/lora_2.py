@@ -1129,7 +1129,6 @@ class LoRANetwork(torch.nn.Module):
                 index = None
             prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
             target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
-            print(f'text module = {text_encoder}')
             text_encoder_loras, skipped = create_modules(False,
                                                          index,
                                                          root_module = text_encoder,

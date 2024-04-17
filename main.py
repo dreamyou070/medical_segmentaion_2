@@ -197,7 +197,7 @@ def main(args):
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
-    """
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -208,9 +208,14 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
 
+            # how to make lm loss ?
             # [1] lm_loss
             caption = batch['caption']
+            print(f'caption = {caption}')
+            """
             lm_loss, image_feature = blip_model(image, caption)
+
+
 
             if args.use_image_condition:
 
@@ -331,7 +336,8 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-
+            """
+    """
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
@@ -383,6 +389,7 @@ def main(args):
                 f.write(f'\n')
     accelerator.end_training()
     """
+
 
 
 if __name__ == "__main__":
