@@ -187,7 +187,7 @@ class TrainDataset_Seg(Dataset):
                 caption = base_prompts[np.random.randint(0, len(base_prompts))]
             else :
                 caption = ''
-            #caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
                 caption += class_map[class_idx][0]
                 if i == class_es.shape[0] - 1:
