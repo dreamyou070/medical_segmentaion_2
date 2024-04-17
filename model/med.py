@@ -47,7 +47,7 @@ from transformers.generation.utils import (BeamSearchEncoderDecoderOutput, BeamS
                                            BeamSampleEncoderDecoderOutput,
                                            BeamSampleDecoderOnlyOutput, GenerationMode, GenerateOutput,
                                            ContrastiveSearchDecoderOnlyOutput, ContrastiveSearchEncoderDecoderOutput,
-                                           CausalLMOutputWithPast, Seq2SeqLMOutput)
+                                           CausalLMOutputWithPast, Seq2SeqLMOutput, ContrastiveSearchOutput)
 import copy
 import inspect
 
