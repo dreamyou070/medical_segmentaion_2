@@ -44,7 +44,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
 
-            cls_token = image_features[:, 0, :]
+            cls_token = image_feature[:, 0, :]
             image_feature_transpose = image_feature[:, 1:, :].transpose(1, 2)  # [batch, dim, pixels]
 
             image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
