@@ -567,7 +567,7 @@ def create_network_2(multiplier: float,
     block_dims = kwargs.get("block_dims", None)
     down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
 
-    
+
     if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
         block_alphas = kwargs.get("block_alphas", None)
         conv_block_dims = kwargs.get("conv_block_dims", None)
@@ -962,7 +962,8 @@ class LoRANetwork(torch.nn.Module):
     #TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
     TEXT_ENCODER_TARGET_REPLACE_MODULE = ["BertSelfAttention", "BertIntermediate"]
 
-    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention","ViTPooler","ViTSelfOutput","ViTIntermediate"]
+    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention","ViTPooler","ViTSelfOutput","ViTIntermediate",
+                                           "Mlp","Attention"]
 
     LORA_PREFIX_UNET = "lora_unet"
     LORA_PREFIX_TEXT_ENCODER = "lora_te"
@@ -1128,6 +1129,7 @@ class LoRANetwork(torch.nn.Module):
                 index = None
             prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
             target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
+            print(f'text module = {text_encoder}')
             text_encoder_loras, skipped = create_modules(False,
                                                          index,
                                                          root_module = text_encoder,
