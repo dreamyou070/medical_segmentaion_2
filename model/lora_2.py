@@ -595,7 +595,7 @@ def create_network_2(multiplier: float,
 
     net_key_names = kwargs.get('key_layers', None)
 
-    print(f'before make network, text condition = {text_condition}')
+
     network = LoRANetwork(image_condition = image_condition,
                           text_condition = text_condition,
                           unet=unet,
@@ -994,7 +994,7 @@ class LoRANetwork(torch.nn.Module):
 
         super().__init__()
 
-        print(f'When making Lora, text_condition = {text_condition}')
+
         self.multiplier = multiplier
         self.lora_dim = lora_dim
         self.alpha = alpha
@@ -1118,7 +1118,6 @@ class LoRANetwork(torch.nn.Module):
         print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
 
         # --------------------------------------------------------------------------------------------------------------------- #
-        """
         text_encoders = text_condition if type(text_condition) == list else [text_condition]
         self.text_encoder_loras = []
         skipped_te = [] # 1 model
@@ -1138,15 +1137,6 @@ class LoRANetwork(torch.nn.Module):
                                                          prefix = prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
-        """
-        skipped_te = []
-        text_encoder_loras, skipped = create_modules(False,
-                                                     index,
-                                                     root_module=text_condition,
-                                                     target_replace_modules=target_replace_module_condition,
-                                                     prefix=prefix_)
-        self.text_encoder_loras.extend(text_encoder_loras)
-        skipped_te += skipped
         print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
 
         # --------------------------------------------------------------------------------------------------------------------- #
