@@ -31,8 +31,8 @@ abdomen_class_map = {0: ['b','background'],
                         12: ['i','intestine'],
                         13: ['o','other'], }
 leader_polyp_class_map = {0: ['b','background'],
-                          1: ['p','polyp'],
-                          2: ['n','neg'],}
+                          1: ['p','non-neoplastic'],
+                          2: ['n','neoplastic'],}
 teeth_class_map = {0: ['b','background'],
                      1: ['t','anomal']}
 
