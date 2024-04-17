@@ -61,11 +61,7 @@ def main(args):
     print(f' blip imag emodel = {blip_image_model.__class__.__name__}')
     print(f' blip text model = {blip_text_model.__class__.__name__}')
 
-    # check named_modules
-    for name, module in blip_text_model.named_modules():
-        print(f' blip text model name = {name}')
 
-    """
     # [3] lora network
     net_kwargs = {}
     if args.network_args is not None:
@@ -203,7 +199,6 @@ def main(args):
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
-    """
     """
     for epoch in range(args.start_epoch, args.max_train_epochs):
 

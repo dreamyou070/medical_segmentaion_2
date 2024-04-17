@@ -1120,6 +1120,7 @@ class LoRANetwork(torch.nn.Module):
         print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
 
         # --------------------------------------------------------------------------------------------------------------------- #
+        """
         text_encoders = text_condition if type(text_condition) == list else [text_condition]
         self.text_encoder_loras = []
         skipped_te = [] # 1 model
@@ -1139,6 +1140,15 @@ class LoRANetwork(torch.nn.Module):
                                                          prefix = prefix_)
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
+        """
+        skipped_te = []
+        text_encoder_loras, skipped = create_modules(False,
+                                                     index,
+                                                     root_module=text_condition,
+                                                     target_replace_modules=target_replace_module_condition,
+                                                     prefix=prefix_)
+        self.text_encoder_loras.extend(text_encoder_loras)
+        skipped_te += skipped
         print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
 
         # --------------------------------------------------------------------------------------------------------------------- #
@@ -1150,7 +1160,7 @@ class LoRANetwork(torch.nn.Module):
                                                      root_module = unet,
                                                      target_replace_modules = target_modules,
                                                      prefix = LoRANetwork.LORA_PREFIX_UNET)
-        skipped = skipped_te + skipped_un
+        skipped = skipped_te + skipped_un + skipped_ie
 
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
