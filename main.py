@@ -1,3 +1,4 @@
+from model.multimodal_blip.blip import blip_decoder
 import argparse, math, random, json
 from tqdm import tqdm
 from accelerate.utils import set_seed
@@ -6,8 +7,8 @@ from torch import nn
 import os
 from attention_store import AttentionStore
 from data import call_dataset
-from diffusers import DDPMScheduler
 from model import call_model_package
+from model.call_model import call_model_package_2
 from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
@@ -18,17 +19,19 @@ from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
 from utils.evaluate_3 import evaluation_check
-from model.pe import AllPositionalEmbedding
-from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
-from utils import get_noise_noisy_latents_and_timesteps
-from model.autodecoder import AutoencoderKL
 from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
-
+from model.lora_2 import create_network_2
+from model.pe import AllPositionalEmbedding, SinglePositionalEmbedding
+from model.diffusion_model import load_target_model
+import os
+from safetensors.torch import load_file
+from model.unet import TimestepEmbedding
+from transformers import CLIPModel
+from model.modeling_vit import ViTModel
 def main(args):
 
     print(f'\n step 1. setting')
@@ -41,23 +44,70 @@ def main(args):
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
         json.dump(vars(args), f, indent=4)
 
-
-
-    print(f'\n step 3. preparing accelerator')
-
+    print(f'\n step 2. preparing accelerator')
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
 
-    print(f'\n step 4. model')
+    print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    decoder = None
+
+    print(f' (3.2) load stable diffusion model')
+    # [1] diffusion
+    text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
+    # [1.0] text
+    text_encoder.requires_grad_(False)
+    # [1.1] vae
+    vae.requires_grad_(False)
+    vae.to(dtype=weight_dtype)
+    vae.eval()
+    # [1.2] unet
+    unet.requires_grad_(False)
+    unet.to(dtype=weight_dtype)
+    # [2] blip model
+    image_size = 384
+    model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
+    blip_model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
+    blip_image_model, blip_text_model = blip_model.visual_encoder, blip_model.text_decoder
+    # [3] lora network
+    net_kwargs = {}
+    if args.network_args is not None:
+        for net_arg in args.network_args:
+            key, value = net_arg.split("=")
+            net_kwargs[key] = value
+    network = create_network_2(1.0,
+                               args.network_dim,
+                               args.network_alpha,
+                               vae,
+                               image_condition = blip_image_model,
+                               text_condition = blip_decoder,
+                               unet = unet,
+                               neuron_dropout=args.network_dropout,
+                               condition_modality='image',
+                               **net_kwargs, )
+    network.apply_to(blip_text_model, blip_image_model, unet, True, True, True)
+
+    unet = unet.to(accelerator.device, dtype=weight_dtype)
+    unet.eval()
+
+    blip_text_model = blip_text_model.to(accelerator.device, dtype=weight_dtype)
+    blip_text_model.eval()
+
+    vae = vae.to(accelerator.device, dtype=weight_dtype)
+    vae.eval()
+
+    blip_image_model = blip_image_model.to(accelerator.device, dtype=weight_dtype)
+    blip_image_model.eval()
+
+    if args.network_weights is not None:
+        print(f' * loading network weights')
+        info = network.load_weights(args.network_weights)
+    network.to(weight_dtype)
+
+
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
-                                        init_latent_p=args.init_latent_p,
-                                        decoder = decoder,
-                                        generation = args.generation,)
+                                        init_latent_p=args.init_latent_p)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -67,7 +117,8 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
+                                                        args.learning_rate)  # all trainable params
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -111,24 +162,38 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    condition_model = accelerator.prepare(condition_model)
-    condition_models = transform_models_if_DDP([condition_model])
+
+    blip_image_model = accelerator.prepare(blip_image_model)
+    blip_image_models = transform_models_if_DDP([blip_image_model])
+
+    blip_text_model = accelerator.prepare(blip_text_model)
+    blip_text_models = transform_models_if_DDP([blip_text_model])
+
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+        accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
+                            lr_scheduler)
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
-        for t_enc in condition_models:
+        for i_enc in blip_image_models:
+            i_enc.train()
+            if args.train_image_encoder:
+                i_enc.visual_model.embeddings.requires_grad_(True)
+
+        for t_enc in blip_text_models:
             t_enc.train()
             if args.train_text_encoder:
                 t_enc.text_model.embeddings.requires_grad_(True)
     else:
         unet.eval()
-        for t_enc in condition_models:
+        for t_enc in blip_text_models:
             t_enc.eval()
         del t_enc
+        for i_enc in blip_image_models:
+            i_enc.eval()
+        del i_enc
         network.prepare_grad_etc()
 
     print(f'\n step 9. registering saving tensor')
@@ -141,28 +206,36 @@ def main(args):
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
+    """
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
 
+        
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
 
-            if args.use_image_condition :
+            # [1] lm_loss
+            caption = batch['caption']
+            lm_loss, image_feature = blip_model(image, caption)
+
+            if args.use_image_condition:
 
                 if not args.image_model_training:
 
                     with torch.no_grad():
-                        cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
+                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
                         if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
+                            encoder_hidden_states = condition_model.get_image_features(
+                                **batch["image_condition"])  # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            encoder_hidden_states = condition_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
+                            encoder_hidden_states = condition_model(
+                                **batch["image_condition"]).last_hidden_state  # [batch, 197, 768]
 
-                else :
+                else:
 
                     with torch.set_grad_enabled(True):
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
@@ -172,14 +245,13 @@ def main(args):
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
                             img_con = batch["image_condition"]
-                            encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
+                            encoder_hidden_states = condition_model(
+                                **batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
 
-
-
-            if args.use_text_condition :
-
+            if args.use_text_condition:
                 with torch.set_grad_enabled(True):
-                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
+                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
+                        "last_hidden_state"]  # [batch, 77, 768]
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
@@ -204,7 +276,7 @@ def main(args):
                 res = int(query.shape[1] ** 0.5)
                 if args.text_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                else :
+                else:
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
@@ -221,7 +293,8 @@ def main(args):
                 generator_loss = recons_loss + kl_weight * kl_loss
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
-            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_org.shape[-1]).contiguous()
+            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                               masks_pred_org.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred_org, target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
@@ -240,12 +313,13 @@ def main(args):
                 loss = loss.mean()
             loss = loss * args.segmentation_loss_weight
 
-            if args.generation :
+            if args.generation:
                 loss += generator_loss * args.generator_loss_weight
 
             loss = loss.mean()
-
-            current_loss = loss.detach().item()
+            
+            total_loss = loss + lm_loss
+            current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
@@ -266,10 +340,6 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-
-
-
-
 
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
@@ -321,6 +391,7 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
+    """
 
 
 if __name__ == "__main__":
@@ -445,12 +516,15 @@ if __name__ == "__main__":
     parser.add_argument("--do_text_attn", action='store_true')
     parser.add_argument("--use_image_condition", action='store_true')
     parser.add_argument("--use_text_condition", action='store_true')
-    parser.add_argument("--image_processor", default = 'vit', type = str)
+    parser.add_argument("--image_processor", default='vit', type=str)
     parser.add_argument("--image_model_training", action='store_true')
     parser.add_argument("--erase_position_embeddings", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
+
     passing_mvtec_argument(args)
     main(args)
+
+

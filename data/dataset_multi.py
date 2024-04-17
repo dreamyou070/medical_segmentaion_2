@@ -183,15 +183,23 @@ class TrainDataset_Seg(Dataset):
             elif argument.obj_name == 'leader_polyp':
                 class_map = leader_polyp_class_map
 
-            caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            if argument.use_base_prompt :
+                caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            else :
+                caption = ''
+            #caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
                 caption += class_map[class_idx][0]
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
-                    caption += ', '
+                    #caption += ', '
+                    caption += ' '
         else :
-            base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            if argument.use_base_prompt :
+                base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            else :
+                base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
 
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")

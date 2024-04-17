@@ -147,9 +147,7 @@ class SemanticSeg_Gen(nn.Module):
                  use_instance_norm = True,
                  mask_res = 128,
                  high_latent_feature = False,
-                 init_latent_p = 1,
-                 decoder = None,
-                 generation = True):
+                 init_latent_p = 1):
 
         super(SemanticSeg_Gen, self).__init__()
 
@@ -166,33 +164,6 @@ class SemanticSeg_Gen(nn.Module):
             self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2))
-        self.generation = generation
-        if generation :
-            self.high_latent_feature = high_latent_feature
-            if self.high_latent_feature :
-                self.feature_generator = nn.Sequential(nn.Sigmoid())
-            else :
-                self.feature_generator = nn.Sequential(nn.Conv2d(320, 4, kernel_size=3, padding=1),
-                                                       nn.Sigmoid())
-            if decoder is not None :
-                self.decoder_model = decoder
-            else :
-                latent_dim = 320
-                if not self.high_latent_feature:
-                    latent_dim = 4
-                self.decoder_model = AutoencoderKL(spatial_dims=2,
-                                                  out_channels=3,
-                                                  num_res_blocks = (2, 2, 2, 2),
-                                                  num_channels = (32, 64, 64, 64),
-                                                  attention_levels=(False, False, True, True),
-                                                  latent_channels=latent_dim,
-                                                  norm_num_groups=32,
-                                                  norm_eps=1e-6,
-                                                  with_encoder_nonlocal_attn=True,
-                                                  with_decoder_nonlocal_attn=True,
-                                                  use_flash_attention=False,
-                                                  use_checkpointing=False,
-                                                  use_convtranspose=False)
         self.outc = OutConv(160, n_classes)
         self.init_latent_p = init_latent_p
 
@@ -207,16 +178,8 @@ class SemanticSeg_Gen(nn.Module):
 
         # ----------------------------------------------------------------------------------------------------
         # semantic rich feature
-        reconstruction, z_mu, z_sigma = None, None, None
-        if self.generation :
-            gen_feature = self.feature_generator(x) # 1, 4, 64, 64
-            # [1] recon
-            merged_feature = gen_feature + self.init_latent_p * init_latent
-            # why ?
-            reconstruction, z_mu, z_sigma = self.reconstruction(merged_feature)
-
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
-        #return gen_feature, logits
-        return reconstruction, z_mu, z_sigma, logits #, gen_feature
+
+        return logits #, gen_feature
 
