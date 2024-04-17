@@ -38,7 +38,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --segmentation_loss_weight 1.0 \
  --gt_ext_npy \
  --use_image_condition \
- --image_processor 'vit' \
+ --image_processor 'blip' \
  --image_model_training \
  --use_image_by_caption \
  --use_base_prompt
