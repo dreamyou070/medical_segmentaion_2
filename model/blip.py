@@ -173,6 +173,7 @@ class BLIP_Decoder(nn.Module):
                                                  repetition_penalty=repetition_penalty,
                                                  **model_kwargs)
 
+        print(f'decoder output = {outputs}')
         captions = []
         for output in outputs:
             caption = self.tokenizer.decode(output, skip_special_tokens=True)    

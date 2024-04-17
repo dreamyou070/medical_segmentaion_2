@@ -15,6 +15,8 @@ from transformers.activations import ACT2FN
 from transformers.file_utils import (
     ModelOutput,
 )
+from transformers.generation.configuration_utils import GenerationConfig
+
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -1057,12 +1059,12 @@ class BertLMHeadModel(BertPreTrainedModel):
                     - [`~generation.BeamSearchEncoderDecoderOutput`],
                     - [`~generation.BeamSampleEncoderDecoderOutput`]
         """
-        """
-        if synced_gpus is None:
-            if is_deepspeed_zero3_enabled() and dist.get_world_size() > 1:
-                synced_gpus = True
-            else:
-                synced_gpus = False
+
+        #if synced_gpus is None:
+        #    if is_deepspeed_zero3_enabled() and dist.get_world_size() > 1:
+        #        synced_gpus = True
+        #    else:
+        synced_gpus = False
 
         # 1. Handle `generation_config` and kwargs that might update it, and validate the `.generate()` call
         self._validate_model_class()
@@ -1112,10 +1114,13 @@ class BertLMHeadModel(BertPreTrainedModel):
         # model_input_name is defined if model-specific keyword input is passed
         # otherwise model_input_name is None
         # all model-specific keyword inputs are removed from `model_kwargs`
-        """
+        # input from vision model
         inputs_tensor, model_input_name, model_kwargs = self._prepare_model_inputs(
             inputs, generation_config.bos_token_id, model_kwargs
         )
+
+
+
         batch_size = inputs_tensor.shape[0]
 
         # 4. Define other model kwargs
