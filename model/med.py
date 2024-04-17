@@ -1,13 +1,3 @@
-'''
- * Copyright (c) 2022, salesforce.com, inc.
- * All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause
- * For full license text, see LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
- * By Junnan Li
- * Based on huggingface code base
- * https://github.com/huggingface/transformers/blob/v4.15.0/src/transformers/models/bert
-'''
-
 import math
 import os
 import warnings
@@ -40,8 +30,7 @@ from transformers.modeling_utils import (
     PreTrainedModel,
     apply_chunking_to_forward,
     find_pruneable_heads_and_indices,
-    prune_linear_layer,
-)
+    prune_linear_layer,)
 from transformers.utils import logging
 from transformers.models.bert.configuration_bert import BertConfig
 
@@ -881,8 +870,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         if labels is not None:
             use_cache = False
 
-        outputs = self.bert(
-            input_ids,
+        outputs = self.bert(input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
             head_mask=head_mask,
@@ -895,11 +883,13 @@ class BertLMHeadModel(BertPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             is_decoder=is_decoder,
-            mode=mode,
-        )
-        
+            mode=mode,)
+        # ----------------------------------------------------------------------------------------------
+        # sequece_output
         sequence_output = outputs[0]
-        print(f'')
+
+        # ----------------------------------------------------------------------------------------------
+        # self.cls? BertOnlyMLMHead
         prediction_scores = self.cls(sequence_output)
         
         if return_logits:
@@ -911,7 +901,8 @@ class BertLMHeadModel(BertPreTrainedModel):
             shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
             labels = labels[:, 1:].contiguous()
             loss_fct = CrossEntropyLoss(reduction=reduction, label_smoothing=0.1) 
-            lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+            lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size),  # prediction value
+                               labels.view(-1))                                             # answer
             if reduction=='none':
                 lm_loss = lm_loss.view(prediction_scores.size(0),-1).sum(1)               
 

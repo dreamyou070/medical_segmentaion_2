@@ -40,6 +40,16 @@ def evaluation_check(segmentation_head, dataloader, device,
             image = batch['image_condition']  # [batch, 3, 384, 384]
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
 
+            # [2] evaluate with generating caption
+            gen_caption = blip_model.generate(image,
+                                          sample=True,
+                                          num_beams=3, max_length=20, min_length=5)[0]
+            caption_save_dir = os.path.join(args.output_dir, 'caption.txt')
+            with open(caption_save_dir, 'a') as f:
+                f.write(f'(epoch) {epoch} | (gen caption) {gen_caption} | (real caption) {caption}\n')
+
+
+
             if args.use_image_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = image_feature

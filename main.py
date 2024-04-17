@@ -83,7 +83,6 @@ def main(args):
                                **net_kwargs, )
     network.apply_to(blip_text_model, blip_image_model, unet, True, True, True)
 
-
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
 
@@ -117,9 +116,10 @@ def main(args):
                                                         args.text_encoder_lr,
                                                         args.unet_lr,
                                                         args.learning_rate)  # all trainable params
+    blip_trainable_params = trainable_params[1]
+    print(f'image_blip_trainable_params : {blip_trainable_params}')
 
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
-    print(f'len of training params (4) = {len(trainable_params)}')
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -212,23 +212,20 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    kl_weight = 1e-6
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-
-
         for step, batch in enumerate(train_dataloader):
-
             device = accelerator.device
             loss_dict = {}
-
             # -----------------------------------------------------------------------------------------------------------------------------
             # [1] lm_loss
             caption = batch['caption']       # ['this picture is of b n']
             image = batch['image_condition'] # [batch, 3, 384, 384]
+
+            # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
 
             # -----------------------------------------------------------------------------------------------------------------------------

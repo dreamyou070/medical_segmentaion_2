@@ -146,7 +146,8 @@ class BLIP_Decoder(nn.Module):
         input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         input_ids[:,0] = self.tokenizer.bos_token_id
         input_ids = input_ids[:, :-1]
-
+        # -----------------------------------------------------------------------------------------------
+        # when text_decoder.generate
         if sample:
             #nucleus sampling
             outputs = self.text_decoder.generate(input_ids=input_ids,
@@ -169,7 +170,8 @@ class BLIP_Decoder(nn.Module):
                                                  pad_token_id=self.tokenizer.pad_token_id,
                                                  repetition_penalty=repetition_penalty,
                                                  **model_kwargs)
-        captions = []    
+
+        captions = []
         for output in outputs:
             caption = self.tokenizer.decode(output, skip_special_tokens=True)    
             captions.append(caption[len(self.prompt):])
