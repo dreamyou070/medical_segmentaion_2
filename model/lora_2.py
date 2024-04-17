@@ -567,7 +567,7 @@ def create_network_2(multiplier: float,
     block_dims = kwargs.get("block_dims", None)
     down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
 
-    """
+    
     if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
         block_alphas = kwargs.get("block_alphas", None)
         conv_block_dims = kwargs.get("conv_block_dims", None)
@@ -594,7 +594,7 @@ def create_network_2(multiplier: float,
     module_dropout = kwargs.get("module_dropout", None)
     if module_dropout is not None:
         module_dropout = float(module_dropout)
-    """
+
     net_key_names = kwargs.get('key_layers', None)
     # すごく引数が多いな ( ^ω^)･･･
     network = LoRANetwork(image_condition = image_condition,
