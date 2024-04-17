@@ -26,7 +26,9 @@ model = model.to(device)
 
 with torch.no_grad():
     # beam search
-    caption = model.generate(image, sample=False, num_beams=3, max_length=20, min_length=5)
+    caption = model.generate(image,
+                             sample=True,
+                             num_beams=3, max_length=20, min_length=5)
     # nucleus sampling
     # caption = model.generate(image, sample=True, top_p=0.9, max_length=20, min_length=5)
     print('caption: ' + caption[0])
