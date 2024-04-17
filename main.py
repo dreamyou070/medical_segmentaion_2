@@ -173,6 +173,8 @@ def main(args):
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
+        blip_model.train()
+        """
         for i_enc in blip_image_models:
             i_enc.train()
             if args.train_image_encoder:
@@ -182,8 +184,10 @@ def main(args):
             t_enc.train()
             if args.train_text_encoder:
                 t_enc.text_model.embeddings.requires_grad_(True)
+        """
     else:
         unet.eval()
+        """
         for t_enc in blip_text_models:
             t_enc.eval()
         del t_enc
@@ -191,6 +195,7 @@ def main(args):
             i_enc.eval()
         del i_enc
         network.prepare_grad_etc()
+        """
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
