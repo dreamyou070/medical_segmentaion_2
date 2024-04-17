@@ -23,50 +23,53 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      blip_model, unet, vae, controller, weight_dtype, epoch,
-                     args):
+                     simple_linear, args):
 
     segmentation_head.eval()
 
     with torch.no_grad():
         y_true_list, y_pred_list = [], []
         dice_coeff_list = []
+
         for global_num, batch in enumerate(dataloader):
 
             loss_dict = {}
 
             # how to make lm loss ?
             # [1] lm_loss
+            # [1] lm_loss
             caption = batch['caption']  # ['this picture is of b n']
             image = batch['image_condition']  # [batch, 3, 384, 384]
+
+            # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
 
-            # [2] evaluate with generating caption
-            gen_caption = blip_model.generate(image,
-                                          sample=True,
-                                          num_beams=3, max_length=20, min_length=5)[0]
-            caption_save_dir = os.path.join(args.output_dir, 'caption.txt')
-            with open(caption_save_dir, 'a') as f:
-                f.write(f'(epoch) {epoch} | (gen caption) {gen_caption} | (real caption) {caption}\n')
+            cls_token = image_features[:, 0, :]
+            image_features = image_features[:, 1:, :]
+            image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
 
+            image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
+            encoder_hidden_states = torch.cat((cls_token.unsqueeze(1), image_feat), dim=1)
+            # print(condition.shape)  # torch.Size([1, 4, 768])
 
-
+            """
+            # -----------------------------------------------------------------------------------------------------------------------------
             if args.use_image_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = image_feature
+            if args.use_text_condition:
+                with torch.set_grad_enabled(True):
+                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
+            """
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-            # key_word_index = batch['key_word_index'][0] # torch([10,14])
-            # target key word should intense
-            # how can i increase the alignment between image and text ?
-
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}

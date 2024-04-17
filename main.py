@@ -117,9 +117,11 @@ def main(args):
                                                         args.unet_lr,
                                                         args.learning_rate)  # all trainable params
     blip_trainable_params = trainable_params[1]
-    print(f'image_blip_trainable_params : {blip_trainable_params}')
+
+    simple_linear = nn.Linear(576, 3)
 
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": simple_linear.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -174,6 +176,7 @@ def main(args):
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
         accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
                             lr_scheduler)
+    simple_linear = accelerator.prepare(simple_linear)
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -228,6 +231,16 @@ def main(args):
             # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
 
+            cls_token = image_features[:, 0, :]
+            image_features = image_features[:, 1:, :]
+            image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
+
+
+            image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
+            encoder_hidden_states = torch.cat((cls_token.unsqueeze(1), image_feat), dim=1)
+            #print(condition.shape)  # torch.Size([1, 4, 768])
+
+            """
             # -----------------------------------------------------------------------------------------------------------------------------
             if args.use_image_condition:
                 with torch.set_grad_enabled(True):
@@ -235,6 +248,7 @@ def main(args):
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
+            """
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
@@ -282,7 +296,7 @@ def main(args):
             loss_dict['lm_loss'] = lm_loss.item()
 
             # -----------------------------------------------------------------------------------------------------------------------------
-            total_loss = loss + lm_loss
+            total_loss = loss # + lm_loss
             current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
@@ -330,7 +344,7 @@ def main(args):
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            blip_model, unet, vae, controller, weight_dtype, epoch,
-                                                           args)
+                                                           simple_linear, args,)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')

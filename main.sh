@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="11_train_with_blip" #
+file_name="12_simple_linear" #
 # 3
 # except generation
 
