@@ -243,8 +243,7 @@ class TrainDataset_Seg(Dataset):
             print(f' get imag condition from vit_transformer ... ')
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)
-
-
+            print(f' get imag condition from vit_transformer ... ( should be (3,384,384) ) : {image_condition.shape}')
 
         else :
             image_condition = self.image_processor(images=Image.open(img_path),

@@ -33,7 +33,7 @@ def call_dataset(args) :
         processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
     elif args.image_processor == 'blip' :
         normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-        processor = transforms.Compose([transforms.Resize((384384), interpolation=InterpolationMode.BICUBIC),
+        processor = transforms.Compose([transforms.Resize((384,384), interpolation=InterpolationMode.BICUBIC),
                                         transforms.ToTensor(),
                                         normalize, ])
 
