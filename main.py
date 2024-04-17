@@ -110,8 +110,11 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
+    trainable_params = network.prepare_optimizer_params(args.image_encoder_lr,
+                                                        args.text_encoder_lr,
+                                                        args.unet_lr,
                                                         args.learning_rate)  # all trainable params
+
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     print(f'len of training params (4) = {len(trainable_params)}')
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
@@ -212,7 +215,6 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-
         
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
@@ -226,7 +228,7 @@ def main(args):
             print(f'image condition = {image}')
             lm_loss, image_feature = blip_model(image, caption)
             print(f'image_feature = {image_feature.shape}')
-
+            """
             if args.use_image_condition:
                 # use image_feature
                 encoder_hidden_states = None
@@ -234,7 +236,7 @@ def main(args):
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
 
-            """
+            
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
@@ -442,6 +444,7 @@ if __name__ == "__main__":
                         help="Number of restarts for cosine scheduler with restarts / cosine with restarts", )
     parser.add_argument("--lr_scheduler_power", type=float, default=1,
                         help="Polynomial power for polynomial scheduler / polynomial", )
+    parser.add_argument('--image_encoder_lr', type=float, default=1e-5)
     parser.add_argument('--text_encoder_lr', type=float, default=1e-5)
     parser.add_argument('--unet_lr', type=float, default=1e-5)
     parser.add_argument('--learning_rate', type=float, default=1e-5)
