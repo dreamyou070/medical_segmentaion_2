@@ -574,13 +574,11 @@ def create_network_2(multiplier: float,
         conv_block_alphas = kwargs.get("conv_block_alphas", None)
 
         block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(
-            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
-        )
+            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha)
 
         # remove block dim/alpha without learning rate
         block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(
-            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
-        )
+            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight)
 
     else:
         block_alphas = None
@@ -596,7 +594,8 @@ def create_network_2(multiplier: float,
         module_dropout = float(module_dropout)
 
     net_key_names = kwargs.get('key_layers', None)
-    # すごく引数が多いな ( ^ω^)･･･
+
+    print(f'before make network, text condition = {text_condition}')
     network = LoRANetwork(image_condition = image_condition,
                           text_condition = text_condition,
                           unet=unet,
@@ -994,6 +993,8 @@ class LoRANetwork(torch.nn.Module):
                  net_key_names: Optional[bool] = False) -> None:
 
         super().__init__()
+
+        print(f'When making Lora, text_condition = {text_condition}')
         self.multiplier = multiplier
         self.lora_dim = lora_dim
         self.alpha = alpha
@@ -1024,12 +1025,9 @@ class LoRANetwork(torch.nn.Module):
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
                            prefix) -> List[LoRAModule]:
-            print(f'root_module = {root_module}')
-
             loras = []
             skipped = []
             # prefix ...
-
             for name, module in root_module.named_modules():
 
                 if module.__class__.__name__ in target_replace_modules:
