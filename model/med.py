@@ -26,7 +26,7 @@ from transformers.modeling_outputs import (
     SequenceClassifierOutput,
     TokenClassifierOutput,
 )
-from transformers.generation_beam_search import BeamScorer, BeamSearchScorer
+from transformers.generation.beam_search import BeamScorer, BeamSearchScorer
 from transformers.modeling_utils import (
     PreTrainedModel,
     apply_chunking_to_forward,
