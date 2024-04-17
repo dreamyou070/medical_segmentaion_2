@@ -22,6 +22,8 @@ from model.lora_2 import create_network_2
 from model.diffusion_model import load_target_model
 import os
 import torch
+from utils.saving import save_model
+from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 
 
 def main(args):
@@ -222,7 +224,7 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             print(f'step = {step}')
             print(f'batch = {batch}')
-            """
+
 
             device = accelerator.device
             loss_dict = {}
@@ -258,8 +260,7 @@ def main(args):
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-            """
-            """
+
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -332,8 +333,6 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-            """
-    """
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
@@ -350,6 +349,7 @@ def main(args):
                        save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
+        """
         # [7] evaluate
         loader = test_dataloader
         if args.check_training:
@@ -383,10 +383,8 @@ def main(args):
                 dice_coeff = sum(dices) / len(dices)
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
+        """
     accelerator.end_training()
-    """
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
