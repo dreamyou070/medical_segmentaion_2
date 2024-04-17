@@ -137,10 +137,9 @@ def main(args):
         def __init__(self):
             super().__init__()
 
-            self.mm_projector = nn.Sequential(nn.Linear(784, 512),
+            self.mm_projector = nn.Sequential(nn.Linear(768, 512),
                                               nn.GELU(),
-                                              nn.Linear(512, 784),
-                                              )
+                                              nn.Linear(512, 768),)
 
         def forward(self, x):
             return self.mm_projector(x)
