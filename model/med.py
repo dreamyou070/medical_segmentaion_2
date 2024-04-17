@@ -15,8 +15,10 @@ from transformers.activations import ACT2FN
 from transformers.file_utils import (
     ModelOutput,
 )
+import torch.distributed as dist
+from transformers.generation.utils import _ranking_fast
 from transformers.generation.configuration_utils import GenerationConfig
-
+from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.modeling_outputs import (
@@ -45,7 +47,7 @@ from transformers.generation.utils import (BeamSearchEncoderDecoderOutput, BeamS
                                            BeamSampleEncoderDecoderOutput,
                                            BeamSampleDecoderOnlyOutput, GenerationMode, GenerateOutput,
                                            ContrastiveSearchDecoderOnlyOutput, ContrastiveSearchEncoderDecoderOutput,
-                                           CausalLMOutputWithPast)
+                                           CausalLMOutputWithPast, Seq2SeqLMOutput)
 import copy
 import inspect
 
@@ -1831,6 +1833,7 @@ class BertLMHeadModel(BertPreTrainedModel):
             # compute the degeneration penalty and re-rank the candidates based on the degeneration penalty and the
             # model confidence. Keeping `selected_idx` on CPU enables multi-device contrastive search and doesn't
             # introduce (noticeable) slowdowns on single-device runs.
+
             selected_idx = _ranking_fast(context_hidden, next_hidden, top_k_probs, penalty_alpha, top_k)
             selected_idx = selected_idx.to("cpu")
 
