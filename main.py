@@ -195,7 +195,7 @@ def main(args):
                             lr_scheduler)
     if args.use_position_embedder:
         position_embedder = accelerator.prepare(position_embedder)
-        position_embedder = transform_models_if_DDP(position_embedder)[0]
+        #position_embedder = transform_models_if_DDP(position_embedder)[0]
 
     simple_linear = accelerator.prepare(simple_linear)
     unet, network = transform_models_if_DDP([unet, network])
