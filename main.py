@@ -1,37 +1,28 @@
-from model.multimodal_blip.blip import blip_decoder
-import argparse, math, random, json
+from model.blip import blip_decoder
+import argparse, random, json
 from tqdm import tqdm
 from accelerate.utils import set_seed
-import torch
 from torch import nn
-import os
 from attention_store import AttentionStore
 from data import call_dataset
-from model import call_model_package
-from model.call_model import call_model_package_2
-from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen
+from model.segmentation_unet import SemanticSeg_Gen
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
+from utils import prepare_dtype, arg_as_list
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
-from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate_3 import evaluation_check
-from monai.utils import DiceCEReduction, LossReduction
+from monai.utils import LossReduction
 from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from utils.losses import PatchAdversarialLoss
 from model.lora_2 import create_network_2
-from model.pe import AllPositionalEmbedding, SinglePositionalEmbedding
 from model.diffusion_model import load_target_model
 import os
-from safetensors.torch import load_file
-from model.unet import TimestepEmbedding
-from transformers import CLIPModel
-from model.modeling_vit import ViTModel
+
+
 def main(args):
 
     print(f'\n step 1. setting')
