@@ -403,8 +403,6 @@ class TestDataset_Seg(Dataset):
                 base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
 
-        print(f' caption = {caption}')
-
         caption_token = self.tokenizer(caption,
                                        padding="max_length",
                                        truncation=True, return_tensors="pt")

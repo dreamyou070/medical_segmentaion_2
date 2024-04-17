@@ -265,7 +265,8 @@ def main(args):
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
-            else:  # [5.1] Multiclassification Loss
+            else:
+                # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
@@ -306,6 +307,8 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
+
+
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
