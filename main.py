@@ -45,20 +45,20 @@ def main(args):
     print(f' (3.2) load stable diffusion model')
     # [1] diffusion
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
-    # [1.0] text
     text_encoder.requires_grad_(False)
-    # [1.1] vae
+    text_encoder.to(dtype=weight_dtype)
     vae.requires_grad_(False)
     vae.to(dtype=weight_dtype)
     vae.eval()
-    # [1.2] unet
     unet.requires_grad_(False)
     unet.to(dtype=weight_dtype)
+
     # [2] blip model
     image_size = 384
     model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
     blip_model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
     blip_image_model, blip_text_model = blip_model.visual_encoder, blip_model.text_decoder
+
     # [3] lora network
     net_kwargs = {}
     if args.network_args is not None:
