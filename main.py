@@ -21,6 +21,7 @@ from utils.losses import PatchAdversarialLoss
 from model.lora_2 import create_network_2
 from model.diffusion_model import load_target_model
 import os
+import torch
 
 
 def main(args):
@@ -45,11 +46,14 @@ def main(args):
     print(f' (3.2) load stable diffusion model')
     # [1] diffusion
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
+
     text_encoder.requires_grad_(False)
     text_encoder.to(dtype=weight_dtype)
+
     vae.requires_grad_(False)
     vae.to(dtype=weight_dtype)
     vae.eval()
+
     unet.requires_grad_(False)
     unet.to(dtype=weight_dtype)
 
@@ -58,7 +62,6 @@ def main(args):
     model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
     blip_model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
     blip_image_model, blip_text_model = blip_model.visual_encoder, blip_model.text_decoder
-
 
     # [3] lora network
     net_kwargs = {}
@@ -77,6 +80,7 @@ def main(args):
                                **net_kwargs, )
     network.apply_to(blip_text_model, blip_image_model, unet, True, True, True)
 
+
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
 
@@ -93,8 +97,6 @@ def main(args):
         print(f' * loading network weights')
         info = network.load_weights(args.network_weights)
     network.to(weight_dtype)
-
-
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
@@ -111,6 +113,7 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
                                                         args.learning_rate)  # all trainable params
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    print(f'len of training params (4) = {len(trainable_params)}')
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -153,12 +156,14 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
+    blip_model.visual_encoder, blip_model.text_decoder = blip_image_model, blip_text_model
+    #blip_image_model = accelerator.prepare(blip_image_model)
+    #blip_image_models = transform_models_if_DDP([blip_image_model])
+    #blip_text_model = accelerator.prepare(blip_text_model)
+    #blip_text_models = transform_models_if_DDP([blip_text_model])
 
-    blip_image_model = accelerator.prepare(blip_image_model)
-    blip_image_models = transform_models_if_DDP([blip_image_model])
-
-    blip_text_model = accelerator.prepare(blip_text_model)
-    blip_text_models = transform_models_if_DDP([blip_text_model])
+    blip_model = accelerator.prepare(blip_model)
+    blip_model = transform_models_if_DDP([blip_model])[0]
 
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
         accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
@@ -215,42 +220,16 @@ def main(args):
             print(f'caption = {caption}')
             print(f'image condition = {image}')
             lm_loss, image_feature = blip_model(image, caption)
-            """
-
-
+            print(f'image_feature = {image_feature.shape}')
 
             if args.use_image_condition:
-
-                if not args.image_model_training:
-
-                    with torch.no_grad():
-                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(
-                                **batch["image_condition"])  # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
-                            encoder_hidden_states = condition_model(
-                                **batch["image_condition"]).last_hidden_state  # [batch, 197, 768]
-
-                else:
-
-                    with torch.set_grad_enabled(True):
-                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(
-                                **batch["image_condition"])  # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
-                            img_con = batch["image_condition"]
-                            encoder_hidden_states = condition_model(
-                                **batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-
+                # use image_feature
+                encoder_hidden_states = None
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
-                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                        "last_hidden_state"]  # [batch, 77, 768]
+                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
 
+            """
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
@@ -262,10 +241,10 @@ def main(args):
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
             with torch.set_grad_enabled(True):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
-
+            """
+            """
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
