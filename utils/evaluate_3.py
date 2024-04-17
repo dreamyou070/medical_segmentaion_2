@@ -23,7 +23,7 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      blip_model, unet, vae, controller, weight_dtype, epoch,
-                     simple_linear, position_embedderm, args):
+                     simple_linear, position_embedder, args):
 
     segmentation_head.eval()
 
