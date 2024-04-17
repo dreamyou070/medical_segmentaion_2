@@ -133,7 +133,19 @@ def main(args):
                                                         args.learning_rate)  # all trainable params
     blip_trainable_params = trainable_params[1]
 
-    simple_linear = nn.Linear(576, 3)
+    class simle_net(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.mm_projector = nn.Sequential(nn.Linear(784, 512),
+                                              nn.GELU(),
+                                              nn.Linear(512, 784),
+                                              )
+
+        def forward(self, x):
+            return self.mm_projector(x)
+
+    simple_linear = simle_net()
 
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": simple_linear.parameters(), "lr": args.learning_rate})
@@ -254,14 +266,11 @@ def main(args):
             # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
 
-            cls_token = image_feature[:, 0, :]
-            image_features = image_feature[:, 1:, :]
-            image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
+            #cls_token = image_feature[:, 0, :]
+            #image_features = image_feature[:, 1:, :]
+            #image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
 
-
-            image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
-            encoder_hidden_states = torch.cat((cls_token.unsqueeze(1), image_feat), dim=1)
-            #print(condition.shape)  # torch.Size([1, 4, 768])
+            encoder_hidden_states = simple_linear(image_feature)
 
             """
             # -----------------------------------------------------------------------------------------------------------------------------

@@ -34,22 +34,12 @@ def evaluation_check(segmentation_head, dataloader, device,
         for global_num, batch in enumerate(dataloader):
 
             loss_dict = {}
-
-            # how to make lm loss ?
-            # [1] lm_loss
-            # [1] lm_loss
             caption = batch['caption']  # ['this picture is of b n']
             image = batch['image_condition']  # [batch, 3, 384, 384]
 
             # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
-
-            cls_token = image_feature[:, 0, :]
-            image_feature_transpose = image_feature[:, 1:, :].transpose(1, 2)  # [batch, dim, pixels]
-
-            image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
-            encoder_hidden_states = torch.cat((cls_token.unsqueeze(1), image_feat), dim=1)
-            # print(condition.shape)  # torch.Size([1, 4, 768])
+            encoder_hidden_states = simple_linear(image_feature)
 
             """
             # -----------------------------------------------------------------------------------------------------------------------------
