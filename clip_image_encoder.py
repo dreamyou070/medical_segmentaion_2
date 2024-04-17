@@ -1,48 +1,32 @@
+from model.blip import blip_decoder
 from PIL import Image
-import requests
-
-from transformers import CLIPProcessor, CLIPModel
-"""
-clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
-
-inputs = processor(images=image, return_tensors="pt", padding=True)#.data['pixel_values'] # [1,3,224,224]
-pixel_values = inputs['data'].pixel_values
-print(f'inputs 1 = {pixel_values.shape}')
-clip_image_model.to("cuda:0")
-image_inputs = inputs.to("cuda:0")
-
-image_features = clip_image_model.get_image_features(**inputs) # [1, 768] (why not batchwize)
-
-#print(f'image_features = {image_features.shape}')
-"""
-
-from transformers import AutoImageProcessor, ViTModel
+from torchvision import transforms
+from torchvision.transforms.functional import InterpolationMode
 import torch
-# HOW TO ALIGNING TWO MODALITY ?
 
-image_processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
-model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-# [2] img
-#image_path = 'data_sample/image/sample_200.jpg'
-#image = Image.open(image_path)
-#image_condition = image_processor(image, return_tensors="pt")
-#image_condition['pixel_values'] = (image_condition['pixel_values']).squeeze()
-#print(image_condition)
-image_condition = {}
-image_condition['pixel_values'] = torch.randn(1,4,64,64)
-#p_value = image_condition['pixel_values'] # [1,3,224,224]
-# add processor output
-#pixel_values = inputs['data'].pixel_values
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+image_size = 384
+img_path = 'data_sample/image/sample_200.jpg'
+raw_image = Image.open(img_path).convert('RGB')
+
+
+transform = transforms.Compose([
+        transforms.Resize((image_size,image_size),interpolation=InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
+        transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+        ])
+image = transform(raw_image).unsqueeze(0).to(device) # [batch sized ]
+
+
+model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
+model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
+model.eval()
+model = model.to(device)
+
 with torch.no_grad():
-    outputs = model(**image_condition)
-
-print(f'outputs = {outputs.last_hidden_state.shape}')
-"""
-
-
-last_hidden_states = outputs.last_hidden_state
-list(last_hidden_states.shape)
-[1, 197, 768]
-"""
+    # beam search
+    caption = model.generate(image, sample=False, num_beams=3, max_length=20, min_length=5)
+    # nucleus sampling
+    # caption = model.generate(image, sample=True, top_p=0.9, max_length=20, min_length=5)
+    print('caption: ' + caption[0])

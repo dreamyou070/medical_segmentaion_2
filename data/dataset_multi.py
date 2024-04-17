@@ -204,7 +204,9 @@ class TrainDataset_Seg(Dataset):
 
         print(f' caption = {caption}')
 
-        caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
+        caption_token = self.tokenizer(caption,
+                                       padding="max_length",
+                                       truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
         """
         key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
@@ -236,8 +238,12 @@ class TrainDataset_Seg(Dataset):
             key_word_index = get_target_index(key_words, caption)
         """
         # [3] image pixel
+
         if argument.image_processor == 'blip' :
-            image_condition = self.image_processor(Image.open(img_path).convert('RGB'))
+            print(f' get imag condition from vit_transformer ... ')
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
+
 
 
         else :

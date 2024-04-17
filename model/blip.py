@@ -133,6 +133,8 @@ class BLIP_Decoder(nn.Module):
         
     def generate(self, image, sample=False, num_beams=3, max_length=30, min_length=10, top_p=0.9, repetition_penalty=1.0):
 
+        print(f'visual encoder input = {image.shape}')
+
         image_embeds = self.visual_encoder(image)
         print(f'when inference, image_embeds = {image_embeds.shape}')
         # [1] generate image embedding
