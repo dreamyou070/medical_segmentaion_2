@@ -17,6 +17,8 @@ from transformers.file_utils import (
 )
 from transformers.generation.configuration_utils import GenerationConfig
 
+from transformers.generation.logits_process import LogitsProcessorList
+from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -1095,6 +1097,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         self._validate_model_kwargs(model_kwargs.copy())
 
         # 2. Set generation parameters if not already defined
+
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if generation_config.pad_token_id is None and generation_config.eos_token_id is not None:
