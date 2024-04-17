@@ -45,8 +45,7 @@ def evaluation_check(segmentation_head, dataloader, device,
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
 
             cls_token = image_features[:, 0, :]
-            image_features = image_features[:, 1:, :]
-            image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
+            image_feature_transpose = image_feature[:, 1:, :].transpose(1, 2)  # [batch, dim, pixels]
 
             image_feat = simple_linear(image_feature_transpose).transpose(1, 2)  # [batch, pixels, dim]
             encoder_hidden_states = torch.cat((cls_token.unsqueeze(1), image_feat), dim=1)
