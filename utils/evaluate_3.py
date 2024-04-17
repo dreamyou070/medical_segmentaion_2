@@ -23,7 +23,7 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      blip_model, unet, vae, controller, weight_dtype, epoch,
-                     simple_linear, args):
+                     simple_linear, position_embedderm, args):
 
     segmentation_head.eval()
 
@@ -68,7 +68,8 @@ def evaluation_check(segmentation_head, dataloader, device,
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type=position_embedder)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}

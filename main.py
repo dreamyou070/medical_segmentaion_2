@@ -25,7 +25,8 @@ import os
 import torch
 from utils.saving import save_model
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
-
+from model.pe import AllPositionalEmbedding
+from safetensors.torch import load_file
 
 def main(args):
 
@@ -59,6 +60,17 @@ def main(args):
 
     unet.requires_grad_(False)
     unet.to(dtype=weight_dtype)
+
+    # [2] pe
+    position_embedder = None
+    position_embedder = AllPositionalEmbedding(pe_do_concat=args.pe_do_concat,
+                                               do_semantic_position=args.do_semantic_position, )
+
+    if args.position_embedder_weights is not None:
+        position_embedder_state_dict = load_file(args.position_embedder_weights)
+        position_embedder.load_state_dict(position_embedder_state_dict)
+        position_embedder.to(dtype=weight_dtype)
+
 
     # [2] blip model
     image_size = 384
@@ -125,6 +137,8 @@ def main(args):
 
     trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": simple_linear.parameters(), "lr": args.learning_rate})
+    if args.use_position_embedder:
+        trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -179,13 +193,18 @@ def main(args):
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
         accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
                             lr_scheduler)
+    if args.use_position_embedder:
+        position_embedder = accelerator.prepare(position_embedder)
+
     simple_linear = accelerator.prepare(simple_linear)
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    position_embedder = accelerator.prepare(position_embedder)[0]
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
         blip_model.train()
+        position_embedder.train()
         """
         for i_enc in blip_image_models:
             i_enc.train()
@@ -260,7 +279,8 @@ def main(args):
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type=position_embedder)
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -347,7 +367,7 @@ def main(args):
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            blip_model, unet, vae, controller, weight_dtype, epoch,
-                                                           simple_linear, args,)
+                                                           simple_linear, position_embedder, args,)
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')

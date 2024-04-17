@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="12_simple_linear" #
+file_name="13_simple_linear_use_position_embedder" #
 # 3
 # except generation
 
@@ -41,4 +41,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_processor 'blip' \
  --image_model_training \
  --use_image_by_caption \
- --use_base_prompt
+ --use_base_prompt \
+ --use_position_embedder
