@@ -121,6 +121,13 @@ class BLIP_Decoder(nn.Module):
                                            labels = decoder_targets,
                                            return_dict = True,)
         loss_lm = decoder_output.loss
+
+        # to generate
+        #hidden_states = decoder_output.hidden_states
+        #print(f'')
+        # first of all not generate caption ...
+        #attentions = decoder_output.attentions
+        #cross_attentions = decoder_output.cross_attentions
         
         return loss_lm, image_embeds
         

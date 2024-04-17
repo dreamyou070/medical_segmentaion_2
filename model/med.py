@@ -903,6 +903,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         )
         
         sequence_output = outputs[0]
+        print(f'')
         prediction_scores = self.cls(sequence_output)
         
         if return_logits:
