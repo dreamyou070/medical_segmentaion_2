@@ -58,7 +58,7 @@ class TrainDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
-                 imagee_processor=None,
+                 image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -84,7 +84,7 @@ class TrainDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.imagee_processor = imagee_processor
+        self.image_processor = image_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -234,12 +234,11 @@ class TrainDataset_Seg(Dataset):
         """
         # [3] image pixel
         if argument.image_processor == 'blip' :
-
-            image_condition = self.transform(Image.open(img_path).convert('RGB'))
+            image_condition = self.image_processor(Image.open(img_path).convert('RGB'))
 
 
         else :
-            image_condition = self.imagee_processor(images=Image.open(img_path),
+            image_condition = self.image_processor(images=Image.open(img_path),
                                                     return_tensors="pt",
                                                     padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
@@ -263,7 +262,7 @@ class TestDataset_Seg(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  tokenizer=None,
-                 imagee_processor=None,
+                 image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res = 128,
@@ -288,7 +287,7 @@ class TestDataset_Seg(Dataset):
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.imagee_processor = imagee_processor
+        self.image_processor = image_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
