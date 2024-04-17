@@ -959,9 +959,9 @@ class BertLMHeadModel(BertPreTrainedModel):
     def generate(
             self,
             inputs: Optional[torch.Tensor] = None,
-            generation_config: Optional[GenerationConfig] = None,
-            logits_processor: Optional[LogitsProcessorList] = None,
-            stopping_criteria: Optional[StoppingCriteriaList] = None,
+            generation_config = None,
+            logits_processor = None,
+            stopping_criteria = None,
             prefix_allowed_tokens_fn: Optional[Callable[[int, torch.Tensor], List[int]]] = None,
             synced_gpus: Optional[bool] = None,
             assistant_model: Optional["PreTrainedModel"] = None,
