@@ -234,11 +234,17 @@ class TrainDataset_Seg(Dataset):
             key_word_index = get_target_index(key_words, caption)
         """
         # [3] image pixel
-        image_condition = self.imagee_processor(images=Image.open(img_path),
-                                                return_tensors="pt",
-                                                padding=True)  # .data['pixel_values'] # [1,3,224,224]
-        image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
-        pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
+        if argument.image_processor == 'blip' :
+
+            image_condition = self.transform(Image.open(img_path).convert('RGB'))
+
+
+        else :
+            image_condition = self.imagee_processor(images=Image.open(img_path),
+                                                    return_tensors="pt",
+                                                    padding=True)  # .data['pixel_values'] # [1,3,224,224]
+            image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
+            pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
 
 
@@ -440,6 +446,12 @@ class TestDataset_Seg(Dataset):
                                                 return_tensors="pt",
                                                 padding=True)  # .data['pixel_values'] # [1,3,224,224]
         image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
+
+        # what should be the image processor
+
+
+
+
 
 
 

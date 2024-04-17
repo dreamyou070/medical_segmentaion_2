@@ -4,9 +4,9 @@ from model.tokenizer import load_tokenizer
 from data.dataset_multi import TrainDataset_Seg, TestDataset_Seg
 from PIL import Image
 import requests
-
 from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
-
+from torchvision import transforms
+from torchvision.transforms.functional import InterpolationMode
 
 
 #image_path = 'data_sample/image/sample_200.jpg'
@@ -31,6 +31,11 @@ def call_dataset(args) :
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
+    elif args.image_processor == 'blip' :
+        normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+        processor = transforms.Compose([transforms.Resize((384384), interpolation=InterpolationMode.BICUBIC),
+                                        transforms.ToTensor(),
+                                        normalize, ])
 
     # [2] train & test dataset
     train_dataset = TrainDataset_Seg(root_dir=args.train_data_path,
