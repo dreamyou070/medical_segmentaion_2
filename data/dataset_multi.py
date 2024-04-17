@@ -141,7 +141,6 @@ class TrainDataset_Seg(Dataset):
                 number = 4
 
             img = np.rot90(img, k=number) # ok, because it is 3 channel image
-
         img = self.transform(img.copy())
 
         # [2] gt dir
