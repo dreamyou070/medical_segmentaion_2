@@ -123,7 +123,6 @@ class TrainDataset_Seg(Dataset):
         return img
 
     def __getitem__(self, idx):
-        print(f' in get data folder')
 
         # [1] base
         img_path = self.image_paths[idx]
@@ -201,8 +200,6 @@ class TrainDataset_Seg(Dataset):
             else :
                 base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
-
-        print(f' caption = {caption}')
 
         caption_token = self.tokenizer(caption,
                                        padding="max_length",
@@ -333,7 +330,7 @@ class TestDataset_Seg(Dataset):
         img_path = self.image_paths[idx]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
-        if self.use_data_aug :
+        if self.use_data_aug:
             # rotating
             random_p = np.random.rand()
             if random_p < 0.25:
@@ -345,38 +342,37 @@ class TestDataset_Seg(Dataset):
             elif 0.75 <= random_p:
                 number = 4
 
-            img = np.rot90(img, k=number) # ok, because it is 3 channel image
-
+            img = np.rot90(img, k=number)  # ok, because it is 3 channel image
         img = self.transform(img.copy())
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
-        if argument.gt_ext_npy :
-            gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
+        if argument.gt_ext_npy:
+            gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
             if self.use_data_aug:
                 gt_arr = np.rot90(gt_arr, k=number)
-            gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
-        else :
+            gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
+        else:
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            gt_arr = np.array(gt_img) # 128,128
-            gt_arr = np.where(gt_arr>100, 1, 0)
+            gt_arr = np.array(gt_img)  # 128,128
+            gt_arr = np.where(gt_arr > 100, 1, 0)
 
+        # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
-        # key_words (ex) 0, 1, 2
 
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
-        gt = np.zeros((self.mask_res,   # 256
-                       self.mask_res,   # 256
-                       self.n_classes)) # 3
+        gt = np.zeros((self.mask_res,  # 256
+                       self.mask_res,  # 256
+                       self.n_classes))  # 3
 
         # 256,256,3
-        gt[:,:,:class_num] = gt_arr_
-        gt = torch.tensor(gt).permute(2,0,1)        # 3,256,256
+        gt[:, :, :class_num] = gt_arr_
+        gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
         # [3] gt flatten
-        gt_flat = gt_arr.flatten() # 128*128
+        gt_flat = gt_arr.flatten()  # 128*128
 
-        if argument.use_image_by_caption :
+        if argument.use_image_by_caption:
 
             # [3] caption
             if argument.obj_name == 'brain':
@@ -388,40 +384,41 @@ class TestDataset_Seg(Dataset):
             elif argument.obj_name == 'leader_polyp':
                 class_map = leader_polyp_class_map
 
+            if argument.use_base_prompt:
+                caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            else:
+                caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
-
-            if argument.test_like_train :
-                for i, class_idx in enumerate(class_es):
-                    caption += class_map[class_idx][0]
-                    if i == len(class_map.keys()) - 1:
-                        caption += ''
-                    else:
-                        caption += ', '
-
-            else :
-
-                for i, k in enumerate(class_map.keys()):
-                    caption += class_map[k][0] # add key word
-                    if i == len(class_map.keys()) - 1:
-                        caption += ''
-                    else :
-                        caption += ', '
-
-
-        else :
-            base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            for i, class_idx in enumerate(class_es):
+                caption += class_map[class_idx][0]
+                if i == class_es.shape[0] - 1:
+                    caption += ''
+                else:
+                    # caption += ', '
+                    caption += ' '
+        else:
+            if argument.use_base_prompt:
+                base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            else:
+                base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
-        caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
-        input_ids = caption_token.input_ids
 
+        print(f' caption = {caption}')
+
+        caption_token = self.tokenizer(caption,
+                                       padding="max_length",
+                                       truncation=True, return_tensors="pt")
+        input_ids = caption_token.input_ids
         """
-        key_words = [class_map[i][0] for i in class_es]  # [b,p]
+        key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
+
         def get_target_index(target_words, caption):
 
             target_word_index = []
             for target_word in target_words:
                 target_word_token = self.tokenizer(target_word, return_tensors="pt")
                 target_word_input_ids = target_word_token.input_ids[:, 1]
+
                 # [1] get target word index from sentence token
                 sentence_token = self.tokenizer(caption, return_tensors="pt")
                 sentence_token = sentence_token.input_ids
@@ -430,7 +427,7 @@ class TestDataset_Seg(Dataset):
                 for i in range(batch_size):
                     # same number from sentence token to target_word_inpud_ids
                     s_tokens = sentence_token[i]
-                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item() # here problem
+                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
                     target_word_index.append(idx)
             return target_word_index
 
@@ -439,25 +436,24 @@ class TestDataset_Seg(Dataset):
             default.extend(get_target_index(key_words, caption))
             key_word_index = default
         else:
-            key_word_index = get_target_index(key_words, caption) # [7,11]
+            key_word_index = get_target_index(key_words, caption)
         """
         # [3] image pixel
-        image_condition = self.imagee_processor(images=Image.open(img_path),
-                                                return_tensors="pt",
-                                                padding=True)  # .data['pixel_values'] # [1,3,224,224]
-        image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
 
-        # what should be the image processor
+        if argument.image_processor == 'blip':
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
 
-
-
-
-
-
+        else:
+            image_condition = self.image_processor(images=Image.open(img_path),
+                                                   return_tensors="pt",
+                                                   padding=True)  # .data['pixel_values'] # [1,3,224,224]
+            image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
+            pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
         return {'image': img,  # [3,512,512]
-                "gt": gt,                       # [3,256,256]
-                "gt_flat" : gt_flat,            # [128*128]
+                "gt": gt,  # [3,256,256]
+                "gt_flat": gt_flat,  # [128*128]
                 "input_ids": input_ids,
                 'caption': caption,
-                "image_condition" : image_condition} # [0,3,4]
+                "image_condition": image_condition}  # [0,3,4]
