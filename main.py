@@ -220,6 +220,9 @@ def main(args):
         print(f' len of train dataloader = {len(train_dataloader)}')
 
         for step, batch in enumerate(train_dataloader):
+            print(f'step = {step}')
+            print(f'batch = {batch}')
+            """
 
             device = accelerator.device
             loss_dict = {}
@@ -232,6 +235,7 @@ def main(args):
             print(f'image condition = {image}')
             lm_loss, image_feature = blip_model(image, caption)
             print(f'image_feature = {image_feature.shape}')
+            """
             """
             if args.use_image_condition:
                 # use image_feature
