@@ -211,8 +211,9 @@ def main(args):
             # how to make lm loss ?
             # [1] lm_loss
             caption = batch['caption']
-            image =
+            image = batch['image_condition']
             print(f'caption = {caption}')
+            print(f'image condition = {image}')
             lm_loss, image_feature = blip_model(image, caption)
             """
 
