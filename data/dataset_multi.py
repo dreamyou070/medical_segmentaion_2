@@ -123,6 +123,7 @@ class TrainDataset_Seg(Dataset):
         return img
 
     def __getitem__(self, idx):
+        print(f' in get data folder')
 
         # [1] base
         img_path = self.image_paths[idx]
@@ -200,6 +201,8 @@ class TrainDataset_Seg(Dataset):
             else :
                 base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
+
+        print(f' caption = {caption}')
 
         caption_token = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
