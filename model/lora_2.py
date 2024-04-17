@@ -1024,10 +1024,12 @@ class LoRANetwork(torch.nn.Module):
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
                            prefix) -> List[LoRAModule]:
+            print(f'root_module = {root_module}')
 
             loras = []
             skipped = []
             # prefix ...
+
             for name, module in root_module.named_modules():
 
                 if module.__class__.__name__ in target_replace_modules:
