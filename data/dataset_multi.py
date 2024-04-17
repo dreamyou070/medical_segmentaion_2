@@ -188,7 +188,11 @@ class TrainDataset_Seg(Dataset):
                 caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                caption += class_map[class_idx][0]
+                if argument.use_key_word :
+                    caption += class_map[class_idx][0]
+                else :
+                    caption += class_map[class_idx][1]
+
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
@@ -390,7 +394,10 @@ class TestDataset_Seg(Dataset):
                 caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                caption += class_map[class_idx][0]
+                if argument.use_key_word :
+                    caption += class_map[class_idx][0]
+                else :
+                    caption += class_map[class_idx][1]
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
