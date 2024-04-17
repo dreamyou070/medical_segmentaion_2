@@ -240,10 +240,8 @@ class TrainDataset_Seg(Dataset):
         # [3] image pixel
 
         if argument.image_processor == 'blip' :
-            print(f' get imag condition from vit_transformer ... ')
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)
-            print(f' get imag condition from vit_transformer ... ( should be (3,384,384) ) : {image_condition.shape}')
 
         else :
             image_condition = self.image_processor(images=Image.open(img_path),
@@ -251,10 +249,6 @@ class TrainDataset_Seg(Dataset):
                                                     padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
-
-
-
-
 
 
         return {'image': img,  # [3,512,512]

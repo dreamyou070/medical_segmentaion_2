@@ -133,16 +133,11 @@ class BLIP_Decoder(nn.Module):
         
     def generate(self, image, sample=False, num_beams=3, max_length=30, min_length=10, top_p=0.9, repetition_penalty=1.0):
 
-        print(f'visual encoder input = {image.shape}')
-
         image_embeds = self.visual_encoder(image)
-        print(f'when inference, image_embeds = {image_embeds.shape}')
         # [1] generate image embedding
         if not sample:
             image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             # [1,197,768] -> [3,197,768]
-        print(f'when inference, image_embeds = {image_embeds.shape}')
-            
         image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(image.device)
         model_kwargs = {"encoder_hidden_states": image_embeds,
                         "encoder_attention_mask":image_atts}
@@ -151,7 +146,6 @@ class BLIP_Decoder(nn.Module):
         input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         input_ids[:,0] = self.tokenizer.bos_token_id
         input_ids = input_ids[:, :-1]
-
 
         if sample:
             #nucleus sampling
@@ -165,7 +159,6 @@ class BLIP_Decoder(nn.Module):
                                                  pad_token_id=self.tokenizer.pad_token_id,
                                                  repetition_penalty=1.1,
                                                  **model_kwargs)
-            print(f'when inference, outputs = {outputs}')
         else:
             #beam search
             outputs = self.text_decoder.generate(input_ids=input_ids,
@@ -176,8 +169,6 @@ class BLIP_Decoder(nn.Module):
                                                  pad_token_id=self.tokenizer.pad_token_id,
                                                  repetition_penalty=repetition_penalty,
                                                  **model_kwargs)
-            print(f'outputs: {outputs}')
-            
         captions = []    
         for output in outputs:
             caption = self.tokenizer.decode(output, skip_special_tokens=True)    

@@ -175,11 +175,7 @@ class BertSelfAttention(nn.Module):
         past_key_value = (key_layer, value_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        # query =
-        print('query_layer:', query_layer.shape)
-        print('key_layer:', key_layer.shape)
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        print('attention_scores:', attention_scores.shape)
 
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
             seq_length = hidden_states.size()[1]

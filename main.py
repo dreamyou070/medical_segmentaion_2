@@ -218,30 +218,22 @@ def main(args):
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
 
-        print(f' start of training ... ')
-        print(f' len of train dataloader = {len(train_dataloader)}')
 
         for step, batch in enumerate(train_dataloader):
-            print(f'step = {step}')
-            print(f'batch = {batch}')
-
 
             device = accelerator.device
             loss_dict = {}
 
             # how to make lm loss ?
             # [1] lm_loss
-            caption = batch['caption']
-            image = batch['image_condition']
-            print(f'caption = {caption}')
-            print(f'image condition = {image}')
-            lm_loss, image_feature = blip_model(image, caption)
-            print(f'image_feature = {image_feature.shape}')
-            """
-            """
+            caption = batch['caption']       # ['this picture is of b n']
+            image = batch['image_condition'] # [batch, 3, 384, 384]
+            lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
+
+
             if args.use_image_condition:
-                # use image_feature
-                encoder_hidden_states = None
+                with torch.set_grad_enabled(True):
+                    encoder_hidden_states = image_feature
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
@@ -310,7 +302,7 @@ def main(args):
                 loss += generator_loss * args.generator_loss_weight
 
             loss = loss.mean()
-            
+            loss_dict['lm_loss'] = lm_loss.item()
             total_loss = loss + lm_loss
             current_loss = total_loss.detach().item()
 

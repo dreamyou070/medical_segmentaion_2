@@ -178,8 +178,6 @@ class VisionTransformer(nn.Module):
         return {'pos_embed', 'cls_token'}
 
     def forward(self, x, register_blk=-1):
-
-        print(f'in vit transformer main functoin, x = {x.shape}')
         B = x.shape[0]
         x = self.patch_embed(x)
 
