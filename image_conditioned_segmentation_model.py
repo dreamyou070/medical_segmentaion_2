@@ -228,6 +228,7 @@ def main(args):
                                       simple_linear,
                                       accelerator.device,
                                       None,
+                                      args.num_inference_steps,
                                       unet,
                                       vae,
                                       args)
@@ -384,6 +385,7 @@ if __name__ == "__main__":
     parser.add_argument("--v_parameterization", action="store_true",
                         help="enable v-parameterization training / v-parameterization学習を有効にする"
                         )
+    parser.add_argument("--num_inference_steps", type=int, default=30,)
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

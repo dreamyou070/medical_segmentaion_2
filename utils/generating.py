@@ -59,11 +59,10 @@ def get_scheduler(args) :
     return scheduler
 
 def retrieve_timesteps(scheduler,
-    num_inference_steps,
-    device,
-    timesteps,
-    **kwargs,
-):
+                       num_inference_steps,
+                       device,
+                       timesteps,
+                       **kwargs,):
     if timesteps is not None:
         accepts_timesteps = "timesteps" in set(inspect.signature(scheduler.set_timesteps).parameters.keys())
         if not accepts_timesteps:
@@ -73,9 +72,14 @@ def retrieve_timesteps(scheduler,
         scheduler.set_timesteps(timesteps=timesteps, device=device, **kwargs)
         timesteps = scheduler.timesteps
         num_inference_steps = len(timesteps)
+
     else:
-        scheduler.set_timesteps(num_inference_steps, device=device, **kwargs)
+        # scheduler.set timesteps
+        scheduler.set_timesteps(num_inference_steps,
+                                device=device,
+                                **kwargs)
         timesteps = scheduler.timesteps
+
     return timesteps, num_inference_steps
 
 def sample_images(dataloader,
@@ -84,6 +88,7 @@ def sample_images(dataloader,
                   simple_linear,
                   device,
                   timesteps,
+                  num_inference_steps,
                   unet,
                   vae,
                   args):
@@ -94,41 +99,47 @@ def sample_images(dataloader,
 
     for i, batch in enumerate(dataloader) :
 
-        # [2] image generating
-        height, width = 512,512
+        if i == 0 :
 
-        # [3] generate condition
-        condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
-        batch['condition_image']['pixel_values'] = condition_pixel
-        feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
-        encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
+            # [2] image generating
+            height, width = 64,64
 
-        # [4] generating
-        timesteps, num_inference_steps = retrieve_timesteps(scheduler, num_inference_steps, device, timesteps)
+            # [3] generate condition
+            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
+            batch['condition_image']['pixel_values'] = condition_pixel
+            feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
+            encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
 
-        # 5. Prepare latent variables
-        num_channels_latents = unet.config.in_channels
-        latents = torch.randn(1,4,64,64)
-        # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
-        extra_step_kwargs = {}
+            # [4] generating
+            timesteps, num_inference_steps = retrieve_timesteps(scheduler,
+                                                                num_inference_steps, # 30
+                                                                device,
+                                                                timesteps)
 
-        # 6.2 Optionally get Guidance Scale Embedding
-        timestep_cond = None
+            # 5. Prepare latent variables
+            num_channels_latents = unet.config.in_channels
+            latents = torch.randn(1, 4, height, width)
+            # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+            extra_step_kwargs = {}
 
-        # 7. Denoising loop
-        for i, t in enumerate(timesteps):
+            # 6.2 Optionally get Guidance Scale Embedding
+            timestep_cond = None
 
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = latents
+            # 7. Denoising loop
+            for i, t in enumerate(timesteps):
 
-            # predict the noise residual
-            noise_pred = unet(latent_model_input,
-                              t,
-                              encoder_hidden_states=encoder_hidden_states,
-                              timestep_cond=timestep_cond,
-                              return_dict=False,)[0]
-            latents = scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = latents
 
-        # 8. final image
-        image = vae.decode(latents / vae.config.scaling_factor, return_dict=False)[0]
+                # predict the noise residual
+                noise_pred = unet(latent_model_input,
+                                  t,
+                                  encoder_hidden_states=encoder_hidden_states,
+                                  timestep_cond=timestep_cond,
+                                  return_dict=False,)[0]
+                latents = scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
 
+            # 8. final image
+            image = vae.decode(latents / vae.config.scaling_factor, return_dict=False)[0]
+
+    return image
