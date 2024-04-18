@@ -19,7 +19,7 @@ from monai.networks.blocks import Convolution
 from monai.networks.layers import Act
 from monai.utils import ensure_tuple_rep
 
-from generative.networks.layers.vector_quantizer import EMAQuantizer, VectorQuantizer
+from gen.generative.networks.layers.vector_quantizer import EMAQuantizer, VectorQuantizer
 
 __all__ = ["VQVAE"]
 

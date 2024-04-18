@@ -20,8 +20,8 @@ import torch.nn.functional as F
 from monai.networks.blocks import Convolution
 from monai.utils import ensure_tuple_rep
 
-from generative.networks.blocks.spade_norm import SPADE
-from generative.networks.nets.autoencoderkl import AttentionBlock, Encoder, Upsample
+from gen.generative.networks.blocks.spade_norm import SPADE
+from gen.generative.networks.nets.autoencoderkl import AttentionBlock, Encoder, Upsample
 
 # To install xformers, use pip install xformers==0.0.16rc401
 if importlib.util.find_spec("xformers") is not None:

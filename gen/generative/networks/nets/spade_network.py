@@ -21,7 +21,7 @@ from monai.networks.blocks import Convolution
 from monai.networks.layers import Act
 from monai.utils.enums import StrEnum
 
-from generative.networks.blocks.spade_norm import SPADE
+from gen.generative.networks.blocks.spade_norm import SPADE
 
 
 class KLDLoss(nn.Module):

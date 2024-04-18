@@ -39,7 +39,7 @@ from monai.networks.blocks import Convolution
 from monai.utils import ensure_tuple_rep
 from torch import nn
 
-from generative.networks.nets.diffusion_model_unet import get_down_block, get_mid_block, get_timestep_embedding
+from gen.generative.networks.nets.diffusion_model_unet import get_down_block, get_mid_block, get_timestep_embedding
 
 
 class ControlNetConditioningEmbedding(nn.Module):

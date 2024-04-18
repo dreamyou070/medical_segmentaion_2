@@ -14,7 +14,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from generative.networks.blocks.transformerblock import TransformerBlock
+from gen.generative.networks.blocks.transformerblock import TransformerBlock
 
 __all__ = ["DecoderOnlyTransformer"]
 

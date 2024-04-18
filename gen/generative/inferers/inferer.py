@@ -23,7 +23,7 @@ from monai.inferers import Inferer
 from monai.transforms import CenterSpatialCrop, SpatialPad
 from monai.utils import optional_import
 
-from generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
+from gen.generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
 
 tqdm, has_tqdm = optional_import("tqdm", name="tqdm")
 

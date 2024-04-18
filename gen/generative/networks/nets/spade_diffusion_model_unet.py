@@ -39,8 +39,8 @@ from monai.networks.blocks import Convolution
 from monai.utils import ensure_tuple_rep
 from torch import nn
 
-from generative.networks.blocks.spade_norm import SPADE
-from generative.networks.nets.diffusion_model_unet import (
+from gen.generative.networks.blocks.spade_norm import SPADE
+from gen.generative.networks.nets.diffusion_model_unet import (
     AttentionBlock,
     Downsample,
     ResnetBlock,

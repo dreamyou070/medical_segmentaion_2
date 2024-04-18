@@ -1644,6 +1644,7 @@ def get_up_block(
 
 
 class DiffusionModelUNet(nn.Module):
+
     """
     Unet network with timestep embedding and attention mechanisms for conditioning based on
     Rombach et al. "High-Resolution Image Synthesis with Latent Diffusion Models" https://arxiv.org/abs/2112.10752
