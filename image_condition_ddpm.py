@@ -5,6 +5,7 @@ from torch import nn
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils.attention_control import passing_argument
+import time
 from utils.accelerator_utils import prepare_accelerator
 from diffusers import DDPMScheduler
 import os
@@ -95,6 +96,7 @@ def main(args):
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
+    """
     for epoch in range(args.max_train_epochs):
         model.train()
         epoch_loss = 0
