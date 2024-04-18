@@ -43,6 +43,7 @@ def main(args):
 
     print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
+    print(f'basic weight_dtype = {weight_dtype}')
 
     print(f' (3.2) load stable diffusion model')
     # [1] diffusion
@@ -61,6 +62,8 @@ def main(args):
 
     # [2.1] image encoder
     condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
+    condition_model.to(dtype=weight_dtype)
+
     # [2.2] image encoder head
     class simple_net(nn.Module):
         def __init__(self):
@@ -71,6 +74,7 @@ def main(args):
         def forward(self, x):
             return self.mm_projector(x)
     simple_linear = simple_net()
+    simple_linear.to(dtype=weight_dtype)
 
     # [3] lora network
     net_kwargs = {}
@@ -170,9 +174,9 @@ def main(args):
             loss_dict = {}
 
             # [1] condition image
-            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype)
-            print(f'condition_pixel dtype = {condition_pixel.dtype}')
-            print(f'condition_pixel shape = {condition_pixel.shape}')
+            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
+            # dtype = float32
+            # 1,3,224,224
             batch['condition_image']['pixel_values'] = condition_pixel
 
             encoder_hidden_states = simple_linear(condition_model(batch['condition_image']))
