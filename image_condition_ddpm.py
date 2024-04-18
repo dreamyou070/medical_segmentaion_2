@@ -183,8 +183,10 @@ def main(args):
             noise = noise.to(device)
             scheduler.set_timesteps(num_inference_steps=1000)
             with autocast(enabled=True):
-                image = inferer.sample(input_noise=noise, diffusion_model=model, scheduler=scheduler,
-                                       condition=encoder_hidden_states)
+                image = inferer.sample(input_noise=noise,
+                                       diffusion_model=model,
+                                       scheduler=scheduler,
+                                       conditioning=encoder_hidden_states)
                 print(f'image = {type(image)}')
 
 
