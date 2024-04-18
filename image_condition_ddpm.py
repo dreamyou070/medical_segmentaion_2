@@ -81,9 +81,9 @@ def main(args):
     l2_loss = nn.MSELoss(reduction='none')
 
     print(f'\n step 8. model to device')
-    model = accelerator.prepare(model)
     optimizer = accelerator.prepare(optimizer)
     train_dataloader, test_dataloader = accelerator.prepare(train_dataloader, test_dataloader)
+    model = accelerator.prepare(model)
     model = transform_models_if_DDP([model])[0]
 
     print(f'\n step 10. Training !')
