@@ -178,9 +178,14 @@ def main(args):
                                        diffusion_model=model,
                                        scheduler=scheduler,
                                        conditioning=encoder_hidden_states,
-                                       mode = "crossattn")
-                print(f'image = {type(image)}')
-
+                                       mode = "crossattn") # tensor image
+                # tensor to pil image
+                from matplotlib import pyplot as plt
+                plt.figure(figsize=(2, 2))
+                plt.imshow(image[0, 0].cpu())
+                plt.tight_layout()
+                plt.axis("off")
+                plt.savefig(os.path.join(output_dir, f"sample_{epoch}.png"))
 
     total_time = time.time() - total_start
     print(f"train completed, total time: {total_time}.")
