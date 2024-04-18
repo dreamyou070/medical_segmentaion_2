@@ -119,22 +119,19 @@ def sample_images(dataloader,
                 latents = torch.randn(1, 4, height, width).to(device, dtype=weight_dtype)
                 # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
                 extra_step_kwargs = {}
-
                 # 7. Denoising loop
                 for i, t in enumerate(timesteps):
-
+                    print(f'generation, i = {i} | t  = {t}')
                     # expand the latents if we are doing classifier free guidance
                     latent_model_input = latents
                     # timestep_cond
-
                     # predict the noise residual
                     noise_pred = unet(latent_model_input,
                                       t,
                                       encoder_hidden_states=encoder_hidden_states,
                                       return_dict=False,)[0]
                     latents = scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
-
             # 8. final image
             image = vae.decode(latents / scaling_factor, return_dict=False)[0]
-    print(image)
+            print(image)
     return image
