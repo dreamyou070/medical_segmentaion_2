@@ -194,9 +194,9 @@ def main(args):
             # [3] unet predict
             noise_pred = unet(latents,timesteps, encoder_hidden_states).sample
             loss = l2_loss(noise_pred.float(), noise.float(),)#.mean([1, 2, 3])
-            print(f'loss = {loss.sahpe}')
+            print(f'loss = {loss.shape}')
             loss = loss.mean([1,2,3])
-            print(f'loss = {loss.sahpe}')
+            print(f'loss = {loss.shape}')
 
 
             total_loss = loss.mean()
