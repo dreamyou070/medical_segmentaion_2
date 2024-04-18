@@ -235,6 +235,9 @@ def main(args):
                                       unet=unet,
                                       vae=vae,
                                       args=args)
+            sample_folder = os.path.join(args.output_dir, 'sample')
+            os.makedirs(sample_folder, exist_ok=True)
+            pil_image.save(os.path.join(sample_folder, f'{epoch}.png'))
 
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()

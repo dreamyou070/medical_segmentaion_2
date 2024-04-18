@@ -13,7 +13,7 @@ from diffusers import (
     KDPM2AncestralDiscreteScheduler,)
 import inspect
 import torch
-
+from PIL import Image
 def get_scheduler(args) :
 
     sched_init_args = {}
@@ -82,6 +82,20 @@ def retrieve_timesteps(scheduler,
 
     return timesteps, num_inference_steps
 
+def numpy_to_pil(images):
+    """
+    Convert a numpy image or a batch of images to a PIL image.
+    """
+    if images.ndim == 3:
+        images = images[None, ...]
+    images = (images * 255).round().astype("uint8")
+    if images.shape[-1] == 1:
+        # special case for grayscale (single channel) images
+        pil_images = [Image.fromarray(image.squeeze(), mode="L") for image in images]
+    else:
+        pil_images = [Image.fromarray(image) for image in images]
+
+    return pil_images
 def sample_images(dataloader,
                   condition_model,
                   weight_dtype,
@@ -132,6 +146,9 @@ def sample_images(dataloader,
                                       return_dict=False,)[0]
                     latents = scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
             # 8. final image
-            image = vae.decode(latents / scaling_factor, return_dict=False)[0]
-            print(image)
-    return image
+            image = vae.decode(latents / scaling_factor, return_dict=False)[0] # torch image
+            image = (image / 2 + 0.5).clamp(0, 1)
+            image = image.cpu().permute(0, 2, 3, 1).numpy()
+            pil_image = numpy_to_pil(image)
+
+    return pil_image
