@@ -91,7 +91,7 @@ class TrainDataset(Dataset):
         mask_rgb = mask_base = np.zeros((H, W, 3))
         for h_index in range(H):
             for w_index in range(W):
-                mask_rgb[h_index, w_index] = self.class_matching_map[mask[h_index, w_index]]
+                mask_rgb[h_index, w_index] = class_matching_map[mask[h_index, w_index]]
         mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
         # resizing
         mask_pil = mask_pil.resize(self.resize_shape, Image.BICUBIC)
@@ -182,7 +182,7 @@ class TestDataset(Dataset):
         mask_rgb = mask_base = np.zeros((H, W, 3))
         for h_index in range(H):
             for w_index in range(W):
-                mask_rgb[h_index, w_index] = self.class_matching_map[mask[h_index, w_index]]
+                mask_rgb[h_index, w_index] = class_matching_map[mask[h_index, w_index]]
         mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
         # resizing
         mask_pil = mask_pil.resize(self.resize_shape, Image.BICUBIC)
