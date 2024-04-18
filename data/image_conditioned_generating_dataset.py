@@ -99,8 +99,8 @@ class TrainDataset(Dataset):
 
         # [2] get condition image
         image = Image.open(self.image_paths[idx])
-        inputs = self.condition_img_tokenizer(images=image, return_tensors="pt")#.squeeze(0)
-        print(f'inputs = {inputs}')
+        inputs = self.condition_img_tokenizer(images=image, return_tensors="pt")
+        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0)
 
         sample = {'image': mask_img,
                   'condition_image' : inputs}
