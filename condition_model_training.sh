@@ -9,7 +9,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="15_visual_pseudo_segmentaion_matching" #
+file_name="16_ddpm" #
 # 3
 # except generation
 

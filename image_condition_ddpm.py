@@ -108,7 +108,7 @@ def main(args):
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
-        """
+
         for step, batch in progress_bar:
 
             optimizer.zero_grad(set_to_none=True)
@@ -140,7 +140,7 @@ def main(args):
             epoch_loss += loss.item()
             progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
         epoch_loss_list.append(epoch_loss / (step + 1))
-        """
+
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         accelerator.wait_for_everyone()
         model.eval()
@@ -185,7 +185,9 @@ def main(args):
                 plt.imshow(image[0, 0].cpu())
                 plt.tight_layout()
                 plt.axis("off")
-                plt.savefig(os.path.join(output_dir, f"sample_{epoch}.png"))
+                sample_dir = os.path.join(output_dir, 'sample')
+                os.makedirs(sample_dir, exist_ok=True)
+                plt.savefig(os.path.join(sample_dir, f"sample_{epoch}.png"))
 
     total_time = time.time() - total_start
     print(f"train completed, total time: {total_time}.")
