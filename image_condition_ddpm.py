@@ -178,15 +178,15 @@ def main(args):
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         if is_main_process:
             # Sampling image during training
-            noise = torch.randn((1,3,256,256))
-            noise = noise.to(device)
+            noise = torch.randn((1,3,256,256)).to(accelerator.device, dtype=weight_dtype)
             scheduler.set_timesteps(num_inference_steps=1000)
             print(f' before, encoder_hidden_states = {encoder_hidden_states.shape}')
             with autocast(enabled=True):
                 image = inferer.sample(input_noise=noise,
                                        diffusion_model=model,
                                        scheduler=scheduler,
-                                       conditioning=encoder_hidden_states)
+                                       conditioning=encoder_hidden_states,
+                                       mode = "crossattn")
                 print(f'image = {type(image)}')
 
 

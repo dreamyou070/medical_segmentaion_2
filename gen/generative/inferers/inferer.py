@@ -115,7 +115,9 @@ class DiffusionInferer(Inferer):
 
         if not scheduler:
             scheduler = self.scheduler
+
         image = input_noise
+
         if verbose and has_tqdm:
             progress_bar = tqdm(scheduler.timesteps)
         else:
@@ -134,9 +136,11 @@ class DiffusionInferer(Inferer):
                     model_input, timesteps=torch.Tensor((t,)).to(input_noise.device), context=None
                 )
             else:
-                model_output = diffusion_model(
-                    image, timesteps=torch.Tensor((t,)).to(input_noise.device), context=conditioning
-                )
+                print(f'in sampling, t = {t}')
+                print(f'conditioning = {conditioning}')
+                model_output = diffusion_model(image,
+                                               timesteps=torch.Tensor((t,)).to(input_noise.device),
+                                               context=conditioning)
 
             # 2. compute previous image: x_t -> x_t-1
             image, _ = scheduler.step(model_output, t, image)
