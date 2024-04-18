@@ -46,16 +46,12 @@ def main(args):
     print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
     print(f' (3.1) unet model')
-
-    model = DiffusionModelUNet(spatial_dims=2,
-                               in_channels=3,
-                               out_channels=3,
-                               num_channels=(128, 256, 256),
+    model = DiffusionModelUNet(spatial_dims=2, in_channels=3, out_channels=1,  num_channels=(128, 256, 256),
                                attention_levels=(True,True,True),
-                               cross_attention_dim = 768,
+                              # cross_attention_dim = 768,
                                num_res_blocks=1,
-                               num_head_channels=256,
-                               with_conditioning=True)
+                               num_head_channels=256,)
+                              # with_conditioning=True)
 
 
     print(f' (3.2) condition model')
@@ -104,6 +100,7 @@ def main(args):
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
+    """
 
     for epoch in range(args.max_train_epochs):
         model.train()
@@ -224,7 +221,7 @@ def main(args):
                    unwrapped_nw=accelerator.unwrap_model(simple_linear),
                    save_dtype=save_dtype)
     accelerator.end_training()
-
+    """
 
 
 if __name__ == "__main__":
