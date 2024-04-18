@@ -23,6 +23,7 @@ from utils.saving import save_model
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 from transformers import ViTModel
 from data.image_conditioned_generating_dataset import call_dataset
+from utils import get_noise_noisy_latents_and_timesteps
 
 def main(args):
 
@@ -61,16 +62,15 @@ def main(args):
     # [2.1] image encoder
     condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
     # [2.2] image encoder head
-    class simle_net(nn.Module):
+    class simple_net(nn.Module):
         def __init__(self):
             super().__init__()
-
             self.mm_projector = nn.Sequential(nn.Linear(768, 512),
                                               nn.GELU(),
                                               nn.Linear(512, 768),)
         def forward(self, x):
             return self.mm_projector(x)
-    simple_linear = simle_net()
+    simple_linear = simple_net()
 
     # [3] lora network
     net_kwargs = {}
@@ -155,8 +155,12 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    """
 
+    from diffusers import AutoencoderKL, DDPMScheduler
+    noise_scheduler = DDPMScheduler(beta_start=0.00085,
+                                    beta_end=0.012, beta_schedule="scaled_linear",
+                                    num_train_timesteps=1000, clip_sample=False)
+    scale_factor = 0.18215
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -164,78 +168,23 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-            # -----------------------------------------------------------------------------------------------------------------------------
-            # [1] lm_loss
-            caption = batch['caption']       # ['this picture is of b n']
-            image = batch['image_condition'] # [batch, 3, 384, 384]
 
-            # why lm_loss does not reducing ??
-            lm_loss, image_feature = blip_model(image, caption) # [batch, 577, 768]
+            # [1] condition image
+            encoder_hidden_states = simple_linear(condition_model(batch['condition_image']))
 
-            #cls_token = image_feature[:, 0, :]
-            #image_features = image_feature[:, 1:, :]
-            #image_feature_transpose = image_features.transpose(1, 2)  # [batch, dim, pixels]
+            # [2] get image
+            with torch.no_grad() :
+                z = vae.encode(batch["image"].to(dtype=weight_dtype)).latent_dist.sample()
+            latents = z * scale_factor
+            noise, noisy_latents, timesteps = get_noise_noisy_latents_and_timesteps(args,
+                                                                                    noise_scheduler,
+                                                                                    latents,
+                                                                                    noise=None)
 
-            encoder_hidden_states = simple_linear(image_feature)
-
-            
-            # -----------------------------------------------------------------------------------------------------------------------------
-            if args.use_image_condition:
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = image_feature
-            if args.use_text_condition:
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
-            
-            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-            gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-            gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-            gt = gt.view(-1, gt.shape[-1]).contiguous()
-            with torch.no_grad():
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type=position_embedder)
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0]  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                if args.text_before_query:
-                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                else:
-                    query = query.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()
-                q_dict[res] = query
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
-            # [2] origin loss
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
-            if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
-            else:
-                # [5.1] Multiclassification Loss
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                # [5.3] Dice Loss
-                if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
-                    loss += dice_loss
-                    loss_dict['dice_loss'] = dice_loss.item()
-                loss = loss.mean()
-            loss = loss * args.segmentation_loss_weight
-            loss = loss.mean()
-            loss_dict['lm_loss'] = lm_loss.item()
-
-            # -----------------------------------------------------------------------------------------------------------------------------
-            total_loss = loss # + lm_loss
+            # [3] unet predict
+            noise_pred = unet(latents,timesteps, encoder_hidden_states).sample
+            loss = torch.nn.functional.mse_loss(noise_pred.float(), noise.float(), reduction="none").mean([1, 2, 3])
+            total_loss = loss.mean()
             current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
@@ -257,8 +206,6 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-
-
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
@@ -269,48 +216,12 @@ def main(args):
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
             save_model(args,
-                       saving_folder='segmentation',
-                       saving_name=f'segmentation-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                       saving_folder='simple_net',
+                       saving_name=f'simple_net-{saving_epoch}.pt',
+                       unwrapped_nw=accelerator.unwrap_model(simple_net),
                        save_dtype=save_dtype)
-
-        # ----------------------------------------------------------------------------------------------------------- #
-
-        # [7] evaluate
-        loader = test_dataloader
-        if args.check_training:
-            print(f'test with training data')
-            loader = train_dataloader
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           blip_model, unet, vae, controller, weight_dtype, epoch,
-                                                           simple_linear, position_embedder, args,)
-        # saving
-        if is_main_process:
-            print(f'  - precision dictionary = {score_dict}')
-            print(f'  - confusion_matrix = {confusion_matrix}')
-            confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
-            with open(confusion_save_dir, 'a') as f:
-                f.write(f' epoch = {epoch + 1} \n')
-                for i in range(len(confusion_matrix)):
-                    for j in range(len(confusion_matrix[i])):
-                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                    f.write('\n')
-                f.write('\n')
-
-            score_save_dir = os.path.join(args.output_dir, 'score.txt')
-            with open(score_save_dir, 'a') as f:
-                dices = []
-                f.write(f' epoch = {epoch + 1} | ')
-                for k in score_dict:
-                    dice = float(score_dict[k])
-                    f.write(f'class {k} = {dice} ')
-                    dices.append(dice)
-                dice_coeff = sum(dices) / len(dices)
-                f.write(f'| dice_coeff = {dice_coeff}')
-                f.write(f'\n')
     accelerator.end_training()
-    """
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
