@@ -170,7 +170,7 @@ def main(args):
             loss_dict = {}
 
             # [1] condition image
-            encoder_hidden_states = simple_linear(condition_model(batch['condition_image']))
+            encoder_hidden_states = simple_linear(condition_model(batch['condition_image'].to(dtype=weight_dtype)))
 
             # [2] get image
             with torch.no_grad() :
