@@ -23,12 +23,13 @@ from monai.inferers import Inferer
 from monai.transforms import CenterSpatialCrop, SpatialPad
 from monai.utils import optional_import
 
-from gen.generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
+#from gen.generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
 
 tqdm, has_tqdm = optional_import("tqdm", name="tqdm")
 
 
 class DiffusionInferer(Inferer):
+
     """
     DiffusionInferer takes a trained diffusion model and a scheduler and can be used to perform a signal forward pass
     for a training iteration, and sample from the model.
@@ -51,6 +52,7 @@ class DiffusionInferer(Inferer):
         mode: str = "crossattn",
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor:
+
         """
         Implements the forward pass for a supervised training iteration.
 
@@ -71,11 +73,9 @@ class DiffusionInferer(Inferer):
         if mode == "concat":
             noisy_image = torch.cat([noisy_image, condition], dim=1)
             condition = None
-        diffusion_model = (
-            partial(diffusion_model, seg=seg)
+        diffusion_model = (partial(diffusion_model, seg=seg)
             if isinstance(diffusion_model, SPADEDiffusionModelUNet)
-            else diffusion_model
-        )
+            else diffusion_model)
         prediction = diffusion_model(x=noisy_image, timesteps=timesteps, context=condition)
 
         return prediction
@@ -320,9 +320,9 @@ class DiffusionInferer(Inferer):
         assert log_probs.shape == inputs.shape
         return log_probs
 
-
+"""
 class LatentDiffusionInferer(DiffusionInferer):
-    """
+    
     LatentDiffusionInferer takes a stage 1 model (VQVAE or AutoencoderKL), diffusion model, and a scheduler, and can
     be used to perform a signal forward pass for a training iteration, and sample from the model.
 
@@ -333,7 +333,7 @@ class LatentDiffusionInferer(DiffusionInferer):
         ldm_latent_shape: desired spatial latent space shape. Used if there is a difference in the autoencoder model's latent shape.
         autoencoder_latent_shape:  autoencoder_latent_shape: autoencoder spatial latent space shape. Used if there is a
              difference between the autoencoder's latent shape and the DM shape.
-    """
+    
 
     def __init__(
         self,
@@ -364,7 +364,7 @@ class LatentDiffusionInferer(DiffusionInferer):
         seg: torch.Tensor | None = None,
         quantized: bool = True,
     ) -> torch.Tensor:
-        """
+        
         Implements the forward pass for a supervised training iteration.
 
         Args:
@@ -378,7 +378,7 @@ class LatentDiffusionInferer(DiffusionInferer):
             seg: if diffusion model is instance of SPADEDiffusionModel, segmentation must be provided.
             quantized: if autoencoder_model is a VQVAE, quantized controls whether the latents to the LDM
             are quantized or not.
-        """
+        
         with torch.no_grad():
             autoencode = autoencoder_model.encode_stage_2_inputs
             if isinstance(autoencoder_model, VQVAE):
@@ -416,7 +416,7 @@ class LatentDiffusionInferer(DiffusionInferer):
         verbose: bool = True,
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Args:
             input_noise: random noise, of the same shape as the desired latent representation.
             autoencoder_model: first stage model.
@@ -429,7 +429,7 @@ class LatentDiffusionInferer(DiffusionInferer):
             verbose: if true, prints the progression bar of the sampling process.
             seg: if diffusion model is instance of SPADEDiffusionModel, or autoencoder_model
              is instance of SPADEAutoencoderKL, segmentation must be provided.
-        """
+        
 
         if (
             isinstance(autoencoder_model, SPADEAutoencoderKL)
@@ -504,7 +504,7 @@ class LatentDiffusionInferer(DiffusionInferer):
         seg: torch.Tensor | None = None,
         quantized: bool = True,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Computes the log-likelihoods of the latent representations of the input.
 
         Args:
@@ -526,7 +526,7 @@ class LatentDiffusionInferer(DiffusionInferer):
              is instance of SPADEAutoencoderKL, segmentation must be provided.
             quantized: if autoencoder_model is a VQVAE, quantized controls whether the latents to the LDM
             are quantized or not.
-        """
+        
         if resample_latent_likelihoods and resample_interpolation_mode not in ("nearest", "bilinear", "trilinear"):
             raise ValueError(
                 f"resample_interpolation mode should be either nearest, bilinear, or trilinear, got {resample_interpolation_mode}"
@@ -563,13 +563,13 @@ class LatentDiffusionInferer(DiffusionInferer):
 
 
 class ControlNetDiffusionInferer(DiffusionInferer):
-    """
+    
     ControlNetDiffusionInferer takes a trained diffusion model and a scheduler and can be used to perform a signal
     forward pass for a training iteration, and sample from the model, supporting ControlNet-based conditioning.
 
     Args:
         scheduler: diffusion scheduler.
-    """
+    
 
     def __init__(self, scheduler: nn.Module) -> None:
         Inferer.__init__(self)
@@ -587,7 +587,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
         mode: str = "crossattn",
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """
+        
         Implements the forward pass for a supervised training iteration.
 
         Args:
@@ -601,7 +601,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
             mode: Conditioning mode for the network.
             seg: if model is instance of SPADEDiffusionModelUnet, segmentation must be
             provided on the forward (for SPADE-like AE or SPADE-like DM)
-        """
+        
         if mode not in ["crossattn", "concat"]:
             raise NotImplementedError(f"{mode} condition is not supported")
 
@@ -644,7 +644,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
         verbose: bool = True,
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Args:
             input_noise: random noise, of the same shape as the desired sample.
             diffusion_model: model to sample from.
@@ -657,7 +657,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
             mode: Conditioning mode for the network.
             verbose: if true, prints the progression bar of the sampling process.
             seg: if diffusion model is instance of SPADEDiffusionModel, segmentation must be provided.
-        """
+        
         if mode not in ["crossattn", "concat"]:
             raise NotImplementedError(f"{mode} condition is not supported")
 
@@ -722,7 +722,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
         verbose: bool = True,
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Computes the log-likelihoods for an input.
 
         Args:
@@ -738,7 +738,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
             scaled_input_range: the [min,max] intensity range of the input data after scaling.
             verbose: if true, prints the progression bar of the sampling process.
             seg: if diffusion model is instance of SPADEDiffusionModel, segmentation must be provided.
-        """
+        
 
         if not scheduler:
             scheduler = self.scheduler
@@ -852,7 +852,7 @@ class ControlNetDiffusionInferer(DiffusionInferer):
 
 
 class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
-    """
+    
     ControlNetLatentDiffusionInferer takes a stage 1 model (VQVAE or AutoencoderKL), diffusion model, controlnet,
     and a scheduler, and can be used to perform a signal forward pass for a training iteration, and sample from
     the model.
@@ -864,7 +864,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
         ldm_latent_shape: desired spatial latent space shape. Used if there is a difference in the autoencoder model's latent shape.
         autoencoder_latent_shape:  autoencoder_latent_shape: autoencoder spatial latent space shape. Used if there is a
              difference between the autoencoder's latent shape and the DM shape.
-    """
+    
 
     def __init__(
         self,
@@ -897,7 +897,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
         seg: torch.Tensor | None = None,
         quantized: bool = True,
     ) -> torch.Tensor:
-        """
+        
         Implements the forward pass for a supervised training iteration.
 
         Args:
@@ -913,7 +913,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
             seg: if diffusion model is instance of SPADEDiffusionModel, segmentation must be provided.
             quantized: if autoencoder_model is a VQVAE, quantized controls whether the latents to the LDM
             are quantized or not.
-        """
+        
         with torch.no_grad():
             autoencode = autoencoder_model.encode_stage_2_inputs
             if isinstance(autoencoder_model, VQVAE):
@@ -959,7 +959,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
         verbose: bool = True,
         seg: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Args:
             input_noise: random noise, of the same shape as the desired latent representation.
             autoencoder_model: first stage model.
@@ -974,7 +974,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
             verbose: if true, prints the progression bar of the sampling process.
             seg: if diffusion model is instance of SPADEDiffusionModel, or autoencoder_model
              is instance of SPADEAutoencoderKL, segmentation must be provided.
-        """
+        
 
         if (
             isinstance(autoencoder_model, SPADEAutoencoderKL)
@@ -1057,7 +1057,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
         seg: torch.Tensor | None = None,
         quantized: bool = True,
     ) -> torch.Tensor | tuple[torch.Tensor, list[torch.Tensor]]:
-        """
+        
         Computes the log-likelihoods of the latent representations of the input.
 
         Args:
@@ -1081,7 +1081,7 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
              is instance of SPADEAutoencoderKL, segmentation must be provided.
             quantized: if autoencoder_model is a VQVAE, quantized controls whether the latents to the LDM
             are quantized or not.
-        """
+        
         if resample_latent_likelihoods and resample_interpolation_mode not in ("nearest", "bilinear", "trilinear"):
             raise ValueError(
                 f"resample_interpolation mode should be either nearest, bilinear, or trilinear, got {resample_interpolation_mode}"
@@ -1121,12 +1121,12 @@ class ControlNetLatentDiffusionInferer(ControlNetDiffusionInferer):
             intermediates = [resizer(x) for x in intermediates]
             outputs = (outputs[0], intermediates)
         return outputs
-
-
+"""
+"""
 class VQVAETransformerInferer(Inferer):
-    """
-    Class to perform inference with a VQVAE + Transformer model.
-    """
+    
+    #Class to perform inference with a VQVAE + Transformer model.
+    
 
     def __init__(self) -> None:
         Inferer.__init__(self)
@@ -1140,7 +1140,7 @@ class VQVAETransformerInferer(Inferer):
         condition: torch.Tensor | None = None,
         return_latent: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, tuple]:
-        """
+        
         Implements the forward pass for a supervised training iteration.
 
         Args:
@@ -1150,7 +1150,7 @@ class VQVAETransformerInferer(Inferer):
             ordering: ordering of the quantised latent representation.
             return_latent: also return latent sequence and spatial dim of the latent.
             condition: conditioning for network input.
-        """
+        
         with torch.no_grad():
             latent = vqvae_model.index_quantize(inputs)
 
@@ -1193,7 +1193,7 @@ class VQVAETransformerInferer(Inferer):
         top_k: int | None = None,
         verbose: bool = True,
     ) -> torch.Tensor:
-        """
+        
         Sampling function for the VQVAE + Transformer model.
 
         Args:
@@ -1205,7 +1205,7 @@ class VQVAETransformerInferer(Inferer):
             temperature: temperature for sampling.
             top_k: top k sampling.
             verbose: if true, prints the progression bar of the sampling process.
-        """
+        
         seq_len = math.prod(latent_spatial_dim)
 
         if verbose and has_tqdm:
@@ -1256,7 +1256,7 @@ class VQVAETransformerInferer(Inferer):
         resample_interpolation_mode: str = "nearest",
         verbose: bool = False,
     ) -> torch.Tensor:
-        """
+        
         Computes the log-likelihoods of the latent representations of the input.
 
         Args:
@@ -1271,7 +1271,7 @@ class VQVAETransformerInferer(Inferer):
                 or 'trilinear;
             verbose: if true, prints the progression bar of the sampling process.
 
-        """
+        
         if resample_latent_likelihoods and resample_interpolation_mode not in ("nearest", "bilinear", "trilinear"):
             raise ValueError(
                 f"resample_interpolation mode should be either nearest, bilinear, or trilinear, got {resample_interpolation_mode}"
@@ -1328,3 +1328,4 @@ class VQVAETransformerInferer(Inferer):
             probs_reshaped = resizer(probs_reshaped[:, None, ...])
 
         return probs_reshaped
+"""

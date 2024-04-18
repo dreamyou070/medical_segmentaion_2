@@ -51,7 +51,7 @@ def main(args):
                                in_channels=3,
                                out_channels=3,
                                num_channels=(128, 256, 256),
-                               attention_levels=(False, True, True),
+                               attention_levels=(True,True,True),
                                cross_attention_dim = 768,
                                num_res_blocks=1,
                                num_head_channels=256,)
@@ -101,22 +101,22 @@ def main(args):
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
-    """
+
     for epoch in range(args.max_train_epochs):
         model.train()
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
+
+
         for step, batch in progress_bar:
 
             # final output
-            images = batch["image"].to(dtype=weight_dtype)
+            images = batch["image"].to(dtype=weight_dtype) # [2
             optimizer.zero_grad(set_to_none=True)
 
-            # [2] condition image
+            # [2] condition image (dtype = float32, 1,3,224,224)
             condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
-            # dtype = float32
-            # 1,3,224,224
             batch['condition_image']['pixel_values'] = condition_pixel
             feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
             encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
@@ -132,8 +132,7 @@ def main(args):
                                      diffusion_model=model,
                                      noise=noise,
                                      timesteps=timesteps,
-                                     condition = )
-
+                                     condition = encoder_hidden_states)
                 loss = F.mse_loss(noise_pred.float(), noise.float())
 
             scaler.scale(loss).backward()
@@ -148,15 +147,25 @@ def main(args):
         if (epoch + 1) % val_interval == 0:
             model.eval()
             val_epoch_loss = 0
-            for step, batch in enumerate(val_loader):
-                images = batch["image"].to(device)
+            for step, batch in enumerate(test_dataloader):
+
+                images = batch["image"].to(dtype=weight_dtype)  # [2
+
+                # [2] condition image (dtype = float32, 1,3,224,224)
+                condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
+                batch['condition_image']['pixel_values'] = condition_pixel
+                feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
+                encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
+
+
                 with torch.no_grad():
                     with autocast(enabled=True):
                         noise = torch.randn_like(images).to(device)
                         timesteps = torch.randint(
                             0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device
                         ).long()
-                        noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps)
+                        noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps,
+                                             condition = encoder_hidden_states)
                         val_loss = F.mse_loss(noise_pred.float(), noise.float())
 
                 val_epoch_loss += val_loss.item()

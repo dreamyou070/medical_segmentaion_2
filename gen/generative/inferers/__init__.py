@@ -12,9 +12,9 @@
 from __future__ import annotations
 
 from .inferer import (
-    ControlNetDiffusionInferer,
-    ControlNetLatentDiffusionInferer,
+    #ControlNetDiffusionInferer,
+    #ControlNetLatentDiffusionInferer,
     DiffusionInferer,
-    LatentDiffusionInferer,
-    VQVAETransformerInferer,
+    #LatentDiffusionInferer,
+    #VQVAETransformerInferer,
 )
