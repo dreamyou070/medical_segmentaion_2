@@ -142,10 +142,7 @@ def main(args):
     simple_linear = accelerator.prepare(simple_linear)
 
     unet, network = transform_models_if_DDP([unet, network])
-    unet_config = unet.config
-    print(f'unet_config = {unet_config}')
 
-    """
 
     if args.gradient_checkpointing:
         unet.train()
@@ -173,7 +170,7 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-    
+        """
         for step, batch in enumerate(train_dataloader):
 
             device = accelerator.device
@@ -225,6 +222,7 @@ def main(args):
                 break
         # --------------------------------------------------------------------------------------- #
         # inference code
+        """
         
         if is_main_process:
             pil_image = sample_images(dataloader = test_dataloader,
@@ -253,7 +251,7 @@ def main(args):
                        unwrapped_nw=accelerator.unwrap_model(simple_net),
                        save_dtype=save_dtype)
     accelerator.end_training()
-    """
+
 
 
 if __name__ == "__main__":

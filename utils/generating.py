@@ -114,7 +114,6 @@ def sample_images(dataloader,
                                                                 timesteps)
 
             # 5. Prepare latent variables
-            num_channels_latents = unet.config.in_channels
             latents = torch.randn(1, 4, height, width)
             # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
             extra_step_kwargs = {}
