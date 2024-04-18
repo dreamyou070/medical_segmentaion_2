@@ -147,32 +147,34 @@ def main(args):
             epoch_loss += loss.item()
             progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
         epoch_loss_list.append(epoch_loss / (step + 1))
-        # --------------------------------------------------------- Validation --------------------------------------------------------- #        
+        """
+        # --------------------------------------------------------- Validation --------------------------------------------------------- #
         accelerator.wait_for_everyone()
         model.eval()
         val_epoch_loss = 0
-        for step, batch in enumerate(test_dataloader):            
-            images = batch["image"].to(dtype=weight_dtype)  # [2
-            # [2] condition image (dtype = float32, 1,3,224,224)
-            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
-            batch['condition_image']['pixel_values'] = condition_pixel
-            feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
-            encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
-            with torch.no_grad():
-                with autocast(enabled=True):
-                    noise = torch.randn_like(images).to(device)
-                    timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device
-                    ).long()
-                    noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps,
-                                         condition = encoder_hidden_states)
-                    val_loss = F.mse_loss(noise_pred.float(), noise.float())
-            val_epoch_loss += val_loss.item()
-            progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
+        for step, batch in enumerate(test_dataloader):
+            if step == 1 :
+                images = batch["image"].to(dtype=weight_dtype)  # [2
+                # [2] condition image (dtype = float32, 1,3,224,224)
+                condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
+                batch['condition_image']['pixel_values'] = condition_pixel
+                feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
+                encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
+                with torch.no_grad():
+                    with autocast(enabled=True):
+                        noise = torch.randn_like(images).to(device)
+                        timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device
+                        ).long()
+                        noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps,
+                                             condition = encoder_hidden_states)
+                        val_loss = F.mse_loss(noise_pred.float(), noise.float())
+                val_epoch_loss += val_loss.item()
+                progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
         # recording val loss
         val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
         with open(val_loss_text, 'a') as f:
             f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
-        """
+
 
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         if is_main_process:
@@ -190,36 +192,6 @@ def main(args):
     print(f"train completed, total time: {total_time}.")
 
 
-    """
-    # --------------------------------------------------------------------------------------- #
-    # inference code
-        pil_image = sample_images(dataloader=test_dataloader,
-                                  condition_model=condition_model,
-                                  weight_dtype=weight_dtype,
-                                  simple_linear=simple_linear,
-                                  device=accelerator.device,
-                                  timesteps=None,
-                                  num_inference_steps=args.num_inference_steps,
-                                  unet=unet,
-                                  vae=vae,
-                                  args=args)
-        sample_folder = os.path.join(args.output_dir, 'sample')
-        os.makedirs(sample_folder, exist_ok=True)
-        pil_image.save(os.path.join(sample_folder, f'{epoch}.png'))
-
-        saving_epoch = str(epoch + 1).zfill(6)
-        save_model(args,
-                   saving_folder='model',
-                   saving_name=f'lora-{saving_epoch}.safetensors',
-                   unwrapped_nw=accelerator.unwrap_model(network),
-                   save_dtype=save_dtype)
-        save_model(args,  # Here Problem ...
-                   saving_folder='simple_net',
-                   saving_name=f'simple_net-{saving_epoch}.pt',
-                   unwrapped_nw=accelerator.unwrap_model(simple_linear),
-                   save_dtype=save_dtype)
-    accelerator.end_training()
-    """
 
 
 if __name__ == "__main__":
