@@ -13,7 +13,21 @@ from utils import prepare_dtype, arg_as_list
 from data.image_conditioned_generating_dataset import call_dataset
 from gen.generative.networks.nets import DiffusionModelUNet
 from gen.generative.inferers import DiffusionInferer
+from transformers import ViTModel
+from torch.cuda.amp import GradScaler, autocast
+
+class simple_net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mm_projector = nn.Sequential(nn.Linear(768, 512),
+                                          nn.GELU(),
+                                          nn.Linear(512, 768), )
+
+    def forward(self, x):
+        return self.mm_projector(x)
+
 def main(args):
+
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -30,6 +44,7 @@ def main(args):
 
     print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
+    print(f' (3.1) unet model')
     model = DiffusionModelUNet(spatial_dims=2,
                                in_channels=3,
                                out_channels=3,
@@ -38,12 +53,18 @@ def main(args):
                                cross_attention_dim = 768,
                                num_res_blocks=1,
                                num_head_channels=256,)
+    print(f' (3.2) condition model')
+    condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
+    condition_model.to(dtype=weight_dtype)
+    condition_model.eval()
+    simple_linear = simple_net()
+    simple_linear.to(dtype=weight_dtype)
 
+    print(f' (3.3) scheduler')
     scheduler = DDPMScheduler(num_train_timesteps=1000)
 
     print(f'\n step 4. dataset and dataloader')
-    if args.seed is None:
-        args.seed = random.randint(0, 2 ** 32)
+    if args.seed is None : args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
     train_dataloader, test_dataloader = call_dataset(args)
 
@@ -66,16 +87,15 @@ def main(args):
     noise_scheduler = DDPMScheduler(beta_start=0.00085,
                                     beta_end=0.012, beta_schedule="scaled_linear",
                                     num_train_timesteps=1000, clip_sample=False)
-    use_pretrained = False
-    """
-    n_epochs = 75
+
+
     val_interval = 5
     epoch_loss_list = []
     val_epoch_loss_list = []
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
-    for epoch in range(n_epochs):
+    for epoch in range(args.max_train_epochs):
         model.train()
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
