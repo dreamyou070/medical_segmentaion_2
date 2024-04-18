@@ -50,8 +50,6 @@ def main(args):
     print(f' (3.2) load stable diffusion model')
     # [1] diffusion
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
-    #text_encoder.requires_grad_(False)
-    #text_encoder.to(dtype=weight_dtype)
     del text_encoder
 
     vae.requires_grad_(False)
@@ -92,17 +90,17 @@ def main(args):
                                unet = unet,
                                neuron_dropout=args.network_dropout,
                                **net_kwargs, )
-    network.apply_to(None, condition_model, unet,
+    network.apply_to(None,
+                     condition_model,
+                     unet,
                      apply_image_encoder=True,
                      apply_text_encoder=False,
                      apply_unet=True)
 
-    unet = unet.to(accelerator.device, dtype=weight_dtype)
-    unet.eval()
-
     condition_model = condition_model.to(accelerator.device, dtype=weight_dtype)
     condition_model.eval()
-
+    unet = unet.to(accelerator.device, dtype=weight_dtype)
+    unet.eval()
     vae = vae.to(accelerator.device, dtype=weight_dtype)
     vae.eval()
 
@@ -124,9 +122,10 @@ def main(args):
                                                         args.text_encoder_lr,
                                                         args.unet_lr,
                                                         args.learning_rate)  # all trainable params
-
-    trainable_params.append({"params": simple_linear.parameters(), "lr": args.learning_rate})
-    optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
+    trainable_params.append({"params": simple_linear.parameters(),
+                             "lr": args.learning_rate})
+    optimizer_name, optimizer_args, optimizer = get_optimizer(args,
+                                                              trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
@@ -136,13 +135,12 @@ def main(args):
 
 
     print(f'\n step 8. model to device')
-    unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-        accelerator.prepare(unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    condition_model = accelerator.prepare(condition_model) # condition_model prepare (changed dype)
-    simple_linear = accelerator.prepare(simple_linear)
-
+    simple_linear, condition_model, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+        accelerator.prepare(simple_linear, condition_model, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     unet, network = transform_models_if_DDP([unet, network])
-
+    condition_model, simple_linear = transform_models_if_DDP([condition_model, simple_linear])
+    # why no model ?
+    # lora network is Unet and vision_encoder based
 
     if args.gradient_checkpointing:
         unet.train()
@@ -223,6 +221,7 @@ def main(args):
         # --------------------------------------------------------------------------------------- #
         # inference code
         """
+
         
         if is_main_process:
             pil_image = sample_images(dataloader = test_dataloader,
@@ -243,6 +242,7 @@ def main(args):
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
+            # here problem
             save_model(args,
                        saving_folder='model',
                        saving_name=f'lora-{saving_epoch}.safetensors',

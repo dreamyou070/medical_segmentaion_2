@@ -135,7 +135,6 @@ def sample_images(dataloader,
                 extra_step_kwargs = {}
                 # 7. Denoising loop
                 for i, t in enumerate(timesteps):
-                    print(f'generation, i = {i} | t  = {t}')
                     # expand the latents if we are doing classifier free guidance
                     latent_model_input = latents
                     # timestep_cond
@@ -149,6 +148,6 @@ def sample_images(dataloader,
             image = vae.decode(latents / scaling_factor, return_dict=False)[0] # torch image
             image = (image / 2 + 0.5).clamp(0, 1)
             image = image.cpu().permute(0, 2, 3, 1).numpy()
-            pil_image = numpy_to_pil(image)
+            pil_image = numpy_to_pil(image)[0]
 
     return pil_image
