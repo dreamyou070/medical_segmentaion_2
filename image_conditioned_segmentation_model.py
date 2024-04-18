@@ -23,6 +23,7 @@ from utils.saving import save_model
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 from transformers import ViTModel
 from data.image_conditioned_generating_dataset import call_dataset
+
 def main(args):
 
     print(f'\n step 1. setting')
@@ -443,6 +444,7 @@ if __name__ == "__main__":
     unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
-
     passing_mvtec_argument(args)
+    from data.image_conditioned_generating_dataset import passing_mvtec_argument as passing_data
+    passing_data(args)
     main(args)
