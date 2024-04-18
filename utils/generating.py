@@ -100,16 +100,13 @@ def sample_images(dataloader,
     for i, batch in enumerate(dataloader) :
 
         if i == 0 :
-
             # [2] image generating
             height, width = 64,64
-
             # [3] generate condition
             condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
             batch['condition_image']['pixel_values'] = condition_pixel
             feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
             encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
-
             # [4] generating
             timesteps, num_inference_steps = retrieve_timesteps(scheduler,
                                                                 num_inference_steps, # 30

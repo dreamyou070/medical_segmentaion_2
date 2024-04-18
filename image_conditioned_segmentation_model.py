@@ -222,16 +222,17 @@ def main(args):
         # inference code
         """
         if is_main_process:
-            pil_image = sample_images(test_dataloader,
-                                      condition_model,
-                                      weight_dtype,
-                                      simple_linear,
-                                      accelerator.device,
-                                      None,
-                                      args.num_inference_steps,
-                                      unet,
-                                      vae,
-                                      args)
+            print(f'unet = {unet}')
+            pil_image = sample_images(dataloader = test_dataloader,
+                                      condition_model = condition_model,
+                                      weight_dtype=weight_dtype,
+                                      simple_linear=simple_linear,
+                                      device = accelerator.device,
+                                      timesteps = None,
+                                      num_inference_steps = args.num_inference_steps,
+                                      unet=unet,
+                                      vae=vae,
+                                      args=args)
 
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
