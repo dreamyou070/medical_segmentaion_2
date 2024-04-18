@@ -2,32 +2,17 @@ import argparse, random, json
 from tqdm import tqdm
 from accelerate.utils import set_seed
 from torch import nn
-from attention_store import AttentionStore
 from model.diffusion_model import transform_models_if_DDP
-from utils.evaluate_3 import evaluation_check
 from model.unet import unet_passing_argument
-from utils import prepare_dtype, arg_as_list
-from utils.attention_control import passing_argument, register_attention_control
+from utils.attention_control import passing_argument
 from utils.accelerator_utils import prepare_accelerator
-from utils.optimizer import get_optimizer, get_scheduler_fix
-from monai.utils import LossReduction
-from torch.nn import L1Loss
-from monai.losses import FocalLoss
-from monai.losses import DiceLoss, DiceCELoss
-from utils.losses import PatchAdversarialLoss
-from diffusers import AutoencoderKL, DDPMScheduler
-from model.lora_2 import create_network_2
-from model.diffusion_model import load_target_model
+from diffusers import DDPMScheduler
 import os
 import torch
-from utils.saving import save_model
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
-from transformers import ViTModel
+from utils import prepare_dtype, arg_as_list
 from data.image_conditioned_generating_dataset import call_dataset
-from utils import get_noise_noisy_latents_and_timesteps
-from utils.generating import sample_images
-from GenerativeModels.generative.networks.nets import DiffusionModelUNet
-from GenerativeModels.generative.inferers import DiffusionInferer
+from gen.generative.networks.nets import DiffusionModelUNet
+from gen.generative.inferers import DiffusionInferer
 def main(args):
     print(f'\n step 1. setting')
     output_dir = args.output_dir
