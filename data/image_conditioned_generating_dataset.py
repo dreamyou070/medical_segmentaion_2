@@ -1,4 +1,4 @@
-from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
+from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor, ViTImageProcessor
 import os
 import numpy as np
 from torch.utils.data import Dataset
@@ -191,7 +191,8 @@ class TestDataset(Dataset):
 
         # [2] get condition image
         image = Image.open(self.image_paths[idx])
-        inputs = self.condition_img_tokenizer(images=image, return_tensors="pt").squeeze(0)
+        inputs = self.condition_img_tokenizer(images=image, return_tensors="pt")
+        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0)
 
         sample = {'image': mask_img,
                   'condition_image': inputs}
@@ -203,7 +204,7 @@ def call_dataset(args) :
     if args.image_processor == 'clip':
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
-        processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
+        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
     # [2] train & test dataset
     train_dataset = TrainDataset(root_dir=args.train_data_path,
