@@ -61,7 +61,8 @@ def main(args):
         num_channels=(128, 256, 256),
         attention_levels=(False, True, True),
         num_res_blocks=1,
-        num_head_channels=256,
+        cross_attention_dim=768,
+        num_head_channels=256,with_conditioning=True
     )
 
 
