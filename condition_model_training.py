@@ -536,6 +536,7 @@ if __name__ == "__main__":
     parser.add_argument("--erase_position_embeddings", action='store_true')
     parser.add_argument("--use_base_prompt", action='store_true')
     parser.add_argument("--use_key_word", action='store_true')
+    parser.add_argument("--use_pseudo_map", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

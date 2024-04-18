@@ -43,7 +43,8 @@ def passing_mvtec_argument(args):
     global argument
     argument = args
 
-class TrainDataset_Seg(Dataset):
+
+class TrainDataset_SegPseudoMap(Dataset):
 
     def __init__(self,
                  root_dir,
@@ -253,7 +254,7 @@ class TrainDataset_Seg(Dataset):
                 'pseudo_label' : pseudo_label}  # [0,3,4]
 
 
-class TestDataset_Seg(Dataset):
+class TestDataset_SegPseudoMap(Dataset):
 
     def __init__(self,
                  root_dir,

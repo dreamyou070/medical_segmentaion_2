@@ -1,6 +1,7 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
-
+# head 를 넣는 것이 더 좋기는 하였으나 아직 더 성장해야 한다.
+#
 port_number=50005
 category="medical"
 obj_name="leader_polyp"
@@ -42,4 +43,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --image_model_training \
  --use_image_by_caption \
  --use_base_prompt \
- --use_position_embedder
+ --use_position_embedder --use_pseudo_map
