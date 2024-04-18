@@ -160,7 +160,6 @@ class TrainDataset_SegPseudoMap(Dataset):
         gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
         pseudo_label = self.image_processor(np.array(gt))
 
-
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
 
