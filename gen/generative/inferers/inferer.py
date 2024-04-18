@@ -136,14 +136,13 @@ class DiffusionInferer(Inferer):
                     model_input, timesteps=torch.Tensor((t,)).to(input_noise.device), context=None
                 )
             else:
-                print(f'in sampling, t = {t}')
-                print(f'conditioning = {conditioning}')
-                model_output = diffusion_model(image,
+                model_output = diffusion_model(x=image,
                                                timesteps=torch.Tensor((t,)).to(input_noise.device),
                                                context=conditioning)
 
             # 2. compute previous image: x_t -> x_t-1
             image, _ = scheduler.step(model_output, t, image)
+            print(f'after iterating, image = {type(image)}')
             if save_intermediates and t % intermediate_steps == 0:
                 intermediates.append(image)
         if save_intermediates:

@@ -1884,8 +1884,6 @@ class DiffusionModelUNet(nn.Module):
         # 1. time
         t_emb = get_timestep_embedding(timesteps, self.block_out_channels[0])
 
-        print(f' t_emb = {t_emb}')
-        print(f' x = {x}')
         # what is x ?
 
         # timesteps does not contain any weights and will always return f32 tensors

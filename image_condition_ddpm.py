@@ -46,14 +46,7 @@ def main(args):
     print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
     print(f' (3.1) unet model')
-    """
-    model = DiffusionModelUNet(spatial_dims=2, in_channels=3, out_channels=1,  num_channels=(128, 256, 256),
-                               attention_levels=(True,True,True),
-                              # cross_attention_dim = 768,
-                               num_res_blocks=1,
-                               num_head_channels=256,)
-                              # with_conditioning=True)
-    """
+
     model = DiffusionModelUNet(spatial_dims=2,
                                in_channels=3,
                                out_channels=3,
@@ -180,7 +173,6 @@ def main(args):
             # Sampling image during training
             noise = torch.randn((1,3,256,256)).to(accelerator.device, dtype=weight_dtype)
             scheduler.set_timesteps(num_inference_steps=1000)
-            print(f' before, encoder_hidden_states = {encoder_hidden_states.shape}')
             with autocast(enabled=True):
                 image = inferer.sample(input_noise=noise,
                                        diffusion_model=model,
