@@ -54,7 +54,8 @@ def main(args):
                                attention_levels=(True,True,True),
                                cross_attention_dim = 768,
                                num_res_blocks=1,
-                               num_head_channels=256,)
+                               num_head_channels=256,
+                               with_conditioning=True)
 
 
     print(f' (3.2) condition model')
@@ -221,7 +222,7 @@ def main(args):
                    unwrapped_nw=accelerator.unwrap_model(simple_linear),
                    save_dtype=save_dtype)
     accelerator.end_training()
-    
+
 
 
 if __name__ == "__main__":
