@@ -133,7 +133,7 @@ def main(args):
     print(f'\n step 8. model to device')
     unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
         accelerator.prepare(unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    condition_model = accelerator.prepare(condition_model)
+    condition_model = accelerator.prepare(condition_model) # condition_model prepare (changed dype)
     simple_linear = accelerator.prepare(simple_linear)
 
     unet, network = transform_models_if_DDP([unet, network])
@@ -170,8 +170,10 @@ def main(args):
             loss_dict = {}
 
             # [1] condition image
-            condition_pixel = batch['condition_image']['pixel_values']#.to(dtype=weight_dtype)
-            batch['condition_image']['pixel_values'] = condition_pixel.to(dtype=weight_dtype)
+            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype)
+            print(f'condition_pixel dtype = {condition_pixel.dtype}')
+            print(f'condition_pixel shape = {condition_pixel.shape}')
+            batch['condition_image']['pixel_values'] = condition_pixel
 
             encoder_hidden_states = simple_linear(condition_model(batch['condition_image']))
 
