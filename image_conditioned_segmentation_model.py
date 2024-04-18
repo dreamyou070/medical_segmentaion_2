@@ -142,6 +142,10 @@ def main(args):
     simple_linear = accelerator.prepare(simple_linear)
 
     unet, network = transform_models_if_DDP([unet, network])
+    unet_config = unet.config
+    print(f'unet_config = {unet_config}')
+
+    """
 
     if args.gradient_checkpointing:
         unet.train()
@@ -164,10 +168,13 @@ def main(args):
                                     beta_end=0.012, beta_schedule="scaled_linear",
                                     num_train_timesteps=1000, clip_sample=False)
     scale_factor = 0.18215
+    """
+    """
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+    """
         """
         for step, batch in enumerate(train_dataloader):
 
@@ -222,7 +229,6 @@ def main(args):
         # inference code
         """
         if is_main_process:
-            print(f'unet = {unet}')
             pil_image = sample_images(dataloader = test_dataloader,
                                       condition_model = condition_model,
                                       weight_dtype=weight_dtype,
