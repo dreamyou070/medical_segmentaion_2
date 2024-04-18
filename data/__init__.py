@@ -9,25 +9,11 @@ from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 from torchvision import transforms
 from torchvision.transforms.functional import InterpolationMode
 
-
-#image_path = 'data_sample/image/sample_200.jpg'
-#image = Image.open(image_path)
-#inputs = processor(images=image, return_tensors="pt", padding=True)#.data['pixel_values'] # [1,3,224,224]
-#image_pixel = inputs.data['pixel_values']
-#print(f'image_pixel = {image_pixel.shape}')
-#clip_image_model.to("cuda:0")
-#image_inputs = inputs.to("cuda:0")
-
-#image_features = clip_image_model.get_image_features(**inputs) # [batch, pix_num, dim = 784]
-#print(f'image_features = {image_features.shape}')
-
-
 def call_dataset(args) :
 
-    # [1.1] load tokenizer
-    tokenizer = load_tokenizer(args)
     # [1.2] image_processor
-    #clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+    clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+
     if args.image_processor == 'clip':
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
