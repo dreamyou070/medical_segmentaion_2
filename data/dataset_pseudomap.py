@@ -157,8 +157,10 @@ class TrainDataset_SegPseudoMap(Dataset):
                        self.n_classes))  # 3
         # 256,256,3
         gt[:, :, :class_num] = gt_arr_
+
+
         gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
-        pseudo_label = self.image_processor(np.array(gt))
+        pseudo_label = self.image_processor(Image.fromarray((gt * 255).astype(np.uint8)).convert('RGB'))
 
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
@@ -368,7 +370,7 @@ class TestDataset_SegPseudoMap(Dataset):
         # 256,256,3
         gt[:, :, :class_num] = gt_arr_
         gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
-        pseudo_label = self.image_processor(np.array(gt))
+        pseudo_label = self.image_processor(Image.fromarray((gt * 255).astype(np.uint8)).convert('RGB'))
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
 
