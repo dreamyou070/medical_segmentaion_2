@@ -100,7 +100,7 @@ class TrainDataset(Dataset):
         # [2] get condition image
         image = Image.open(self.image_paths[idx])
         inputs = self.condition_img_tokenizer(images=image, return_tensors="pt")
-        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0)
+        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0).contiguous()
 
         sample = {'image': mask_img,
                   'condition_image' : inputs}
@@ -192,7 +192,7 @@ class TestDataset(Dataset):
         # [2] get condition image
         image = Image.open(self.image_paths[idx])
         inputs = self.condition_img_tokenizer(images=image, return_tensors="pt")
-        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0)
+        inputs['pixel_values'] = inputs['pixel_values'].squeeze(0).contiguous()
 
         sample = {'image': mask_img,
                   'condition_image': inputs}
