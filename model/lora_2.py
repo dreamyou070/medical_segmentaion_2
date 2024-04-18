@@ -1117,12 +1117,12 @@ class LoRANetwork(torch.nn.Module):
                                                               prefix = prefix_)
                 self.image_encoder_loras.extend(image_encoder_loras)
                 skipped_ie += skipped
-        print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
+            print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
 
         # -------------------------------------------------------------------------------------------------------------------- #
+        self.text_encoder_loras = []
         if text_condition is not None:
             text_encoders = text_condition if type(text_condition) == list else [text_condition]
-            self.text_encoder_loras = []
             skipped_te = [] # 1 model
             for i, text_encoder in enumerate(text_encoders):
                 if len(text_encoders) > 1:
@@ -1139,9 +1139,10 @@ class LoRANetwork(torch.nn.Module):
                                                              prefix = prefix_)
                 self.text_encoder_loras.extend(text_encoder_loras)
                 skipped_te += skipped
-        print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
+            print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
 
         # --------------------------------------------------------------------------------------------------------------------- #
+        self.unet_loras = []
         if unet is not None :
             target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
             if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
