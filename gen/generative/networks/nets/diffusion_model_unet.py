@@ -1746,20 +1746,17 @@ class DiffusionModelUNet(nn.Module):
         self.with_conditioning = with_conditioning
 
         # input
-        self.conv_in = Convolution(
-            spatial_dims=spatial_dims,
-            in_channels=in_channels,
-            out_channels=num_channels[0],
-            strides=1,
-            kernel_size=3,
-            padding=1,
-            conv_only=True,
-        )
+        self.conv_in = Convolution(spatial_dims=spatial_dims,
+                                   in_channels=in_channels,
+                                   out_channels=num_channels[0],
+                                   strides=1,
+                                   kernel_size=3,
+                                   padding=1,
+                                   conv_only=True,   )
 
         # time
         time_embed_dim = num_channels[0] * 4
-        self.time_embed = nn.Sequential(
-            nn.Linear(num_channels[0], time_embed_dim), nn.SiLU(), nn.Linear(time_embed_dim, time_embed_dim))
+        self.time_embed = nn.Sequential(nn.Linear(num_channels[0], time_embed_dim), nn.SiLU(), nn.Linear(time_embed_dim, time_embed_dim))
 
         # class embedding
         self.num_class_embeds = num_class_embeds
@@ -2068,7 +2065,10 @@ class DiffusionModelEncoder(nn.Module):
 
             self.down_blocks.append(down_block)
 
-        self.out = nn.Sequential(nn.Linear(4096, 512), nn.ReLU(), nn.Dropout(0.1), nn.Linear(512, self.out_channels))
+        self.out = nn.Sequential(nn.Linear(4096, 512),
+                                 nn.ReLU(),
+                                 nn.Dropout(0.1),
+                                 nn.Linear(512, self.out_channels)) # why not possible .. ?
 
     def forward(
         self,

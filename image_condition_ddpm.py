@@ -56,7 +56,7 @@ def main(args):
     """
     model = DiffusionModelUNet(spatial_dims=2,
                                in_channels=3,
-                               out_channels=1,
+                               out_channels=3,
                                num_channels=(128, 256, 256),
                                attention_levels=(False, True, True),
                                num_res_blocks=1,
@@ -94,8 +94,7 @@ def main(args):
     model = transform_models_if_DDP([model])[0]
 
     print(f'\n step 10. Training !')
-    progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
-                        disable=not accelerator.is_local_main_process, desc="steps")
+    progress_bar = tqdm(range(args.max_train_epochs), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
     noise_scheduler = DDPMScheduler(beta_start=0.00085,
