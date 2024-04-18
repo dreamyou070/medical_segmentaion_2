@@ -5,7 +5,6 @@ from torch.utils.data import Dataset
 import torch
 from PIL import Image
 from torchvision import transforms
-from tensorflow.keras.utils import to_categorical
 
 def passing_mvtec_argument(args):
     global argument
