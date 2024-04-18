@@ -114,7 +114,7 @@ def sample_images(dataloader,
                                                                 timesteps)
 
             # 5. Prepare latent variables
-            latents = torch.randn(1, 4, height, width)
+            latents = torch.randn(1, 4, height, width).to(device, dtype=weight_dtype)
             # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
             extra_step_kwargs = {}
 
