@@ -16,7 +16,7 @@ from gen.generative.networks.nets import DiffusionModelUNet
 from gen.generative.inferers import DiffusionInferer
 from transformers import ViTModel
 from torch.cuda.amp import GradScaler, autocast
-
+from torch.nn import functional as F
 class simple_net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -102,28 +102,25 @@ def main(args):
                                     beta_schedule="scaled_linear",
                                     num_train_timesteps=1000,
                                     clip_sample=False)
-
-
     val_interval = 5
     epoch_loss_list = []
     val_epoch_loss_list = []
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
-    """
 
     for epoch in range(args.max_train_epochs):
         model.train()
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
-
-
         for step, batch in progress_bar:
 
-            # final output
-            images = batch["image"].to(dtype=weight_dtype) # [2
             optimizer.zero_grad(set_to_none=True)
+
+            # final output
+            images = batch["image"].to(dtype=weight_dtype) # mask image -> [3,256,256]
+            print(f'images  = {images.shape}')
 
             # [2] condition image (dtype = float32, 1,3,224,224)
             condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
@@ -180,8 +177,9 @@ def main(args):
 
                 val_epoch_loss += val_loss.item()
                 progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
-            val_epoch_loss_list.append(val_epoch_loss / (step + 1))
 
+        accelerator.wait_for_everyone()
+        if is_main_process:
             # Sampling image during training
             noise = torch.randn((1, 1, 64, 64))
             noise = noise.to(device)
@@ -189,22 +187,14 @@ def main(args):
             with autocast(enabled=True):
                 image = inferer.sample(input_noise=noise, diffusion_model=model, scheduler=scheduler)
 
-            plt.figure(figsize=(2, 2))
-            plt.imshow(image[0, 0].cpu(), vmin=0, vmax=1, cmap="gray")
-            plt.tight_layout()
-            plt.axis("off")
-            plt.show()
 
     total_time = time.time() - total_start
     print(f"train completed, total time: {total_time}.")
 
 
-
+    """
     # --------------------------------------------------------------------------------------- #
     # inference code
-
-    accelerator.wait_for_everyone()
-    if is_main_process:
         pil_image = sample_images(dataloader=test_dataloader,
                                   condition_model=condition_model,
                                   weight_dtype=weight_dtype,

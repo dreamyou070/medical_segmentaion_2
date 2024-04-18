@@ -28,6 +28,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 3 \
+ --resize_shape 256 \
  --mask_res 256 \
  --batch_size 1 \
  --use_batchnorm \
