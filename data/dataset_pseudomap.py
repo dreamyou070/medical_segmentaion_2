@@ -2,55 +2,46 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 import torch
-import glob
 from PIL import Image
 from torchvision import transforms
-import cv2
 from tensorflow.keras.utils import to_categorical
+from torchvision.transforms.functional import InterpolationMode
 
-brain_class_map = {0: ['b','brain'],
-                   1: ['n','non-enhancing tumor core'],
-                   2: ['e','edema'],
-                   3: ['t','enhancing tumor'],}
-cardiac_class_map = {0: ['b','background'],
-                        1: ['l','left ventricle'],
-                        2: ['m','myocardium'],
-                        3: ['r','right ventricle'],}
-abdomen_class_map = {0: ['b','background'],
-                        1: ['x','aorta'],
-                        2: ['l','liver'],
-                        3: ['k','kidney'],
-                        4: ['t','tumor'],
-                        5: ['v','vein'],
-                        6: ['s','spleen'],
-                        7: ['p','pancreas'],
-                        8: ['g','gallbladder'],
-                        9: ['f','fat'],
-                        10: ['m','muscle'],
-                        11: ['h','heart'],
-                        12: ['i','intestine'],
-                        13: ['o','other'], }
-leader_polyp_class_map = {0: ['b','background'],
-                          1: ['p','non-neoplastic'],
-                          2: ['n','neoplastic'],}
-teeth_class_map = {0: ['b','background'],
-                     1: ['t','anomal']}
-
-# (i) normal- NOR,
-# (ii) patients with previous myocardial infarction- MINF,
-# (iii) patients with dilated cardiomyopathy- DCM,
-# (iv) patients with hypertrophic cardiomyopathy- HCM,
-# (v) patients with abnormal right ventricle- ARV
-
+brain_class_map = {0: ['b', 'brain'],
+                   1: ['n', 'non-enhancing tumor core'],
+                   2: ['e', 'edema'],
+                   3: ['t', 'enhancing tumor'], }
+cardiac_class_map = {0: ['b', 'background'],
+                     1: ['l', 'left ventricle'],
+                     2: ['m', 'myocardium'],
+                     3: ['r', 'right ventricle'], }
+abdomen_class_map = {0: ['b', 'background'],
+                     1: ['x', 'aorta'],
+                     2: ['l', 'liver'],
+                     3: ['k', 'kidney'],
+                     4: ['t', 'tumor'],
+                     5: ['v', 'vein'],
+                     6: ['s', 'spleen'],
+                     7: ['p', 'pancreas'],
+                     8: ['g', 'gallbladder'],
+                     9: ['f', 'fat'],
+                     10: ['m', 'muscle'],
+                     11: ['h', 'heart'],
+                     12: ['i', 'intestine'],
+                     13: ['o', 'other'], }
+leader_polyp_class_map = {0: ['b', 'background'],
+                          1: ['p', 'non-neoplastic'],
+                          2: ['n', 'neoplastic'], }
+teeth_class_map = {0: ['b', 'background'],
+                   1: ['t', 'anomal']}
 base_prompts = ['this is a picture of ',
                 'this is a picture of a ',
                 'this is a picture of the ',
-                'this picture is of ',]
+                'this picture is of ', ]
 
 def passing_mvtec_argument(args):
     global argument
     argument = args
-
 
 class TrainDataset_Seg(Dataset):
 
@@ -61,30 +52,31 @@ class TrainDataset_Seg(Dataset):
                  image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
-                 mask_res = 128,
-                 use_data_aug = False,):
+                 mask_res=128,
+                 use_data_aug=False, ):
 
         # [1] base image
         self.root_dir = root_dir
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir) # anomal
-        for folder in folders :
-            folder_dir = os.path.join(self.root_dir, folder) # anomal
+        folders = os.listdir(self.root_dir)  # anomal
+        for folder in folders:
+            folder_dir = os.path.join(self.root_dir, folder)  # anomal
             folder_res = folder.split('_')[-1]
-            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}') # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')    # [128,128]
-            files = os.listdir(rgb_folder) #
+            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}')  # anomal / image_256
+            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')  # [128,128]
+            files = os.listdir(rgb_folder)  #
             for file in files:
                 name, ext = os.path.splitext(file)
                 image_paths.append(os.path.join(rgb_folder, file))
-                if argument.gt_ext_npy :
+                if argument.gt_ext_npy:
                     gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
-                else :
+                else:
                     gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.image_processor = image_processor
+        self.image_processor = transforms.Compose([transforms.Resize((24,24), interpolation=InterpolationMode.BICUBIC),
+                                                   transforms.ToTensor(),])
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -128,7 +120,7 @@ class TrainDataset_Seg(Dataset):
         img_path = self.image_paths[idx]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
-        if self.use_data_aug :
+        if self.use_data_aug:
             # rotating
             random_p = np.random.rand()
             if random_p < 0.25:
@@ -139,40 +131,39 @@ class TrainDataset_Seg(Dataset):
                 number = 3
             elif 0.75 <= random_p:
                 number = 4
-
-            img = np.rot90(img, k=number) # ok, because it is 3 channel image
+            img = np.rot90(img, k=number)  # ok, because it is 3 channel image
         img = self.transform(img.copy())
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
-        if argument.gt_ext_npy :
-            gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
+        if argument.gt_ext_npy:
+            gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
             if self.use_data_aug:
                 gt_arr = np.rot90(gt_arr, k=number)
-            gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
-        else :
+            gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
+        else:
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            gt_arr = np.array(gt_img) # 128,128
+            gt_arr = np.array(gt_img)  # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
         # [3] make semantic pseudo mal
-
         # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
-
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
-        gt = np.zeros((self.mask_res,   # 256
-                       self.mask_res,   # 256
-                       self.n_classes)) # 3
-
+        gt = np.zeros((self.mask_res,  # 256
+                       self.mask_res,  # 256
+                       self.n_classes))  # 3
         # 256,256,3
-        gt[:,:,:class_num] = gt_arr_
-        gt = torch.tensor(gt).permute(2,0,1)        # 3,256,256
-        # [3] gt flatten
-        gt_flat = gt_arr.flatten() # 128*128
+        gt[:, :, :class_num] = gt_arr_
+        gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
+        pseudo_label = self.image_processor(gt)
 
-        if argument.use_image_by_caption :
+
+        # [3] gt flatten
+        gt_flat = gt_arr.flatten()  # 128*128
+
+        if argument.use_image_by_caption:
 
             # [3] caption
             if argument.obj_name == 'brain':
@@ -184,26 +175,26 @@ class TrainDataset_Seg(Dataset):
             elif argument.obj_name == 'leader_polyp':
                 class_map = leader_polyp_class_map
 
-            if argument.use_base_prompt :
+            if argument.use_base_prompt:
                 caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
+            else:
                 caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                if argument.use_key_word :
+                if argument.use_key_word:
                     caption += class_map[class_idx][0]
-                else :
+                else:
                     caption += class_map[class_idx][1]
 
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
-                    #caption += ', '
+                    # caption += ', '
                     caption += ' '
-        else :
-            if argument.use_base_prompt :
+        else:
+            if argument.use_base_prompt:
                 base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
+            else:
                 base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
 
@@ -232,7 +223,7 @@ class TrainDataset_Seg(Dataset):
                     idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
                     target_word_index.append(idx)
             return target_word_index
-        
+
         if argument.use_cls_token:
             default = [0]  # cls token index
             default.extend(get_target_index(key_words, caption))
@@ -242,24 +233,25 @@ class TrainDataset_Seg(Dataset):
         """
         # [3] image pixel
 
-        if argument.image_processor == 'blip' :
+        if argument.image_processor == 'blip':
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)
 
-        else :
+        else:
             image_condition = self.image_processor(images=Image.open(img_path),
-                                                    return_tensors="pt",
-                                                    padding=True)  # .data['pixel_values'] # [1,3,224,224]
+                                                   return_tensors="pt",
+                                                   padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
-
         return {'image': img,  # [3,512,512]
-                "gt": gt,                       # [3,256,256]
-                "gt_flat" : gt_flat,            # [128*128]
+                "gt": gt,  # [3,256,256]
+                "gt_flat": gt_flat,  # [128*128]
                 "input_ids": input_ids,
-                'caption' : caption,
-                "image_condition" : image_condition} # [0,3,4]
+                'caption': caption,
+                "image_condition": image_condition,
+                'pseudo_label' : pseudo_label}  # [0,3,4]
+
 
 class TestDataset_Seg(Dataset):
 
@@ -270,29 +262,30 @@ class TestDataset_Seg(Dataset):
                  image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
-                 mask_res = 128,
-                 use_data_aug = False,):
+                 mask_res=128,
+                 use_data_aug=False, ):
 
         # [1] base image
         self.root_dir = root_dir
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir) # anomal
-        for folder in folders :
-            folder_dir = os.path.join(self.root_dir, folder) # anomal
-            rgb_folder = os.path.join(folder_dir, f'images') # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'masks')    # [128,128]
-            files = os.listdir(rgb_folder) #
+        folders = os.listdir(self.root_dir)  # anomal
+        for folder in folders:
+            folder_dir = os.path.join(self.root_dir, folder)  # anomal
+            rgb_folder = os.path.join(folder_dir, f'images')  # anomal / image_256
+            gt_folder = os.path.join(folder_dir, f'masks')  # [128,128]
+            files = os.listdir(rgb_folder)  #
             for file in files:
                 name, ext = os.path.splitext(file)
                 image_paths.append(os.path.join(rgb_folder, file))
-                if argument.gt_ext_npy :
+                if argument.gt_ext_npy:
                     gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
-                else :
+                else:
                     gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
         self.tokenizer = tokenizer
-        self.image_processor = image_processor
+        self.image_processor = transforms.Compose([transforms.Resize((24, 24), interpolation=InterpolationMode.BICUBIC),
+                                                   transforms.ToTensor(), ])
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -375,6 +368,7 @@ class TestDataset_Seg(Dataset):
         # 256,256,3
         gt[:, :, :class_num] = gt_arr_
         gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
+        pseudo_label = self.image_processor(gt)
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
 
@@ -396,9 +390,9 @@ class TestDataset_Seg(Dataset):
                 caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                if argument.use_key_word :
+                if argument.use_key_word:
                     caption += class_map[class_idx][0]
-                else :
+                else:
                     caption += class_map[class_idx][1]
                 if i == class_es.shape[0] - 1:
                     caption += ''
@@ -463,4 +457,5 @@ class TestDataset_Seg(Dataset):
                 "gt_flat": gt_flat,  # [128*128]
                 "input_ids": input_ids,
                 'caption': caption,
-                "image_condition": image_condition}  # [0,3,4]
+                "image_condition": image_condition,
+                'pseudo_label' : pseudo_label}  # [0,3,4]
