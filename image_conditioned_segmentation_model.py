@@ -168,14 +168,12 @@ def main(args):
                                     beta_end=0.012, beta_schedule="scaled_linear",
                                     num_train_timesteps=1000, clip_sample=False)
     scale_factor = 0.18215
-    """
-    """
+    
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-    """
-        """
+    
         for step, batch in enumerate(train_dataloader):
 
             device = accelerator.device
@@ -227,7 +225,7 @@ def main(args):
                 break
         # --------------------------------------------------------------------------------------- #
         # inference code
-        """
+        
         if is_main_process:
             pil_image = sample_images(dataloader = test_dataloader,
                                       condition_model = condition_model,
@@ -255,6 +253,7 @@ def main(args):
                        unwrapped_nw=accelerator.unwrap_model(simple_net),
                        save_dtype=save_dtype)
     accelerator.end_training()
+    """
 
 
 if __name__ == "__main__":
