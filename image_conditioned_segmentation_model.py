@@ -131,7 +131,7 @@ def main(args):
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    l2_loss = nn.MSELoss()
+    l2_loss = nn.MSELoss(reduction='none')
 
 
     print(f'\n step 8. model to device')
@@ -179,8 +179,7 @@ def main(args):
             # 1,3,224,224
             batch['condition_image']['pixel_values'] = condition_pixel
             feat = condition_model(**batch['condition_image']).last_hidden_state # processor output
-            encoder_hidden_states = simple_linear(feat.contiguous())
-            print(f'encoder_hidden_states = {encoder_hidden_states.shape}')
+            encoder_hidden_states = simple_linear(feat.contiguous()) # [batch=1, 197, 768]
 
             # [2] get image
             with torch.no_grad() :
@@ -193,7 +192,8 @@ def main(args):
 
             # [3] unet predict
             noise_pred = unet(latents,timesteps, encoder_hidden_states).sample
-            loss = l2_loss(noise_pred.float(), noise.float(),)#.mean([1, 2, 3])
+            loss = l2_loss(noise_pred.float(),
+                           noise.float(),)#.mean([1, 2, 3])
             print(f'loss = {loss.shape}')
             loss = loss.mean([1,2,3])
             print(f'loss = {loss.shape}')
