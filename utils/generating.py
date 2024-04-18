@@ -136,5 +136,5 @@ def sample_images(dataloader,
 
             # 8. final image
             image = vae.decode(latents / scaling_factor, return_dict=False)[0]
-
+    print(image)
     return image
