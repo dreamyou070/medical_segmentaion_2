@@ -72,6 +72,7 @@ def main(args):
                                               nn.Linear(512, 768),)
         def forward(self, x):
             return self.mm_projector(x)
+
     simple_linear = simple_net()
     simple_linear.to(dtype=weight_dtype)
 
@@ -99,8 +100,10 @@ def main(args):
 
     condition_model = condition_model.to(accelerator.device, dtype=weight_dtype)
     condition_model.eval()
+
     unet = unet.to(accelerator.device, dtype=weight_dtype)
     unet.eval()
+
     vae = vae.to(accelerator.device, dtype=weight_dtype)
     vae.eval()
 
@@ -136,17 +139,14 @@ def main(args):
 
     print(f'\n step 8. model to device')
     simple_linear, condition_model, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-        accelerator.prepare(simple_linear, condition_model, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    accelerator.prepare(simple_linear, condition_model, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     unet, network = transform_models_if_DDP([unet, network])
     condition_model, simple_linear = transform_models_if_DDP([condition_model, simple_linear])
-    # why no model ?
-    # lora network is Unet and vision_encoder based
 
     if args.gradient_checkpointing:
         unet.train()
         condition_model.train()
         simple_linear.train()
-
     else:
         unet.eval()
 
@@ -168,7 +168,7 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        """
+
         for step, batch in enumerate(train_dataloader):
 
             device = accelerator.device
@@ -220,17 +220,16 @@ def main(args):
                 break
         # --------------------------------------------------------------------------------------- #
         # inference code
-        """
 
-        
+        accelerator.wait_for_everyone()
         if is_main_process:
-            pil_image = sample_images(dataloader = test_dataloader,
-                                      condition_model = condition_model,
+            pil_image = sample_images(dataloader=test_dataloader,
+                                      condition_model=condition_model,
                                       weight_dtype=weight_dtype,
                                       simple_linear=simple_linear,
-                                      device = accelerator.device,
-                                      timesteps = None,
-                                      num_inference_steps = args.num_inference_steps,
+                                      device=accelerator.device,
+                                      timesteps=None,
+                                      num_inference_steps=args.num_inference_steps,
                                       unet=unet,
                                       vae=vae,
                                       args=args)
@@ -238,20 +237,16 @@ def main(args):
             os.makedirs(sample_folder, exist_ok=True)
             pil_image.save(os.path.join(sample_folder, f'{epoch}.png'))
 
-        # ----------------------------------------------------------------------------------------------------------- #
-        accelerator.wait_for_everyone()
-        if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
-            # here problem
             save_model(args,
                        saving_folder='model',
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
-            save_model(args,
+            save_model(args, # Here Problem ...
                        saving_folder='simple_net',
                        saving_name=f'simple_net-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(simple_net),
+                       unwrapped_nw=accelerator.unwrap_model(simple_linear),
                        save_dtype=save_dtype)
     accelerator.end_training()
 
