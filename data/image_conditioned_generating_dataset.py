@@ -88,7 +88,7 @@ class TrainDataset(Dataset):
         mask = np.load(mask_path)      # 256,256
         H, W = mask.shape[0], mask.shape[1]
         # L mode to RGB mode
-        mask_rgb = mask_base = np.zeros(H, W, 3)
+        mask_rgb = mask_base = np.zeros((H, W, 3))
         for h_index in range(H):
             for w_index in range(W):
                 mask_rgb[h_index, w_index] = self.class_matching_map[mask[h_index, w_index]]
@@ -179,7 +179,7 @@ class TestDataset(Dataset):
         mask = np.load(mask_path)  # 256,256
         H, W = mask.shape[0], mask.shape[1]
         # L mode to RGB mode
-        mask_rgb = mask_base = np.zeros(H, W, 3)
+        mask_rgb = mask_base = np.zeros((H, W, 3))
         for h_index in range(H):
             for w_index in range(W):
                 mask_rgb[h_index, w_index] = self.class_matching_map[mask[h_index, w_index]]
