@@ -15,6 +15,7 @@ from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from utils.losses import PatchAdversarialLoss
+from diffusers import AutoencoderKL, DDPMScheduler
 from model.lora_2 import create_network_2
 from model.diffusion_model import load_target_model
 import os
@@ -24,6 +25,7 @@ from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, 
 from transformers import ViTModel
 from data.image_conditioned_generating_dataset import call_dataset
 from utils import get_noise_noisy_latents_and_timesteps
+from utils.generating import sample_images
 
 def main(args):
 
@@ -48,7 +50,6 @@ def main(args):
     print(f' (3.2) load stable diffusion model')
     # [1] diffusion
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
-
     #text_encoder.requires_grad_(False)
     #text_encoder.to(dtype=weight_dtype)
     del text_encoder
@@ -159,8 +160,6 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-
-    from diffusers import AutoencoderKL, DDPMScheduler
     noise_scheduler = DDPMScheduler(beta_start=0.00085,
                                     beta_end=0.012, beta_schedule="scaled_linear",
                                     num_train_timesteps=1000, clip_sample=False)
@@ -169,7 +168,9 @@ def main(args):
 
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+        """
         for step, batch in enumerate(train_dataloader):
+
             device = accelerator.device
             loss_dict = {}
 
@@ -194,11 +195,7 @@ def main(args):
             noise_pred = unet(latents,timesteps, encoder_hidden_states).sample
             loss = l2_loss(noise_pred.float(),
                            noise.float(),)#.mean([1, 2, 3])
-            print(f'loss = {loss.shape}')
             loss = loss.mean([1,2,3])
-            print(f'loss = {loss.shape}')
-
-
             total_loss = loss.mean()
             current_loss = total_loss.detach().item()
 
@@ -210,7 +207,7 @@ def main(args):
             epoch_loss_total += current_loss
             avr_loss = epoch_loss_total / len(loss_list)
             loss_dict['avr_loss'] = avr_loss
-            accelerator.backward(loss)
+            accelerator.backward(loss.mean())
             optimizer.step()
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
@@ -221,6 +218,20 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
+        # --------------------------------------------------------------------------------------- #
+        # inference code
+        """
+        if is_main_process:
+            pil_image = sample_images(test_dataloader,
+                                      condition_model,
+                                      weight_dtype,
+                                      simple_linear,
+                                      accelerator.device,
+                                      None,
+                                      unet,
+                                      vae,
+                                      args)
+
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:
@@ -366,6 +377,13 @@ if __name__ == "__main__":
     parser.add_argument("--erase_position_embeddings", action='store_true')
     parser.add_argument("--use_base_prompt", action='store_true')
     parser.add_argument("--use_key_word", action='store_true')
+    parser.add_argument("--sample_sampler",type=str,default="ddim",
+        choices=["ddim","pndm","lms","euler","euler_a","heun","dpm_2","dpm_2_a","dpmsolver","dpmsolver++",
+                 "dpmsingle","k_lms","k_euler","k_euler_a","k_dpm_2","k_dpm_2_a",],
+        help=f"sampler (scheduler) type for sample images / サンプル出力時のサンプラー（スケジューラ）の種類",)
+    parser.add_argument("--v_parameterization", action="store_true",
+                        help="enable v-parameterization training / v-parameterization学習を有効にする"
+                        )
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
