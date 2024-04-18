@@ -163,8 +163,7 @@ def main(args):
                 with torch.no_grad():
                     with autocast(enabled=True):
                         noise = torch.randn_like(images).to(device)
-                        timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device
-                        ).long()
+                        timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
                         noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps,
                                              condition = encoder_hidden_states)
                         val_loss = F.mse_loss(noise_pred.float(), noise.float())
@@ -182,6 +181,7 @@ def main(args):
             noise = torch.randn((1,3,256,256))
             noise = noise.to(device)
             scheduler.set_timesteps(num_inference_steps=1000)
+            print(f' before, encoder_hidden_states = {encoder_hidden_states.shape}')
             with autocast(enabled=True):
                 image = inferer.sample(input_noise=noise,
                                        diffusion_model=model,
