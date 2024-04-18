@@ -118,20 +118,17 @@ def sample_images(dataloader,
             # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
             extra_step_kwargs = {}
 
-            # 6.2 Optionally get Guidance Scale Embedding
-            timestep_cond = None
-
             # 7. Denoising loop
             for i, t in enumerate(timesteps):
 
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = latents
+                # timestep_cond
 
                 # predict the noise residual
                 noise_pred = unet(latent_model_input,
                                   t,
                                   encoder_hidden_states=encoder_hidden_states,
-                                  timestep_cond=timestep_cond,
                                   return_dict=False,)[0]
                 latents = scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
 
