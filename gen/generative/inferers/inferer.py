@@ -24,7 +24,13 @@ from monai.transforms import CenterSpatialCrop, SpatialPad
 from monai.utils import optional_import
 
 #from gen.generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
-from generative.networks.nets import SPADEDiffusionModelUNet
+import os
+import sys
+present_path = os.path.abspath(os.path.dirname(__file__))
+parent_path = os.path.dirname(present_path)
+sys.path.append(parent_path)
+sys.path.append(os.path.join(parent_path))
+from networks.nets import SPADEDiffusionModelUNet
 tqdm, has_tqdm = optional_import("tqdm", name="tqdm")
 
 
