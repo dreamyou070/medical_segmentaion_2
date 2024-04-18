@@ -1097,57 +1097,61 @@ class LoRANetwork(torch.nn.Module):
         image_encoders = image_condition if type(image_condition) == list else [image_condition]
         self.image_encoder_loras = []
         skipped_ie = [] # 1 model
-        for i, image_encoder in enumerate(image_encoders):
-            if len(image_encoders) > 1:
-                index = i + 1
-                print(f"create LoRA for Image Encoder {index}:")
-            else:
-                index = None
+        if image_condition is not None :
+            for i, image_encoder in enumerate(image_encoders):
+                if len(image_encoders) > 1:
+                    index = i + 1
+                    print(f"create LoRA for Image Encoder {index}:")
+                else:
+                    index = None
 
-            # ---------------------------------------------------------------------------------------------------------------------
-            # create image encoder LoRA
-            prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
-            target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
-            image_encoder_loras, skipped = create_modules(False,
-                                                          index,
-                                                          root_module = image_encoder,
-                                                          target_replace_modules = target_replace_module_condition,
-                                                          prefix = prefix_)
-            self.image_encoder_loras.extend(image_encoder_loras)
-            skipped_ie += skipped
+                # ---------------------------------------------------------------------------------------------------------------------
+                # create image encoder LoRA
+                prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
+                target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
+
+                image_encoder_loras, skipped = create_modules(False,
+                                                              index,
+                                                              root_module = image_encoder,
+                                                              target_replace_modules = target_replace_module_condition,
+                                                              prefix = prefix_)
+                self.image_encoder_loras.extend(image_encoder_loras)
+                skipped_ie += skipped
         print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
 
-        # --------------------------------------------------------------------------------------------------------------------- #
-        text_encoders = text_condition if type(text_condition) == list else [text_condition]
-        self.text_encoder_loras = []
-        skipped_te = [] # 1 model
-        for i, text_encoder in enumerate(text_encoders):
-            if len(text_encoders) > 1:
-                index = i + 1
-                print(f"create LoRA for Text Encoder {index}:")
-            else:
-                index = None
-            prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
-            target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
-            text_encoder_loras, skipped = create_modules(False,
-                                                         index,
-                                                         root_module = text_encoder,
-                                                         target_replace_modules = target_replace_module_condition,
-                                                         prefix = prefix_)
-            self.text_encoder_loras.extend(text_encoder_loras)
-            skipped_te += skipped
+        # -------------------------------------------------------------------------------------------------------------------- #
+        if text_condition is not None:
+            text_encoders = text_condition if type(text_condition) == list else [text_condition]
+            self.text_encoder_loras = []
+            skipped_te = [] # 1 model
+            for i, text_encoder in enumerate(text_encoders):
+                if len(text_encoders) > 1:
+                    index = i + 1
+                    print(f"create LoRA for Text Encoder {index}:")
+                else:
+                    index = None
+                prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
+                target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
+                text_encoder_loras, skipped = create_modules(False,
+                                                             index,
+                                                             root_module = text_encoder,
+                                                             target_replace_modules = target_replace_module_condition,
+                                                             prefix = prefix_)
+                self.text_encoder_loras.extend(text_encoder_loras)
+                skipped_te += skipped
         print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
 
         # --------------------------------------------------------------------------------------------------------------------- #
-        target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
-        if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
-            target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
-        self.unet_loras, skipped_un = create_modules(True,
-                                                     None,
-                                                     root_module = unet,
-                                                     target_replace_modules = target_modules,
-                                                     prefix = LoRANetwork.LORA_PREFIX_UNET)
-        skipped = skipped_te + skipped_un + skipped_ie
+        if unet is not None :
+            target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
+            if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
+                target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
+            self.unet_loras, skipped_un = create_modules(True,
+                                                         None,
+                                                         root_module = unet,
+                                                         target_replace_modules = target_modules,
+                                                         prefix = LoRANetwork.LORA_PREFIX_UNET)
+            skipped = skipped_te + skipped_un + skipped_ie
 
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
