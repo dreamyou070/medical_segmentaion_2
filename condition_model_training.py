@@ -540,9 +540,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
-    from data.dataset_multi import passing_mvtec_argument
-
+    from data.dataset_multi import passing_mvtec_argument as passing_mvtec_argument
     passing_mvtec_argument(args)
+    from data.dataset_pseudomap import passing_mvtec_argument as passing_mvtec_argument_pseudo
+    passing_mvtec_argument_pseudo(args)
     main(args)
-
-
