@@ -94,8 +94,6 @@ def main(args):
     model,simple_linear = accelerator.prepare(model,simple_linear)
     simple_linear,condition_model, model = transform_models_if_DDP([simple_linear,condition_model, model])
 
-
-
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_epochs), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0

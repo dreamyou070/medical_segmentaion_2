@@ -24,7 +24,7 @@ from monai.transforms import CenterSpatialCrop, SpatialPad
 from monai.utils import optional_import
 
 #from gen.generative.networks.nets import VQVAE, SPADEAutoencoderKL, SPADEDiffusionModelUNet
-
+from generative.networks.nets import SPADEDiffusionModelUNet
 tqdm, has_tqdm = optional_import("tqdm", name="tqdm")
 
 
@@ -74,8 +74,7 @@ class DiffusionInferer(Inferer):
             noisy_image = torch.cat([noisy_image, condition], dim=1)
             condition = None
         diffusion_model = (partial(diffusion_model, seg=seg)
-            if isinstance(diffusion_model, SPADEDiffusionModelUNet)
-            else diffusion_model)
+            if isinstance(diffusion_model, SPADEDiffusionModelUNet) else diffusion_model)
         prediction = diffusion_model(x=noisy_image, timesteps=timesteps, context=condition)
 
         return prediction
