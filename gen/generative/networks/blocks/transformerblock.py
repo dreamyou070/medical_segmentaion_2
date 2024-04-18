@@ -14,8 +14,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 from monai.networks.blocks.mlp import MLPBlock
-
-from generative.networks.blocks.selfattention import SABlock
+from .selfattention import SABlock
 
 
 class TransformerBlock(nn.Module):
