@@ -67,8 +67,9 @@ def main(args):
 
     print(f' (3.2) condition model')
     condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
-    condition_model.to(dtype=weight_dtype)
+    condition_model = condition_model.to(accelerator.device, dtype=weight_dtype)
     condition_model.eval()
+
     simple_linear = simple_net()
     simple_linear.to(dtype=weight_dtype)
 
@@ -90,8 +91,10 @@ def main(args):
     print(f'\n step 8. model to device')
     optimizer = accelerator.prepare(optimizer)
     train_dataloader, test_dataloader = accelerator.prepare(train_dataloader, test_dataloader)
-    model = accelerator.prepare(model)
-    model = transform_models_if_DDP([model])[0]
+    model,simple_linear = accelerator.prepare(model,simple_linear)
+    simple_linear,condition_model, model = transform_models_if_DDP([simple_linear,condition_model, model])
+
+
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_epochs), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
