@@ -142,7 +142,6 @@ class DiffusionInferer(Inferer):
 
             # 2. compute previous image: x_t -> x_t-1
             image = scheduler.step(model_output, t, image).prev_sample
-            print(f'after iterating, image = {type(image)}')
             if save_intermediates and t % intermediate_steps == 0:
                 intermediates.append(image)
         if save_intermediates:
