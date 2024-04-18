@@ -178,9 +178,8 @@ def main(args):
             # dtype = float32
             # 1,3,224,224
             batch['condition_image']['pixel_values'] = condition_pixel
-            print(f'condition_model dypte = {condition_pixel.dtype}')
-            feat = condition_model(**batch['condition_image']) # processor output
-
+            feat = condition_model(**batch['condition_image']).last_hidden_state # processor output
+            # BaseModelOutputWithPooling
             encoder_hidden_states = simple_linear(feat)
 
             # [2] get image

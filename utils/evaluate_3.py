@@ -37,6 +37,8 @@ def evaluation_check(segmentation_head, dataloader, device,
             caption = batch['caption']  # ['this picture is of b n']
             image = batch['image_condition']  # [batch, 3, 384, 384]
 
+            
+
             # why lm_loss does not reducing ??
             lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
             encoder_hidden_states = simple_linear(image_feature)
