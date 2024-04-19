@@ -49,8 +49,8 @@ def main(args):
     print(f' (3.1) unet model')
 
     model = DiffusionModelUNet(spatial_dims=2,
-                               in_channels=3,
-                               out_channels=3,
+                               in_channels=1,
+                               out_channels=1,
                                num_channels=(128, 256, 256),
                                attention_levels=(True, True, True),
                                num_res_blocks=1,
