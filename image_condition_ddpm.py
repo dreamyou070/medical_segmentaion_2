@@ -143,34 +143,30 @@ def main(args):
         model.eval()
         val_epoch_loss = 0
         for step, batch in enumerate(test_dataloader):
-            if step == 1 :
-                images = batch["image"].to(dtype=weight_dtype)  # [2
-                # [2] condition image (dtype = float32, 1,3,224,224)
-                condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
-                batch['condition_image']['pixel_values'] = condition_pixel
-                feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
-                encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
+            images = batch["image"].to(dtype=weight_dtype)  # [2
+            # [2] condition image (dtype = float32, 1,3,224,224)
+            condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
+            batch['condition_image']['pixel_values'] = condition_pixel
+            feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
+            encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
 
-                with torch.no_grad():
-                    with autocast(enabled=True):
-                        noise = torch.randn_like(images).to(device)
-                        timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
-                        noise_pred = inferer(inputs=images,
-                                             diffusion_model=model,
-                                             noise=noise,
-                                             timesteps=timesteps,
-                                             condition = encoder_hidden_states)
-                        val_loss = F.mse_loss(noise_pred.float(), noise.float())
-                val_epoch_loss += val_loss.item()
-                progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
+            with torch.no_grad():
+                with autocast(enabled=True):
+                    noise = torch.randn_like(images).to(device)
+                    timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
+                    noise_pred = inferer(inputs=images,
+                                         diffusion_model=model,
+                                         noise=noise,
+                                         timesteps=timesteps,
+                                         condition = encoder_hidden_states)
+                    val_loss = F.mse_loss(noise_pred.float(), noise.float())
+            val_epoch_loss += val_loss.item()
+            progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
 
-            else :
-                break
         # recording val loss
         val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
         with open(val_loss_text, 'a') as f:
             f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
-
 
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         if is_main_process:
