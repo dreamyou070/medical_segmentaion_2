@@ -39,4 +39,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --gt_ext_npy \
  --use_image_condition \
  --image_processor 'vit' \
- --image_model_training
+ --image_model_training \
+ --light_decoder

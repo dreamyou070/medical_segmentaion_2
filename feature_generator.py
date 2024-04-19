@@ -8,7 +8,7 @@ from attention_store import AttentionStore
 from data import call_dataset
 from diffusers import DDPMScheduler
 from model import call_model_package
-from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen
+from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen, SemanticSeg_2
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
@@ -52,12 +52,17 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
     decoder = None
+
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
                                         init_latent_p=args.init_latent_p,
                                         decoder = decoder,
                                         generation = args.generation,)
+    if args.light_decoder :
+        segmentation_head = SemanticSeg_2(n_classes=args.n_classes,
+                                          mask_res=args.mask_res,)
+
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -448,6 +453,7 @@ if __name__ == "__main__":
     parser.add_argument("--image_processor", default = 'vit', type = str)
     parser.add_argument("--image_model_training", action='store_true')
     parser.add_argument("--erase_position_embeddings", action='store_true')
+    parser.add_argument("--light_decoder", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
