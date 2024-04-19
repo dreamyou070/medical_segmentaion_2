@@ -77,9 +77,7 @@ def main(args):
     print(f'\n step 5. optimizer') # oh.. i did not put simple linear in optimizer
     trainable_params = [{'params': model.parameters(),
                          'lr': args.learning_rate,}]
-    trainable_params += [{'params': simple_linear.parameters(),
-                          'lr': args.learning_rate}]
-    #optimizer = torch.optim.Adam(params=model.parameters(), lr=2.5e-5)
+    trainable_params += [{'params': simple_linear.parameters(), 'lr': args.learning_rate}]
     optimizer = torch.optim.Adam(trainable_params)
     inferer = DiffusionInferer(scheduler)
 
@@ -113,7 +111,7 @@ def main(args):
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
-
+        """
         for step, batch in progress_bar:
 
             optimizer.zero_grad(set_to_none=True)
@@ -138,14 +136,15 @@ def main(args):
                                      noise=noise,
                                      timesteps=timesteps,
                                      condition = encoder_hidden_states)
-                loss = F.mse_loss(noise_pred.float(), noise.float())
+                loss = F.mse_loss(noise_pred.float(),
+                                  noise.float())
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             epoch_loss += loss.item()
             progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
         epoch_loss_list.append(epoch_loss / (step + 1))
-
+        """
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         accelerator.wait_for_everyone()
         model.eval()
@@ -158,19 +157,25 @@ def main(args):
                 batch['condition_image']['pixel_values'] = condition_pixel
                 feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
                 encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
+                """
                 with torch.no_grad():
                     with autocast(enabled=True):
                         noise = torch.randn_like(images).to(device)
                         timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
-                        noise_pred = inferer(inputs=images, diffusion_model=model, noise=noise, timesteps=timesteps,
+                        noise_pred = inferer(inputs=images,
+                                             diffusion_model=model, noise=noise, timesteps=timesteps,
                                              condition = encoder_hidden_states)
                         val_loss = F.mse_loss(noise_pred.float(), noise.float())
                 val_epoch_loss += val_loss.item()
                 progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
+                """
+            else :
+                break
         # recording val loss
-        val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
-        with open(val_loss_text, 'a') as f:
-            f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
+        #val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
+        #with open(val_loss_text, 'a') as f:
+        #    f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
+
 
 
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
@@ -184,6 +189,7 @@ def main(args):
                                        scheduler=scheduler,
                                        conditioning=encoder_hidden_states,
                                        mode = "crossattn") # tensor image
+                print(f'image = {image.shape}')
                 # tensor to pil image
                 from matplotlib import pyplot as plt
                 plt.figure(figsize=(2, 2))
