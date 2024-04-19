@@ -47,17 +47,15 @@ def main(args):
     print(f' step 3. load model')
     weight_dtype, save_dtype = prepare_dtype(args)
     print(f' (3.1) unet model')
-
     model = DiffusionModelUNet(spatial_dims=2,
-                               in_channels=1,
-                               out_channels=1,
+                               in_channels=3,
+                               out_channels=3,
                                num_channels=(128, 256, 256),
-                               attention_levels=(True, True, True),
+                               attention_levels=(False, True, True),
                                num_res_blocks=1,
-                               cross_attention_dim=768,
                                num_head_channels=256,
+                               cross_attention_dim=768,
                                with_conditioning=True )
-
 
     print(f' (3.2) condition model')
     condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
