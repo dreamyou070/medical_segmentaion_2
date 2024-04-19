@@ -19,6 +19,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
 import numpy as np
 from PIL import Image
+from utils.optimizer import get_optimizer, get_scheduler_fix
 class simple_net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -86,9 +87,14 @@ def main(args):
     print(f'\n step 7. loss function')
     l2_loss = nn.MSELoss(reduction='none')
 
+    print(f'\n step 6. lr')
+    lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
+
+
     print(f'\n step 8. model to device')
     model, simple_linear, train_dataloader, test_dataloader, optimizer = accelerator.prepare(model, simple_linear, train_dataloader, test_dataloader, optimizer)
     simple_linear,condition_model, model = transform_models_if_DDP([simple_linear,condition_model, model])
+    lr_scheduler = accelerator.prepare(lr_scheduler)
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_epochs), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
@@ -96,10 +102,11 @@ def main(args):
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
-
+    global_step = 0
+    loss_list = []
     for epoch in range(args.max_train_epochs):
         model.train()
-        epoch_loss = 0
+        epoch_loss_total = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
 
@@ -129,9 +136,26 @@ def main(args):
                                      timesteps=timesteps,
                                      condition = encoder_hidden_states)
                 loss = l2_loss(noise_pred.float(), noise.float())
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+
+            loss = loss.mean()
+
+            current_loss = loss.detach().item()
+
+            if epoch == args.start_epoch:
+                loss_list.append(current_loss)
+            else:
+                epoch_loss_total -= loss_list[step]
+                loss_list[step] = current_loss
+            epoch_loss_total += current_loss
+            avr_loss = epoch_loss_total / len(loss_list)
+            loss_dict['avr_loss'] = avr_loss
+            accelerator.backward(loss)
+            optimizer.step()
+            lr_scheduler.step()
+
+
+
+
             epoch_loss += loss.item()
             progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
         epoch_loss_list.append(epoch_loss / (step + 1))
@@ -141,6 +165,8 @@ def main(args):
         model.eval()
         val_epoch_loss = 0
         for step, batch in enumerate(test_dataloader):
+
+            loss_dict = {}
             images = batch["image"].to(dtype=weight_dtype)  # [2
             # [2] condition image (dtype = float32, 1,3,224,224)
             condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
@@ -187,7 +213,6 @@ def main(args):
 
     total_time = time.time() - total_start
     print(f"train completed, total time: {total_time}.")
-
 
 
 
