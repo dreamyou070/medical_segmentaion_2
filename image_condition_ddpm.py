@@ -74,8 +74,13 @@ def main(args):
     set_seed(args.seed)
     train_dataloader, test_dataloader = call_dataset(args)
 
-    print(f'\n step 5. optimizer')
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=2.5e-5)
+    print(f'\n step 5. optimizer') # oh.. i did not put simple linear in optimizer
+    trainable_params = [{'params': model.parameters(),
+                         'lr': args.learning_rate,}]
+    trainable_params += [{'params': simple_linear.parameters(),
+                          'lr': args.learning_rate}]
+    #optimizer = torch.optim.Adam(params=model.parameters(), lr=2.5e-5)
+    optimizer = torch.optim.Adam(trainable_params)
     inferer = DiffusionInferer(scheduler)
 
     print(f'\n step 7. loss function')
