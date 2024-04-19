@@ -107,12 +107,11 @@ def main(args):
     loss_list = []
     for epoch in range(args.max_train_epochs):
         model.train()
+        loss_dict = {}
         epoch_loss_total = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
-
         for step, batch in progress_bar:
-
             optimizer.zero_grad(set_to_none=True)
 
             # final output
@@ -139,9 +138,7 @@ def main(args):
                 loss = l2_loss(noise_pred.float(), noise.float())
 
             loss = loss.mean()
-
             current_loss = loss.detach().item()
-
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
             else:
@@ -153,13 +150,14 @@ def main(args):
             accelerator.backward(loss)
             optimizer.step()
             lr_scheduler.step()
-
-
-
-
-            epoch_loss += loss.item()
-            progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
-        epoch_loss_list.append(epoch_loss / (step + 1))
+            optimizer.zero_grad(set_to_none=True)
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                global_step += 1
+            if is_main_process:
+                progress_bar.set_postfix(**loss_dict)
+            if global_step >= args.max_train_steps:
+                break
 
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         accelerator.wait_for_everyone()
@@ -167,7 +165,7 @@ def main(args):
         val_epoch_loss = 0
         for step, batch in enumerate(test_dataloader):
 
-            loss_dict = {}
+
             images = batch["image"].to(dtype=weight_dtype)  # [2
             # [2] condition image (dtype = float32, 1,3,224,224)
             condition_pixel = batch['condition_image']['pixel_values'].to(dtype=weight_dtype, )
