@@ -17,13 +17,14 @@ from gen.generative.inferers import DiffusionInferer
 from transformers import ViTModel
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
+import numpy as np
+from PIL import Image
 class simple_net(nn.Module):
     def __init__(self):
         super().__init__()
         self.mm_projector = nn.Sequential(nn.Linear(768, 512),
                                           nn.GELU(),
                                           nn.Linear(512, 768), )
-
     def forward(self, x):
         return self.mm_projector(x)
 
@@ -51,7 +52,7 @@ def main(args):
                                in_channels=3,
                                out_channels=3,
                                num_channels=(128, 256, 256),
-                               attention_levels=(False, True, True),
+                               attention_levels=(True, True, True),
                                num_res_blocks=1,
                                cross_attention_dim=768,
                                num_head_channels=256,
@@ -61,22 +62,25 @@ def main(args):
     print(f' (3.2) condition model')
     condition_model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
     condition_model = condition_model.to(accelerator.device, dtype=weight_dtype)
-    condition_model.eval()
-
     simple_linear = simple_net()
     simple_linear.to(dtype=weight_dtype)
+    condition_model.eval()
+    simple_linear.eval()
 
     print(f' (3.3) scheduler')
-    scheduler = DDPMScheduler(num_train_timesteps=1000)
+    scheduler = DDPMScheduler(beta_start=0.00085,
+                              beta_end=0.012,
+                              beta_schedule="scaled_linear",
+                              num_train_timesteps=1000,
+                              clip_sample=False)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None : args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
     train_dataloader, test_dataloader = call_dataset(args)
 
-    print(f'\n step 5. optimizer') # oh.. i did not put simple linear in optimizer
-    trainable_params = [{'params': model.parameters(),
-                         'lr': args.learning_rate,}]
+    print(f'\n step 5. optimizer')
+    trainable_params  = [{'params': model.parameters(), 'lr': args.learning_rate,}]
     trainable_params += [{'params': simple_linear.parameters(), 'lr': args.learning_rate}]
     optimizer = torch.optim.Adam(trainable_params)
     inferer = DiffusionInferer(scheduler)
@@ -85,23 +89,12 @@ def main(args):
     l2_loss = nn.MSELoss(reduction='none')
 
     print(f'\n step 8. model to device')
-    optimizer = accelerator.prepare(optimizer)
-    train_dataloader, test_dataloader = accelerator.prepare(train_dataloader, test_dataloader)
-    model,simple_linear = accelerator.prepare(model,simple_linear)
+    model, simple_linear, train_dataloader, test_dataloader, optimizer = accelerator.prepare(model, simple_linear, train_dataloader, test_dataloader, optimizer)
     simple_linear,condition_model, model = transform_models_if_DDP([simple_linear,condition_model, model])
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_epochs), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
-    global_step = 0
-    loss_list = []
-    noise_scheduler = DDPMScheduler(beta_start=0.00085,
-                                    beta_end=0.012,
-                                    beta_schedule="scaled_linear",
-                                    num_train_timesteps=1000,
-                                    clip_sample=False)
-    val_interval = 5
     epoch_loss_list = []
-    val_epoch_loss_list = []
     scaler = GradScaler()
     total_start = time.time()
     device = accelerator.device
@@ -111,7 +104,7 @@ def main(args):
         epoch_loss = 0
         progress_bar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=70)
         progress_bar.set_description(f"Epoch {epoch}")
-        """
+
         for step, batch in progress_bar:
 
             optimizer.zero_grad(set_to_none=True)
@@ -128,7 +121,8 @@ def main(args):
                 # Generate random noise
                 noise = torch.randn_like(images).to(device)
                 # Create timesteps
-                timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
+                timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps,
+                                          (images.shape[0],), device=images.device).long()
 
                 # Get model prediction
                 noise_pred = inferer(inputs=images,
@@ -136,15 +130,14 @@ def main(args):
                                      noise=noise,
                                      timesteps=timesteps,
                                      condition = encoder_hidden_states)
-                loss = F.mse_loss(noise_pred.float(),
-                                  noise.float())
+                loss = l2_loss(noise_pred.float(), noise.float())
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             epoch_loss += loss.item()
             progress_bar.set_postfix({"loss": epoch_loss / (step + 1)})
         epoch_loss_list.append(epoch_loss / (step + 1))
-        """
+
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
         accelerator.wait_for_everyone()
         model.eval()
@@ -157,25 +150,26 @@ def main(args):
                 batch['condition_image']['pixel_values'] = condition_pixel
                 feat = condition_model(**batch['condition_image']).last_hidden_state  # processor output
                 encoder_hidden_states = simple_linear(feat.contiguous())  # [batch=1, 197, 768]
-                """
+
                 with torch.no_grad():
                     with autocast(enabled=True):
                         noise = torch.randn_like(images).to(device)
                         timesteps = torch.randint(0, inferer.scheduler.num_train_timesteps, (images.shape[0],), device=images.device).long()
                         noise_pred = inferer(inputs=images,
-                                             diffusion_model=model, noise=noise, timesteps=timesteps,
+                                             diffusion_model=model,
+                                             noise=noise,
+                                             timesteps=timesteps,
                                              condition = encoder_hidden_states)
                         val_loss = F.mse_loss(noise_pred.float(), noise.float())
                 val_epoch_loss += val_loss.item()
                 progress_bar.set_postfix({"val_loss": val_epoch_loss / (step + 1)})
-                """
+
             else :
                 break
         # recording val loss
-        #val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
-        #with open(val_loss_text, 'a') as f:
-        #    f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
-
+        val_loss_text = os.path.join(record_save_dir, 'val_loss.txt')
+        with open(val_loss_text, 'a') as f:
+            f.write(f' epoch = {epoch}, val_loss = {val_epoch_loss / (step + 1)} \n')
 
 
         # --------------------------------------------------------- Validation --------------------------------------------------------- #
@@ -189,16 +183,13 @@ def main(args):
                                        scheduler=scheduler,
                                        conditioning=encoder_hidden_states,
                                        mode = "crossattn") # tensor image (1,3,256,256)
-                print(f'image = {image.shape}')
-                # tensor to pil image
-                from matplotlib import pyplot as plt
-                plt.figure(figsize=(2, 2))
-                plt.imshow(image[0, 0].cpu())
-                plt.tight_layout()
-                plt.axis("off")
+                rgb_image = image[0].cpu().detach().numpy()
+                rgb_image = (rgb_image * 255).astype(np.uint8)
+                rgb_image = np.transpose(rgb_image, (1, 2, 0))
+                rgb_pil = Image.fromarray(rgb_image)
                 sample_dir = os.path.join(output_dir, 'sample')
                 os.makedirs(sample_dir, exist_ok=True)
-                plt.savefig(os.path.join(sample_dir, f"sample_{epoch}.png"))
+                rgb_pil.save(os.path.join(sample_dir, f"sample_{epoch}.png"))
 
     total_time = time.time() - total_start
     print(f"train completed, total time: {total_time}.")
