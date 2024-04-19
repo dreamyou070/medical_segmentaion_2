@@ -188,7 +188,7 @@ def main(args):
                                        diffusion_model=model,
                                        scheduler=scheduler,
                                        conditioning=encoder_hidden_states,
-                                       mode = "crossattn") # tensor image
+                                       mode = "crossattn") # tensor image (1,3,256,256)
                 print(f'image = {image.shape}')
                 # tensor to pil image
                 from matplotlib import pyplot as plt

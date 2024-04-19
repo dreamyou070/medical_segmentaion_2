@@ -47,6 +47,10 @@ base_prompts = ['this is a picture of ',
                 'this is a picture of the ',
                 'this picture is of ',]
 
+class_matching_map = {0 : np.array([0,0,0]),
+                          1 : np.array([255,0,0]),
+                          2 : np.array([0,255,0]),
+                          3 : np.array([0,0,255])}
 def passing_mvtec_argument(args):
     global argument
     argument = args
@@ -150,6 +154,19 @@ class TrainDataset_Seg(Dataset):
             if self.use_data_aug:
                 gt_arr = np.rot90(gt_arr, k=number)
             gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
+            # make image from numpy
+
+            # [1] get final image
+            H, W = gt_arr.shape[0], gt_arr.shape[1]
+            mask_rgb = np.zeros((H, W, 3))
+            for h_index in range(H):
+                for w_index in range(W):
+                    mask_rgb[h_index, w_index] = class_matching_map[gt_arr[h_index, w_index]]
+            mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
+            mask_pil = mask_pil.resize((384,384), Image.BICUBIC)
+            mask_img = self.transform(np.array(mask_pil))
+
+
         else :
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
             gt_arr = np.array(gt_img) # 128,128

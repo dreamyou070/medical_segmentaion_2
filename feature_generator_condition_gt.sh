@@ -13,7 +13,7 @@ file_name="11_segment_with_image_condition_vit_image_model_training" #
 # except generation
 
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
- --main_process_port $port_number feature_generator.py --log_with wandb \
+ --main_process_port $port_number feature_generator_condition_gt.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
