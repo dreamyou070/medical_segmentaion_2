@@ -73,6 +73,8 @@ def main(args):
                               num_train_timesteps=1000,
                               clip_sample=False)
 
+    inferer = DiffusionInferer(scheduler=scheduler)
+
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None : args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
