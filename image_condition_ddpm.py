@@ -79,17 +79,16 @@ def main(args):
     train_dataloader, test_dataloader = call_dataset(args)
 
     print(f'\n step 5. optimizer')
-    trainable_params  = [{'params': model.parameters(), 'lr': args.learning_rate,}]
+    args.max_train_steps = len(train_dataloader) * args.max_train_epochs
+    trainable_params = [{'params': model.parameters(), 'lr': args.learning_rate, }]
     trainable_params += [{'params': simple_linear.parameters(), 'lr': args.learning_rate}]
-    optimizer = torch.optim.Adam(trainable_params)
-    inferer = DiffusionInferer(scheduler)
-
-    print(f'\n step 7. loss function')
-    l2_loss = nn.MSELoss(reduction='none')
+    optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
+    print(f'\n step 7. loss function')
+    l2_loss = nn.MSELoss(reduction='none')
 
     print(f'\n step 8. model to device')
     model, simple_linear, train_dataloader, test_dataloader, optimizer = accelerator.prepare(model, simple_linear, train_dataloader, test_dataloader, optimizer)
