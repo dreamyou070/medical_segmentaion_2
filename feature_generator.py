@@ -154,11 +154,8 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-
             if args.use_image_condition :
-
                 if not args.image_model_training:
-
                     with torch.no_grad():
                         cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
                         if args.image_processor == 'clip':
@@ -166,9 +163,7 @@ def main(args):
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
                             encoder_hidden_states = condition_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
-
                 else :
-
                     with torch.set_grad_enabled(True):
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
                         if args.image_processor == 'clip':
@@ -178,14 +173,9 @@ def main(args):
                         elif args.image_processor == 'vit':
                             img_con = batch["image_condition"]
                             encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-
-
-
             if args.use_text_condition :
-
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
-
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
