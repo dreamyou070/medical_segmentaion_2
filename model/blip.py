@@ -122,7 +122,7 @@ class BLIP_Decoder(nn.Module):
                                            encoder_attention_mask = image_atts,                  
                                            labels = decoder_targets,
                                            return_dict = True,)
-        loss_lm = decoder_output.loss
+
 
         # to generate
         #hidden_states = decoder_output.hidden_states
@@ -131,7 +131,7 @@ class BLIP_Decoder(nn.Module):
         #attentions = decoder_output.attentions
         #cross_attentions = decoder_output.cross_attentions
         
-        return loss_lm, image_embeds
+        return decoder_output, image_embeds
         
     def generate(self, image, sample=False, num_beams=3, max_length=30, min_length=10, top_p=0.9, repetition_penalty=1.0):
 

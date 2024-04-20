@@ -79,14 +79,6 @@ def main(args):
     optimizer = torch.optim.AdamW(model.parameters(),
                                   args.learning_rate,
                                   **optimizer_kwargs)
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(f"trainable parameter : {name}")
-        else :
-            print(f"non-trainable parameter : {name}")
-
-
-
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
@@ -119,8 +111,9 @@ def main(args):
             image = batch['image_condition']
 
             # [1] generating loss
-            loss, image_feature = model(image, caption)
-            print(f'loss = {loss}')
+            output, image_feature = model(image, caption)
+            loss = output.loss(requires_grad=True)
+
 
             # [2] optimizing loss
             optimizer.zero_grad()
