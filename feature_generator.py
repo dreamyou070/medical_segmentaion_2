@@ -162,9 +162,8 @@ def main(args):
                             encoder_hidden_states = condition_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            output = condition_model(**batch["image_condition"])
+                            output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state # [batch, 197, 768]
-                            pix_embedding = output.pix_embedding
                             encoder_hidden_states = encoder_hidden_states + pix_embedding
                 else :
                     with torch.set_grad_enabled(True):
@@ -174,9 +173,8 @@ def main(args):
                                 **batch["image_condition"])  # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            output = condition_model(**batch["image_condition"])
+                            output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            pix_embedding = output.pix_embedding
                             encoder_hidden_states = encoder_hidden_states + pix_embedding
 
             if args.use_text_condition :

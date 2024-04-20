@@ -544,8 +544,7 @@ class ViTModel(ViTPreTrainedModel):
         if pixel_values.dtype != expected_dtype:
             pixel_values = pixel_values.to(expected_dtype)
 
-        embedding_output = self.embeddings(pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding
-        )
+        embedding_output = self.embeddings(pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding)
         pix_embedding = embedding_output
 
         encoder_outputs = self.encoder(
@@ -567,9 +566,7 @@ class ViTModel(ViTPreTrainedModel):
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states,
-            attentions=encoder_outputs.attentions,
-            pix_embedding=pix_embedding,
-        )
+            attentions=encoder_outputs.attentions,), pix_embedding
 
 
 class ViTPooler(nn.Module):
