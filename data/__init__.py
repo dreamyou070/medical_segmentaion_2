@@ -11,7 +11,7 @@ from torchvision.transforms.functional import InterpolationMode
 def call_dataset(args) :
 
     # [1.2] image_processor
-    tokenizer = load_tokenizer(args.tokenizer_path)
+    tokenizer = load_tokenizer()
     clip_image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
 
     if args.image_processor == 'clip':
