@@ -5,7 +5,7 @@ from torchvision import transforms
 from model.resnet import resnet50, resnet101
 #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=True)
 #model.eval()
-model = resnet101(pretrained=True)
+model = resnet101(weights="pretrained")
 """
 
 # [2] image
