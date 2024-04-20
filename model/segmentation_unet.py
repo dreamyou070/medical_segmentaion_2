@@ -181,54 +181,6 @@ class SemanticSeg_Gen(nn.Module):
         return logits #, gen_feature
 
 
-class SemanticSeg_Gen(nn.Module):
-    def __init__(self,
-                 n_classes,
-                 bilinear=False,
-                 use_batchnorm=True,
-                 use_instance_norm = True,
-                 mask_res = 128,
-                 high_latent_feature = False,
-                 init_latent_p = 1):
-
-        super(SemanticSeg_Gen, self).__init__()
-
-        c = 320
-
-        self.mlp_layer_1 = torch.nn.Linear(1280, c)
-        self.upsample_layer_1 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
-
-        self.mlp_layer_2 = torch.nn.Linear(640, c)
-        self.upsample_layer_2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-
-        self.mlp_layer_3 = torch.nn.Linear(320, c)
-        self.upsample_layer_3 = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
-
-        self.outc = OutConv(160, n_classes)
-
-
-    def dim_and_res_up(self, mlp_layer, upsample_layer, x):
-        # [batch, dim, res, res] -> [batch, res*res, dim]
-        batch, dim, res, res = x.shape
-        x = x.permute(0, 2, 3, 1).contiguous().reshape(1, res * res, dim)
-        # [1] dim change
-        x = mlp_layer(x)  # x = [batch, res*res, new_dim]
-        new_dim = x.shape[-1]
-        x = x.permute(0, 2, 1).contiguous().reshape(1, new_dim, res, res)
-        # [2] res change
-        x = upsample_layer(x)
-        return x
-
-    def forward(self, x16_out, x32_out, x64_out):
-
-        x16_out = self.dim_and_res_up(self.mlp_layer_1, self.upsample_layer_1, x16_out)
-        x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)
-        x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)
-        x = torch.cat([x16_out, x32_out, x64_out], dim=1)
-        x = self.segmentation_head(x)
-        logits = self.outc(x)  # 1, 4, 128,128
-
-        return logits
 
 
 class SemanticSeg_2(nn.Module):
@@ -286,14 +238,6 @@ class SemanticSeg_2(nn.Module):
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
         return logits
-
-        # x = self.segmentation_head(x)
-        # logits = self.outc(x)  # 1, 4, 128,128
-
-        # return logits  # , gen_feature
-
-
-
 
 """
 # [1] get image
