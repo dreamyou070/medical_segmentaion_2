@@ -10,7 +10,7 @@ layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="13_segment_image_condition_light_decoder" #
 # 3
-# except generation #--gt_ext_npy \
+# except generation #\
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -39,4 +39,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --light_decoder
+ --gt_ext_npy --light_decoder
