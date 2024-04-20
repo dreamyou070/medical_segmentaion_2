@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50015
+port_number=50003
 category="medical"
-obj_name="leader_polyp"
-trigger_word="leader_polyp"
-benchmark="bkai-igh-neopolyp"
+obj_name="cardiac"
+trigger_word="cardiac"
+benchmark="acdc"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="15_segment_image_condition_light_decoder_use_noise_pred_loss_with_pix_embedding" #
+file_name="3_segment_image_condition_light_decoder_use_noise_pred_loss" #
 # 3
 # except generation #\
 
@@ -27,7 +27,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 3 \
+ --n_classes 4 \
  --mask_res 256 \
  --batch_size 1 \
  --use_batchnorm \

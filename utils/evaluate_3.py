@@ -45,7 +45,8 @@ def evaluation_check(segmentation_head, dataloader, device,
                         elif args.image_processor == 'vit':
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            encoder_hidden_states = encoder_hidden_states + pix_embedding
+                            if args.use_vit_pix_embed:
+                                encoder_hidden_states = encoder_hidden_states + pix_embedding
                 else:
                     with torch.set_grad_enabled(True):
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
@@ -56,7 +57,8 @@ def evaluation_check(segmentation_head, dataloader, device,
                         elif args.image_processor == 'vit':
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            encoder_hidden_states = encoder_hidden_states + pix_embedding
+                            if args.use_vit_pix_embed:
+                                encoder_hidden_states = encoder_hidden_states + pix_embedding
 
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
