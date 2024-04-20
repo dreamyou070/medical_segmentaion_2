@@ -28,6 +28,7 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
+from model.blip import blip_decoder
 
 # image conditioned segmentation mask generating
 
@@ -50,10 +51,11 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     print(f' (3.1) blip model')
-    from model.blip import blip_decoder
     image_size = 384
     model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
-    model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
+    model = blip_decoder(pretrained=model_url,
+                         image_size=image_size,
+                         vit='base')
     # make trainable parameter
 
     print(f'\n step 4. dataset and dataloader')
@@ -64,7 +66,10 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = [{"params": model.parameters(), "lr": args.learning_rate}]
+    trainable_params = [{"params": model.parameters(),
+                         "lr": args.learning_rate}]
+    print(f'training model parameters = {model.parameters()}')
+
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
