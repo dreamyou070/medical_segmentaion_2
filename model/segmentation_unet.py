@@ -145,9 +145,7 @@ class SemanticSeg_Gen(nn.Module):
                  bilinear=False,
                  use_batchnorm=True,
                  use_instance_norm = True,
-                 mask_res = 128,
-                 high_latent_feature = False,
-                 init_latent_p = 1):
+                 mask_res = 128):
 
         super(SemanticSeg_Gen, self).__init__()
 
@@ -165,7 +163,6 @@ class SemanticSeg_Gen(nn.Module):
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2),
                                                    Up_conv(in_channels=160, out_channels=160, kernel_size=2))
         self.outc = OutConv(160, n_classes)
-        self.init_latent_p = init_latent_p
 
 
     def reconstruction(self, x):
