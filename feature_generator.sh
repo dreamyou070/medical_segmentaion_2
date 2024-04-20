@@ -1,7 +1,7 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50000
+port_number=50003
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
@@ -12,7 +12,7 @@ file_name="3_segment_image_condition_light_decoder" #
 # 3
 # except generation #--gt_ext_npy \
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_5_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
