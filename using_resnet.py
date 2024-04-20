@@ -2,9 +2,11 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=True)
-model.eval()
+from model.resnet import resnet50, resnet101
+#model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=True)
+#model.eval()
+model = resnet101(pretrained=True)
+"""
 
 # [2] image
 image_path = r'data_sample/image/sample_200.jpg'
@@ -26,4 +28,5 @@ if torch.cuda.is_available():
 with torch.no_grad():
     output = model(input_batch)
 # Tensor of shape 1000, with confidence scores over ImageNet's 1000 classes
-print(output[0])
+print(output[0].shape)
+"""

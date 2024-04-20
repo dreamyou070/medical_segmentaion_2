@@ -522,6 +522,10 @@ class TestDataset_Seg(Dataset):
         if argument.image_processor == 'blip':
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)
+        elif argument.image_processor == 'resnet':
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
+
 
         else:
             image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),

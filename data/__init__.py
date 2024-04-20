@@ -23,6 +23,11 @@ def call_dataset(args) :
         processor = transforms.Compose([transforms.Resize((384,384), interpolation=InterpolationMode.BICUBIC),
                                         transforms.ToTensor(),
                                         normalize, ])
+    elif args.image_processor == 'resnet' :
+        processor = transforms.Compose([transforms.Resize((256,256), interpolation=InterpolationMode.BICUBIC),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])
+
 
     # [2] train & test dataset
     train_dataset = TrainDataset_Seg(root_dir=args.train_data_path,
