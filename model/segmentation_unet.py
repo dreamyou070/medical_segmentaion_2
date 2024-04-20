@@ -219,7 +219,7 @@ class SemanticSeg_Gen(nn.Module):
         x = upsample_layer(x)
         return x
 
-    def forward(self, x16_out, x32_out, x64_out, init_latent):
+    def forward(self, x16_out, x32_out, x64_out):
 
         x16_out = self.dim_and_res_up(self.mlp_layer_1, self.upsample_layer_1, x16_out)
         x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)
@@ -228,7 +228,7 @@ class SemanticSeg_Gen(nn.Module):
         x = self.segmentation_head(x)
         logits = self.outc(x)  # 1, 4, 128,128
 
-        return logits #, gen_feature
+        return logits
 
 
 class SemanticSeg_2(nn.Module):
