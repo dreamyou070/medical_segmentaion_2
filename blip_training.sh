@@ -40,4 +40,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --use_image_condition \
  --image_processor 'blip' \
  --image_model_training \
- --light_decoder
+ --use_image_by_caption \
+ --use_base_prompt
