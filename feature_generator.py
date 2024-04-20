@@ -50,13 +50,9 @@ def main(args):
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-
-    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
-                                        mask_res=args.mask_res)
+    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes, mask_res=args.mask_res)
     if args.light_decoder :
-        segmentation_head = SemanticSeg_2(n_classes=args.n_classes,
-                                          mask_res=args.mask_res,)
-
+        segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -66,8 +62,14 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
-    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
+                                                        args.unet_lr,
+                                                        args.learning_rate) # all trainable params
+
+
+
+    trainable_params.append({"params": segmentation_head.parameters(),
+                             "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -170,11 +172,13 @@ def main(args):
             if args.use_text_condition :
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
+
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
+
             # key_word_index = batch['key_word_index'][0] # torch([10,14])
             # target key word should intense
             # how can i increase the alignment between image and text ?
@@ -269,7 +273,8 @@ def main(args):
             loader = train_dataloader
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           args)
+                                                           None, None, args)
+
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {score_dict}')

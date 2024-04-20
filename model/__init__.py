@@ -6,6 +6,7 @@ from safetensors.torch import load_file
 from model.unet import TimestepEmbedding
 from transformers import CLIPModel
 from model.modeling_vit import ViTModel
+
 def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True, unet_lora = True ):
 
     # [1] diffusion
@@ -36,45 +37,39 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         for net_arg in args.network_args:
             key, value = net_arg.split("=")
             net_kwargs[key] = value
-
-
     if args.use_image_condition :
-        """ see well how the model is trained """
-        network = create_network(1.0,
-                                 args.network_dim,
-                                 args.network_alpha,
-                                 vae,
-                                 image_model,
-                                 unet,
-                                 neuron_dropout=args.network_dropout,
-                                 condition_modality='image',
-                                 **net_kwargs, )
-
+        condition_model = image_model
+        condition_modality = 'image'
     else :
-        network = create_network(1.0,
-                                 args.network_dim, args.network_alpha,
-                                 vae, text_encoder, unet, neuron_dropout=args.network_dropout,
-                                 condition_modality = 'text',
-                                 **net_kwargs, )
-
-    if args.use_text_condition :
-        network.apply_to(text_encoder, unet, text_encoder_lora, unet_lora)
-    else :
-        network.apply_to(image_model, unet, apply_text_encoder=True, apply_unet=True)
-
-    unet = unet.to(accelerator.device, dtype=weight_dtype)
-    unet.eval()
-    text_encoder = text_encoder.to(accelerator.device, dtype=weight_dtype)
-    text_encoder.eval()
-    vae = vae.to(accelerator.device, dtype=weight_dtype)
-    vae.eval()
-    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
-    image_model.eval()
+        condition_model = text_encoder
+        condition_modality = 'text'
+    """ see well how the model is trained """
+    network = create_network(1.0,
+                             args.network_dim,
+                             args.network_alpha,
+                             vae,
+                             condition_model,
+                             unet,
+                             neuron_dropout=args.network_dropout,
+                             condition_modality=condition_modality,
+                             **net_kwargs, )
+    network.apply_to(condition_model,
+                     unet,
+                     True,
+                     True)
     if args.network_weights is not None :
         print(f' * loading network weights')
         info = network.load_weights(args.network_weights)
     network.to(weight_dtype)
-    if args.use_text_condition :
-        return text_encoder, vae, unet, network
-    else :
-        return image_model, vae, unet, network
+
+    # [3] unet
+    unet = unet.to(accelerator.device, dtype=weight_dtype)
+    unet.eval()
+    # [4] network
+    condition_model = condition_model.to(accelerator.device, dtype=weight_dtype)
+    condition_model.eval()
+    # [5] vae
+    vae = vae.to(accelerator.device, dtype=weight_dtype)
+    vae.eval()
+
+    return condition_model, vae, unet, network
