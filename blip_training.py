@@ -101,7 +101,7 @@ def main(args):
 
             # [2] optimizing loss
             optimizer.zero_grad()
-            accelerator.backward(lm_loss)
+            accelerator.backward(lm_loss, retrain_graph=True)
             optimizer.step()
             lr_scheduler.step()
 

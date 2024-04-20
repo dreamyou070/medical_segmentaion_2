@@ -44,8 +44,7 @@ teeth_class_map = {0: ['b','background'],
 
 base_prompts = ['this is a picture of ',
                 'this is a picture of a ',
-                'this is a picture of the ',
-                'this picture is of ',]
+                'this is a picture of the ',]
 
 class_matching_map = {0 : np.array([0,0,0]),
                           1 : np.array([255,0,0]),
