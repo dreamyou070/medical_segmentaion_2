@@ -71,11 +71,6 @@ def main(args):
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    l1_loss = L1Loss()
-    l2_loss = nn.MSELoss()
-    adv_loss = PatchAdversarialLoss(criterion="least_squares")
-    loss_CE = nn.CrossEntropyLoss()
-    loss_FC = Multiclass_FocalLoss()
 
     print(f'\n step 8. model to device')
     model, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
@@ -146,6 +141,27 @@ def main(args):
                        saving_name=f'blip_model-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(model),
                        save_dtype=save_dtype)
+        # -------------------------------------------------------------------------------------------------------------
+        # test data evaluation
+        if is_main_process:
+            model.eval()
+            result = []
+            with torch.no_grad():
+                for step, batch in enumerate(test_dataloader):
+                    img_id = batch['image_id']
+                    image = batch['image_condition']
+                    num_beams = 3
+                    max_length = 20
+                    min_length = 5
+                    captions = model.generate(image,
+                                              sample=False,
+                                              num_beams=num_beams,
+                                              max_length=max_length,
+                                              min_length=min_length)
+
+                    for caption, img_id in zip(captions, img_id):
+                        result.append({"image_id": img_id.item(), "caption": caption})
+        # saving result
 
 
 

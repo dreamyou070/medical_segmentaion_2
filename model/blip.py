@@ -82,7 +82,7 @@ class BLIP_Decoder(nn.Module):
                  vit = 'base',
                  vit_grad_ckpt = False,
                  vit_ckpt_layer = 0,
-                 prompt = 'a picture of ',
+                 prompt = 'this is a picture of ',
                  ):
         """
         Args:
