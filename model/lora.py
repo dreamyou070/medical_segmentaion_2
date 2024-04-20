@@ -1254,7 +1254,6 @@ class LoRANetwork(torch.nn.Module):
         def enumerate_params(loras):
             params = []
             for lora in loras:
-                print(f'traiing lora name = {lora.lora_name}')
                 params.extend(lora.parameters())
             return params
 
