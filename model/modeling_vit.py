@@ -546,7 +546,7 @@ class ViTModel(ViTPreTrainedModel):
 
         embedding_output = self.embeddings(pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding
         )
-        print(f'embedding_output: {embedding_output.shape}')
+        pix_embedding = embedding_output
 
         encoder_outputs = self.encoder(
             embedding_output,
@@ -568,6 +568,7 @@ class ViTModel(ViTPreTrainedModel):
             pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
+            pix_embedding=pix_embedding,
         )
 
 

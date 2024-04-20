@@ -33,10 +33,8 @@ def evaluation_check(segmentation_head, dataloader, device,
 
         for global_num, batch in enumerate(dataloader):
 
-            mask_embedding = batch["mask_embedding"]  # 1,197,1
-
-            loss_dict = {}
             if args.use_image_condition:
+
                 if not args.image_model_training:
                     with torch.no_grad():
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
@@ -45,9 +43,10 @@ def evaluation_check(segmentation_head, dataloader, device,
                                 **batch["image_condition"])  # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            encoder_hidden_states = condition_model(
-                                **batch["image_condition"]).last_hidden_state  # [batch, 197, 768]
-                    encoder_hidden_states = encoder_hidden_states * mask_embedding
+                            output = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            pix_embedding = output.pix_embedding
+                            encoder_hidden_states = encoder_hidden_states + pix_embedding
                 else:
                     with torch.set_grad_enabled(True):
                         cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
@@ -56,10 +55,11 @@ def evaluation_check(segmentation_head, dataloader, device,
                                 **batch["image_condition"])  # [Batch, 1, 768]
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
                         elif args.image_processor == 'vit':
-                            img_con = batch["image_condition"]
-                            encoder_hidden_states = condition_model(
-                                **batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-                    encoder_hidden_states = encoder_hidden_states * mask_embedding
+                            output = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            pix_embedding = output.pix_embedding
+                            encoder_hidden_states = encoder_hidden_states + pix_embedding
+
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
                     encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
