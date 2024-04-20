@@ -59,7 +59,6 @@ def main(args):
                                         mask_res=args.mask_res,
                                         high_latent_feature=args.high_latent_feature,
                                         init_latent_p=args.init_latent_p,
-                                        decoder = decoder,
                                         generation = args.generation,)
     if args.light_decoder :
         segmentation_head = SemanticSeg_2(n_classes=args.n_classes,
