@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50013
+port_number=50014
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="13_segment_image_condition_light_decoder" #
+file_name="14_segment_image_condition_light_decoder_use_noise_pred_loss" #
 # 3
 # except generation #\
 
@@ -39,4 +39,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --gt_ext_npy --light_decoder
+ --gt_ext_npy --light_decoder --use_noise_pred_loss

@@ -76,8 +76,8 @@ def main(args):
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    l1_loss = L1Loss()
-    l2_loss = nn.MSELoss()
+    #l1_loss = L1Loss()
+    l2_loss = nn.MSELoss(reduction='None')
     adv_loss = PatchAdversarialLoss(criterion="least_squares")
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
@@ -187,7 +187,11 @@ def main(args):
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list).sample
+
+            target_noise = torch.randn_like(noise_pred)
+            noise_loss = l2_loss(noise_pred, target_noise).mean([1,2,3])
+
 
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
@@ -226,7 +230,11 @@ def main(args):
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
-            loss = loss * args.segmentation_loss_weight
+
+            if args.use_noise_pred_loss :
+                loss_dict['noise_loss'] = noise_loss.mean().item()
+                loss = loss + noise_loss.mean()
+
             loss = loss.mean()
             current_loss = loss.detach().item()
 
@@ -430,6 +438,7 @@ if __name__ == "__main__":
     parser.add_argument("--erase_position_embeddings", action='store_true')
     parser.add_argument("--light_decoder", action='store_true')
     parser.add_argument("--use_base_prompt", action='store_true')
+    parser.add_argument("--use_noise_pred_loss", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
