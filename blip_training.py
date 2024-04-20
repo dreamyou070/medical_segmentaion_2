@@ -83,6 +83,7 @@ def main(args):
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
@@ -93,21 +94,20 @@ def main(args):
             loss_dict = {}
 
             caption = batch['caption']
-            print(f'training caption = {caption}')
             image = batch['image_condition']
 
             # [1] generating loss
-            lm_loss, image_feature = model(image, caption)
+            loss, image_feature = model(image, caption)
+            print(f'loss = {loss}')
 
             # [2] optimizing loss
             optimizer.zero_grad()
-            accelerator.backward(lm_loss, retrain_graph=True)
+            accelerator.backward(loss)
             optimizer.step()
             lr_scheduler.step()
 
             # [3] logging
-            loss = lm_loss.mean()
-            loss_dict['lm_loss'] = lm_loss.item()
+            loss_dict['lm_loss'] = loss.mean().item()
 
             # -----------------------------------------------------------------------------------------------------------------------------
             total_loss = loss  # + lm_loss
