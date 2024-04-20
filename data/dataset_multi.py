@@ -290,6 +290,8 @@ class TrainDataset_Seg(Dataset):
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)  # [3,224,224]
         else :
+
+            print(f'image path : {img_path}')
             image_condition = self.image_processor(images=Image.open(img_path),
                                                     return_tensors="pt",
                                                     padding=True)  # .data['pixel_values'] # [1,3,224,224]
