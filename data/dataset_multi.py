@@ -7,6 +7,7 @@ from PIL import Image
 from torchvision import transforms
 import cv2
 from tensorflow.keras.utils import to_categorical
+from torch import nn
 
 brain_class_map = {0: ['b','brain'],
                    1: ['n','non-enhancing tumor core'],
