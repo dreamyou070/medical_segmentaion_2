@@ -291,8 +291,7 @@ class TrainDataset_Seg(Dataset):
             image_condition = self.image_processor(pil)  # [3,224,224]
         else :
 
-            print(f'image path : {img_path}')
-            image_condition = self.image_processor(images=Image.open(img_path),
+            image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
                                                     return_tensors="pt",
                                                     padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
@@ -525,7 +524,7 @@ class TestDataset_Seg(Dataset):
             image_condition = self.image_processor(pil)
 
         else:
-            image_condition = self.image_processor(images=Image.open(img_path),
+            image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
                                                    return_tensors="pt",
                                                    padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
