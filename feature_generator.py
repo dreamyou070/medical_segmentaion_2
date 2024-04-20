@@ -156,8 +156,6 @@ def main(args):
 
                 print(f'img_condition = {img_condition}')
 
-                import time
-                time.sleep(100)
                 if not args.image_model_training:
                     with torch.no_grad():
                         cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
