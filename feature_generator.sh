@@ -5,12 +5,12 @@ port_number=50000
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="bkai-igh-neopolyp"
+benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="11_segment_with_image_condition_vit_image_model_training" #
+file_name="3_segment_image_condition" #
 # 3
-# except generation
+# except generation #--gt_ext_npy \
 
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -36,7 +36,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --init_latent_p 1.0 \
  --generator_loss_weight 1.0 \
  --segmentation_loss_weight 1.0 \
- --gt_ext_npy \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
