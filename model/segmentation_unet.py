@@ -210,11 +210,11 @@ class SemanticSeg_Gen(nn.Module):
     def dim_and_res_up(self, mlp_layer, upsample_layer, x):
         # [batch, dim, res, res] -> [batch, res*res, dim]
         batch, dim, res, res = x.shape
-        x = x.permute(0, 2, 3, 1).contious().reshape(1, res * res, dim)
+        x = x.permute(0, 2, 3, 1).contiguous().reshape(1, res * res, dim)
         # [1] dim change
         x = mlp_layer(x)  # x = [batch, res*res, new_dim]
         new_dim = x.shape[-1]
-        x = x.permute(0, 2, 1).contious().reshape(1, new_dim, res, res)
+        x = x.permute(0, 2, 1).contiguous().reshape(1, new_dim, res, res)
         # [2] res change
         x = upsample_layer(x)
         return x
