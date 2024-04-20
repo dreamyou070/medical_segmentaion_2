@@ -51,12 +51,6 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
-
-
-
-
-
-
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
                                         mask_res=args.mask_res)
     if args.light_decoder :

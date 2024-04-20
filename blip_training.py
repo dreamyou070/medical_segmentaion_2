@@ -93,6 +93,7 @@ def main(args):
             loss_dict = {}
 
             caption = batch['caption']
+            print(f'training caption = {caption}')
             image = batch['image_condition']
 
             # [1] generating loss
