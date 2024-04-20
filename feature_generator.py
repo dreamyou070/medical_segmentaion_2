@@ -204,40 +204,30 @@ def main(args):
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            reconstruction_org, z_mu, z_sigma, masks_pred_org = segmentation_head(x16_out, x32_out, x64_out, latents)
+            masks_pred = segmentation_head(x16_out, x32_out, x64_out) # [1,4,256,256]
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
-            if args.generation:
-                recons_loss = l1_loss(reconstruction_org.float(), image.float())
-                kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
-                kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
-                generator_loss = recons_loss + kl_weight * kl_loss
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
-            masks_pred_ = masks_pred_org.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred_org.shape[-1]).contiguous()
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred_org, target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred_org.device))  # N
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
                 if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
                 loss += focal_loss
                 loss_dict['focal_loss'] = focal_loss.item()
                 # [5.3] Dice Loss
                 if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred_org, gt)
+                    dice_loss = loss_Dice(masks_pred, gt)
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
             loss = loss * args.segmentation_loss_weight
-
-            if args.generation :
-                loss += generator_loss * args.generator_loss_weight
-
             loss = loss.mean()
-
             current_loss = loss.detach().item()
 
             if epoch == args.start_epoch:

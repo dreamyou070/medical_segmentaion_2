@@ -168,7 +168,7 @@ class SemanticSeg_Gen(nn.Module):
     def reconstruction(self, x):
         return self.decoder_model(x)
 
-    def forward(self, x16_out, x32_out, x64_out, init_latent):
+    def forward(self, x16_out, x32_out, x64_out):
 
         x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
         x = self.up2(x, x64_out)       # 1,320,64,64
