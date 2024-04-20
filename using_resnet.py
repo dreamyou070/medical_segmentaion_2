@@ -3,10 +3,11 @@ from PIL import Image
 from torchvision import transforms
 
 from model.resnet import resnet101, ResNet101_Weights
-#model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=True)
-#model.eval()
-#model = resnet101(weights=ResNet101_Weights.IMAGENET1K_V2)
-#torchvision.models.resnet101
+#from torchvision.models import resnet101, ResNet101_Weights
+
+# Old weights with accuracy 76.130%
+resnet101(weights=ResNet101_Weights.IMAGENET1K_V2)
+
 """
 
 # [2] image
