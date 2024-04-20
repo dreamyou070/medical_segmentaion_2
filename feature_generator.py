@@ -189,8 +189,9 @@ def main(args):
             with torch.set_grad_enabled(True):
                 noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list).sample
 
-            target_noise = torch.randn_like(noise_pred)
-            noise_loss = l2_loss(noise_pred, target_noise).mean([1,2,3])
+            target = torch.randn_like(noise_pred)
+            loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none")
+            noise_loss = loss.mean([1, 2, 3])
 
 
             query_dict, key_dict = controller.query_dict, controller.key_dict
