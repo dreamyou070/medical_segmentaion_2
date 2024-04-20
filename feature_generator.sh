@@ -3,12 +3,12 @@
 
 port_number=50003
 category="medical"
-obj_name="cardiac"
-trigger_word="cardiac"
-benchmark="acdc"
+obj_name="brain"
+trigger_word="brain"
+benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="3_segment_image_condition_light_decoder_use_noise_pred_loss" #
+file_name="1_segment_image_condition_light_decoder_use_noise_pred_loss" #
 # 3
 # except generation #\
 
