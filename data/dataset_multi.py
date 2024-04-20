@@ -258,10 +258,24 @@ class TrainDataset_Seg(Dataset):
         """
         # [3] image pixel
 
+        # condition image = [384,384]
+        # gt =[3,256,256]
+        gt_pil = gt.permute(1,2,0).cpu().numpy() * 255
+        gt_pil = gt_pil.astype(np.uint8)
+        # remove r channel to zero
+        gt_pil[:,:,0] = gt_pil[:,:,0] * 0
+        gt_pil = Image.fromarray(gt_pil)  # [256,256,3], RGB mask
+
+        gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
+        binary_gt = np.where(gt_arr != 0 , 255, 0)
+        binary_gt = Image.fromarray(binary_gt.astype(np.uint8))
+        binary_gt = binary_gt.resize((224,224), Image.BICUBIC) # only object
+        binary_gt = np.array(binary_gt)
+        binary_gt = np.where(binary_gt > 100, 1, 0)
+
         if argument.image_processor == 'blip' :
             pil = Image.open(img_path).convert('RGB')
-            image_condition = self.image_processor(pil)
-
+            image_condition = self.image_processor(pil)  # [3,224,224]
         else :
             image_condition = self.image_processor(images=Image.open(img_path),
                                                     return_tensors="pt",
@@ -269,7 +283,9 @@ class TrainDataset_Seg(Dataset):
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
+        image_condition.data["output_attentions"] = binary_gt
 
+        # can i use visual attention mask in ViT ?
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]

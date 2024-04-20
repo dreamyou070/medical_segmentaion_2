@@ -12,7 +12,7 @@ file_name="14_segment_image_condition_light_decoder_use_noise_pred_loss" #
 # 3
 # except generation #\
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
