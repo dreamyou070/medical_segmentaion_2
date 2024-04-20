@@ -43,26 +43,18 @@ def main(args):
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
         json.dump(vars(args), f, indent=4)
 
-    print(f'\n step 3. preparing accelerator')
+    print(f'\n step 2. preparing accelerator')
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
 
-    print(f'\n step 4. model')
+    print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-
-
-
-
-
-
-
-    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes,
-                                        mask_res=args.mask_res)
-    if args.light_decoder :
-        segmentation_head = SemanticSeg_2(n_classes=args.n_classes,
-                                          mask_res=args.mask_res,)
-
+    print(f' (3.1) blip model')
+    from model.blip import blip_decoder
+    image_size = 384
+    model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth'
+    model = blip_decoder(pretrained=model_url, image_size=image_size, vit='base')
+    # make trainable parameter
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -72,8 +64,7 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
-    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    trainable_params = [{"params": model.parameters(), "lr": args.learning_rate}]
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -85,60 +76,11 @@ def main(args):
     adv_loss = PatchAdversarialLoss(criterion="least_squares")
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
-    loss_Dice = DiceLoss(include_background=False,
-                         to_onehot_y=False,
-                         sigmoid=False,
-                         softmax=True,
-                         other_act=None,
-                         squared_pred=False,
-                         jaccard=False,
-                         reduction=LossReduction.MEAN,
-                         smooth_nr=1e-5,
-                         smooth_dr=1e-5,
-                         batch=False,
-                         weight=None)
-
-    loss_dicece = DiceCELoss(include_background=False,
-                             to_onehot_y=False,
-                             sigmoid=False,
-                             softmax=True,
-                             squared_pred=True,
-                             lambda_dice=args.dice_weight,
-                             smooth_nr=1e-5,
-                             smooth_dr=1e-5,
-                             weight=None, )
 
     print(f'\n step 8. model to device')
-    condition_model = accelerator.prepare(condition_model)
-    condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    unet, network = transform_models_if_DDP([unet, network])
-    segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-    if args.gradient_checkpointing:
-        unet.train()
-        segmentation_head.train()
-        for t_enc in condition_models:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-    else:
-        unet.eval()
-        for t_enc in condition_models:
-            t_enc.eval()
-        del t_enc
-        network.prepare_grad_etc()
-
-    print(f'\n step 9. registering saving tensor')
-    controller = AttentionStore()
-    register_attention_control(unet, controller)
+    model, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+      accelerator.prepare(model, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    model = transform_models_if_DDP([model])[0]
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
@@ -147,52 +89,42 @@ def main(args):
     loss_list = []
     kl_weight = 1e-6
     for epoch in range(args.start_epoch, args.max_train_epochs):
-
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+        model.train()
 
-        for step, batch in enumerate(train_dataloader):
-            device = accelerator.device
-            loss_dict = {}
-            if args.use_image_condition :
-                if not args.image_model_training:
-                    with torch.no_grad():
-                        cond_input = batch["image_condition"].data["pixel_values"] # pixel_value = [3, 224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(**batch["image_condition"]) # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
-                            encoder_hidden_states = condition_model(**batch["image_condition"]).last_hidden_state # [batch, 197, 768]
-                else :
-                    with torch.set_grad_enabled(True):
-                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(
-                                **batch["image_condition"])  # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
-                            img_con = batch["image_condition"]
-                            encoder_hidden_states = condition_model(**batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
-            if args.use_text_condition :
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
-            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-            gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-            gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-            gt = gt.view(-1, gt.shape[-1]).contiguous()
-            # key_word_index = batch['key_word_index'][0] # torch([10,14])
-            # target key word should intense
-            # how can i increase the alignment between image and text ?
+        for i, batch in enumerate(train_dataloader):
 
-            with torch.no_grad():
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+            caption = batch['caption']
+            image = batch['image_condition']
+            lm_loss = model(image, caption)
 
-            with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+            #optimizer.zero_grad()
+            #loss.backward()
+            #optimizer.step()
 
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
+            #metric_logger.update(loss=loss.item())
+            #metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+            # gather the stats from all processes
+        #metric_logger.synchronize_between_processes()
+        #print("Averaged stats:", metric_logger.global_avg())
+        #return {k: "{:.3f}".format(meter.global_avg) for k, meter in metric_logger.meters.items()}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             q_dict = {}
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0]  # head, pix_num, dim

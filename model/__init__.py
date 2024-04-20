@@ -26,15 +26,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-        embedding_layer = image_model.embeddings
-        for name, child in embedding_layer.named_children():
-            if name == 'position_embeddings':
-                print(f'name : {name}')
-                child.weight.data.fill_(0) # parameter containing
-        img_position_embeddings = image_model.embeddings.position_embeddings
-        print(f' * img_position_embeddings : {img_position_embeddings}')
-        image_model.embeddings.position_embeddings.data.fill_(0)
-        print(f' * img_position_embeddings : {img_position_embeddings}')
+
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
 
@@ -44,7 +36,10 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         for net_arg in args.network_args:
             key, value = net_arg.split("=")
             net_kwargs[key] = value
+
+
     if args.use_image_condition :
+        """ see well how the model is trained """
         network = create_network(1.0,
                                  args.network_dim,
                                  args.network_alpha,

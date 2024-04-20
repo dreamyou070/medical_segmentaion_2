@@ -22,7 +22,7 @@ def eval_step(engine, batch):
     return batch
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
-                     blip_model, unet, vae, controller, weight_dtype, epoch,
+                     condition_model, unet, vae, controller, weight_dtype, epoch,
                      simple_linear, position_embedder, args):
 
     segmentation_head.eval()
@@ -34,34 +34,47 @@ def evaluation_check(segmentation_head, dataloader, device,
         for global_num, batch in enumerate(dataloader):
 
             loss_dict = {}
-            caption = batch['caption']  # ['this picture is of b n']
-            image = batch['image_condition']  # [batch, 3, 384, 384]
-
-
-
-            # why lm_loss does not reducing ??
-            lm_loss, image_feature = blip_model(image, caption)  # [batch, 577, 768]
-            encoder_hidden_states = simple_linear(image_feature)
-
-            """
-            # -----------------------------------------------------------------------------------------------------------------------------
             if args.use_image_condition:
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = image_feature
+                if not args.image_model_training:
+                    with torch.no_grad():
+                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
+                        if args.image_processor == 'clip':
+                            encoder_hidden_states = condition_model.get_image_features(
+                                **batch["image_condition"])  # [Batch, 1, 768]
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                        elif args.image_processor == 'vit':
+                            encoder_hidden_states = condition_model(
+                                **batch["image_condition"]).last_hidden_state  # [batch, 197, 768]
+                else:
+                    with torch.set_grad_enabled(True):
+                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
+                        if args.image_processor == 'clip':
+                            encoder_hidden_states = condition_model.get_image_features(
+                                **batch["image_condition"])  # [Batch, 1, 768]
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
+                        elif args.image_processor == 'vit':
+                            img_con = batch["image_condition"]
+                            encoder_hidden_states = condition_model(
+                                **batch["image_condition"].to(device)).last_hidden_state  # [batch, 197, 768]
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
-                    encoder_hidden_states = text_encoder(batch["input_ids"].to(device))["last_hidden_state"]  # [batch, 77, 768]
-            """
+                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
+                        "last_hidden_state"]  # [batch, 77, 768]
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
+            # key_word_index = batch['key_word_index'][0] # torch([10,14])
+            # target key word should intense
+            # how can i increase the alignment between image and text ?
+
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
             with torch.set_grad_enabled(True):
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type=position_embedder)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -74,8 +87,13 @@ def evaluation_check(segmentation_head, dataloader, device,
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
+
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            masks_pred = segmentation_head(x16_out, x32_out, x64_out, latents)
+
+            masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
+
+
+
 
             #######################################################################################################################
             # [1] pred
@@ -84,6 +102,12 @@ def evaluation_check(segmentation_head, dataloader, device,
             y_pred_list.append(mask_pred_argmax)
             y_true = gt_flat.squeeze()
             y_true_list.append(y_true)
+
+
+
+
+
+
         #######################################################################################################################
         # [1] pred
         y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
