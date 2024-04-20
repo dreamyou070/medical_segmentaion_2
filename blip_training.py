@@ -66,11 +66,22 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = [{"params": model.parameters(),
-                         "lr": args.learning_rate}]
+    trainable_params = []
     print(f'training model parameters = {model.parameters()}')
+    import ast
+    optimizer_kwargs = {}
+    if args.optimizer_args is not None and len(args.optimizer_args) > 0:
+        for arg in args.optimizer_args:
+            key, value = arg.split("=")
+            value = ast.literal_eval(value)
+            optimizer_kwargs[key] = value
+    print("optkwargs:", optimizer_kwargs)
+    optimizer = torch.optim.AdamW(model.parameters(),
+                                  args.learning_rate,
+                                  **optimizer_kwargs)
 
-    optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
+
+
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
