@@ -29,6 +29,8 @@ from monai.losses import DiceLoss, DiceCELoss
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
 from utils.losses import PatchAdversarialLoss
 
+# image conditioned segmentation mask generating
+
 def main(args):
 
     print(f'\n step 1. setting')
