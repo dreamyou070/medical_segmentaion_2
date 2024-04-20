@@ -75,10 +75,15 @@ def main(args):
             key, value = arg.split("=")
             value = ast.literal_eval(value)
             optimizer_kwargs[key] = value
-    print("optkwargs:", optimizer_kwargs)
+    print("optimizer kwargs:", optimizer_kwargs)
     optimizer = torch.optim.AdamW(model.parameters(),
                                   args.learning_rate,
                                   **optimizer_kwargs)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(f"trainable parameter : {name}")
+        else :
+            print(f"non-trainable parameter : {name}")
 
 
 
@@ -89,9 +94,9 @@ def main(args):
     print(f'\n step 7. loss function')
 
     print(f'\n step 8. model to device')
-    model, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(model, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    model = transform_models_if_DDP([model])[0]
+    model, optimizer, train_dataloader, test_dataloader, lr_scheduler = accelerator.prepare(model, optimizer,
+                                                                                            train_dataloader, test_dataloader,
+                                                                                            lr_scheduler)
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
@@ -101,6 +106,7 @@ def main(args):
     kl_weight = 1e-6
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
+
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         model.train()
