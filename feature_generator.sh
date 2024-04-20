@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50004
+port_number=50013
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="Pranet"
+benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="4_segment_image_condition_conventional_decoder" #
+file_name="13_segment_image_condition_light_decoder" #
 # 3
 # except generation #--gt_ext_npy \
 
@@ -27,7 +27,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 2 \
+ --n_classes 3 \
  --mask_res 256 \
  --batch_size 1 \
  --use_batchnorm \
@@ -38,4 +38,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --segmentation_loss_weight 1.0 \
  --use_image_condition \
  --image_processor 'vit' \
- --image_model_training
+ --image_model_training \
+ --light_decoder
