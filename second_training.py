@@ -149,6 +149,15 @@ def main(args):
     kl_weight = 1e-6
 
     print(f'\n step 11. Get Visual Token')
+    for step, batch in enumerate(train_dataloader):
+        with torch.no_grad():
+            cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
+            output, pix_embedding = condition_model(**batch["image_condition"])
+            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+            # which pixel is right ?
+
+
+
 
     """
     for epoch in range(args.start_epoch, args.max_train_epochs):
