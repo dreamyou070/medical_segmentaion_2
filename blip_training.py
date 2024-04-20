@@ -93,76 +93,29 @@ def main(args):
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         model.train()
 
-        for i, batch in enumerate(train_dataloader):
+        for step, batch in enumerate(train_dataloader):
+
+            loss_dict = {}
 
             caption = batch['caption']
             image = batch['image_condition']
-            lm_loss = model(image, caption)
 
-            #optimizer.zero_grad()
-            #loss.backward()
-            #optimizer.step()
+            # [1] generating loss
+            lm_loss, image_feature = model(image, caption)
 
-            #metric_logger.update(loss=loss.item())
-            #metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+            # [2] optimizing loss
+            optimizer.zero_grad()
+            accelerator.backward(lm_loss)
+            optimizer.step()
+            lr_scheduler.step()
 
-            # gather the stats from all processes
-        #metric_logger.synchronize_between_processes()
-        #print("Averaged stats:", metric_logger.global_avg())
-        #return {k: "{:.3f}".format(meter.global_avg) for k, meter in metric_logger.meters.items()}
+            # [3] logging
+            loss = lm_loss.mean()
+            loss_dict['lm_loss'] = lm_loss.item()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            q_dict = {}
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0]  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                if args.text_before_query:
-                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                else :
-                    query = query.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()
-                q_dict[res] = query
-
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-            masks_pred = segmentation_head(x16_out, x32_out, x64_out) # [1,4,256,256]
-            # ------------------------------------------------------------------------------------------------------------
-            # [1] generator loss
-            # ------------------------------------------------------------------------------------------------------------
-            # [2] origin loss
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
-            if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
-            else:  # [5.1] Multiclassification Loss
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                # [5.3] Dice Loss
-                if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
-                    loss += dice_loss
-                    loss_dict['dice_loss'] = dice_loss.item()
-                loss = loss.mean()
-            loss = loss * args.segmentation_loss_weight
-            loss = loss.mean()
-            current_loss = loss.detach().item()
+            # -----------------------------------------------------------------------------------------------------------------------------
+            total_loss = loss  # + lm_loss
+            current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
@@ -183,57 +136,20 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-
-        # ----------------------------------------------------------------------------------------------------------- #
+        # -------------------------------------------------------------------------------------------------------------
+        # saving model
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
             save_model(args,
-                       saving_folder='model',
-                       saving_name=f'lora-{saving_epoch}.safetensors',
-                       unwrapped_nw=accelerator.unwrap_model(network),
-                       save_dtype=save_dtype)
-            save_model(args,
-                       saving_folder='segmentation',
-                       saving_name=f'segmentation-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                       saving_folder='blip_model',
+                       saving_name=f'blip_model-{saving_epoch}.pt',
+                       unwrapped_nw=accelerator.unwrap_model(model),
                        save_dtype=save_dtype)
 
-        # ----------------------------------------------------------------------------------------------------------- #
-        # [7] evaluate
-        loader = test_dataloader
-        if args.check_training:
-            print(f'test with training data')
-            loader = train_dataloader
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           args)
-        # saving
-        if is_main_process:
-            print(f'  - precision dictionary = {score_dict}')
-            print(f'  - confusion_matrix = {confusion_matrix}')
-            confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
-            with open(confusion_save_dir, 'a') as f:
-                f.write(f' epoch = {epoch + 1} \n')
-                for i in range(len(confusion_matrix)):
-                    for j in range(len(confusion_matrix[i])):
-                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                    f.write('\n')
-                f.write('\n')
 
-            score_save_dir = os.path.join(args.output_dir, 'score.txt')
-            with open(score_save_dir, 'a') as f:
-                dices = []
-                f.write(f' epoch = {epoch + 1} | ')
-                for k in score_dict:
-                    dice = float(score_dict[k])
-                    f.write(f'class {k} = {dice} ')
-                    dices.append(dice)
-                dice_coeff = sum(dices) / len(dices)
-                f.write(f'| dice_coeff = {dice_coeff}')
-                f.write(f'\n')
-    accelerator.end_training()
+
+
 
 
 if __name__ == "__main__":
