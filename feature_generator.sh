@@ -6,14 +6,14 @@
 # 23_use_layer_norm_reducing_redundancy
 # 24_use_instance_norm_reducing_redundancy
 
-port_number=52121
+port_number=52323
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="21_use_layer_norm_reducing_redundancy_use_weighted_reduct" #
+file_name="23_use_layer_norm_reducing_redundancy" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -41,4 +41,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_model_training \
  --use_noise_pred_loss \
  --use_layer_norm \
- --reducing_redundancy --use_weighted_reduct
+ --reducing_redundancy
