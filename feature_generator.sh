@@ -1,19 +1,19 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-# 5_segment_image_condition_light_decoder_not_use_cls_token
-# 6_segment_image_condition_light_decoder_only_use_cls_token
-# 7_segment_image_condition_light_decoder_reduction
-# 8_segment_image_condition_light_decoder_no_condition
-# 9_segment_image_condition_light_decoder_reduction_not_dynamic_class
-port_number=51111
+# 21_use_layer_norm_reducing_redundancy_use_weighted_reduct
+# 22_use_instance_norm_reducing_redundancy_use_weighted_reduct
+# 23_use_layer_norm_reducing_redundancy
+# 24_use_instance_norm_reducing_redundancy
+
+port_number=52121
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="11_segment_image_condition_light_decoder_self_condition" #
+file_name="21_use_layer_norm_reducing_redundancy_use_weighted_reduct" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -33,14 +33,13 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 2 \
- --mask_res 256 \
+ --n_classes 4 --gt_ext_npy --mask_res 256 \
  --batch_size 1 \
- --use_batchnorm \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --light_decoder \
- --use_noise_pred_loss
+ --use_noise_pred_loss \
+ --use_layer_norm \
+ --reducing_redundancy --use_weighted_reduct

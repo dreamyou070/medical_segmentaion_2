@@ -7,7 +7,7 @@ from attention_store import AttentionStore
 from data import call_dataset
 from model.segmentation_unet import SemanticSeg_Gen
 from model.diffusion_model import transform_models_if_DDP
-from utils.evaluate_3 import evaluation_check
+from utils.evaluate import evaluation_check
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list
 from utils.attention_control import passing_argument, register_attention_control

@@ -18,12 +18,10 @@ class DoubleConv(nn.Module):
             mid_channels = out_channels
 
         self.double_conv = nn.Sequential(nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
-                                         nn.LayerNorm(
-                                             [mid_channels, int(20480 / mid_channels), int(20480 / mid_channels)]),
+                                         nn.LayerNorm([mid_channels, int(20480 / mid_channels), int(20480 / mid_channels)]),
                                          nn.ReLU(inplace=True),
                                          nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
-                                         nn.LayerNorm(
-                                             [mid_channels, int(20480 / mid_channels), int(20480 / mid_channels)]),
+                                         nn.LayerNorm([mid_channels, int(20480 / mid_channels), int(20480 / mid_channels)]),
                                          nn.ReLU(inplace=True))
 
         if use_batchnorm :
@@ -97,102 +95,16 @@ class OutConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-class SemanticSeg(nn.Module):
+class SemanticModel(nn.Module):
     def __init__(self,
                  n_classes,
                  bilinear=False,
-                 use_batchnorm=True,
-                 use_instance_norm = True,
-                 mask_res = 128,
-                 high_latent_feature = False):
-
-        super(SemanticSeg, self).__init__()
-
-        factor = 2 if bilinear else 1
-        self.up1 = Up(1280, 640 // factor, bilinear, use_batchnorm, use_instance_norm)
-        self.up2 = Up(640, 320 // factor, bilinear, use_batchnorm, use_instance_norm)
-
-        if mask_res == 128:
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2))
-        if mask_res == 256 :
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2),
-                                                   Up_conv(in_channels = 160, out_channels = 160, kernel_size=2))
-        if mask_res == 512 :
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
-                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2),
-                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2))
-        self.high_latent_feature = high_latent_feature
-        if self.high_latent_feature :
-            self.feature_generator = nn.Sequential(nn.Sigmoid())
-        else :
-            self.feature_generator = nn.Sequential(nn.Conv2d(320, 4, kernel_size=3, padding=1),
-                                                   nn.Sigmoid())
-        self.outc = OutConv(160, n_classes)
-
-
-    def forward(self, x16_out, x32_out, x64_out):
-
-        x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
-        x = self.up2(x, x64_out)       # 1,320,64,64
-        gen_feature = self.feature_generator(x) # 1, 4, 64, 64
-        x = self.segmentation_head(x)
-        logits = self.outc(x)  # 1, 4, 128,128
-        return gen_feature, logits
-
-class SemanticSeg_Gen(nn.Module):
-    def __init__(self,
-                 n_classes,
-                 bilinear=False,
-                 use_batchnorm=True,
-                 use_instance_norm = True,
-                 mask_res = 128):
-
-        super(SemanticSeg_Gen, self).__init__()
-
-        factor = 2 if bilinear else 1
-        self.up1 = Up(1280, 640 // factor, bilinear, use_batchnorm, use_instance_norm)
-        self.up2 = Up(640, 320 // factor, bilinear, use_batchnorm, use_instance_norm)
-
-        if mask_res == 128:
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2))
-        if mask_res == 256 :
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels = 320, out_channels = 160, kernel_size=2),
-                                                   Up_conv(in_channels = 160, out_channels = 160, kernel_size=2))
-        if mask_res == 512 :
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320, out_channels=160, kernel_size=2),
-                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2),
-                                                   Up_conv(in_channels=160, out_channels=160, kernel_size=2))
-        self.outc = OutConv(160, n_classes)
-
-
-    def reconstruction(self, x):
-        return self.decoder_model(x)
-
-    def forward(self, x16_out, x32_out, x64_out):
-
-        x = self.up1(x16_out,x32_out)  # 1,640,32,32 -> 640*32
-        x = self.up2(x, x64_out)       # 1,320,64,64
-
-        # ----------------------------------------------------------------------------------------------------
-        # semantic rich feature
-        x = self.segmentation_head(x)
-        logits = self.outc(x)  # 1, 4, 128,128
-
-        return logits #, gen_feature
-
-
-
-
-class SemanticSeg_2(nn.Module):
-    def __init__(self,
-                 n_classes,
-                 bilinear=False,
-                 use_batchnorm=True,
+                 use_layer_norm=True,
                  use_instance_norm=True,
                  mask_res=128,
                  high_latent_feature=False,
                  init_latent_p=1):
-        super(SemanticSeg_2, self).__init__()
+        super(SemanticModel, self).__init__()
 
         c = 320
 
@@ -205,16 +117,40 @@ class SemanticSeg_2(nn.Module):
         self.mlp_layer_3 = torch.nn.Linear(320, c)
         self.upsample_layer_3 = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
 
-        # self.outc = OutConv(160, n_classes)
-        if mask_res == 128:
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2))
-        if mask_res == 256:
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
-                                                   Up_conv(in_channels=160*3, out_channels=160, kernel_size=2))
-        if mask_res == 512:
-            self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
-                                                   Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
-                                                   Up_conv(in_channels=160*2, out_channels=160, kernel_size=2))
+        self.use_layer_norm = use_layer_norm
+        self.use_instance_norm = use_instance_norm
+        if self.use_layer_norm:
+            if mask_res == 128:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160 , 128, 128]),)
+            if mask_res == 256:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.LayerNorm([160*3, 128, 128]),
+                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160, 256,256]))
+            if mask_res == 512:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.LayerNorm([160*3, 128, 128]),
+                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
+                                                       nn.LayerNorm([160*2, 256, 256]),
+                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160, 512, 512]))
+        if self.use_instance_norm :
+            if mask_res == 128:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                                                       nn.InstanceNorm2d(160),)
+            if mask_res == 256:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.InstanceNorm2d(160*3),
+                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
+                                                       nn.InstanceNorm2d(160))
+            if mask_res == 512:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.InstanceNorm2d(160*3),
+                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
+                                                       nn.InstanceNorm2d(160*2),
+                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
+                                                       nn.InstanceNorm2d(160))
         self.outc = OutConv(160, n_classes)
 
     def dim_and_res_up(self, mlp_layer, upsample_layer, x):
@@ -230,68 +166,12 @@ class SemanticSeg_2(nn.Module):
         return x
 
     def forward(self, x16_out, x32_out, x64_out):
+
         x16_out = self.dim_and_res_up(self.mlp_layer_1, self.upsample_layer_1, x16_out)  # [batch, 320, 64,64]
         x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)  # [batch, 320, 64,64]
         x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)  # [batch, 320, 64,64]
         x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
-
-        x = self.segmentation_head(x)
+        # non linear model ?
+        x = self.segmentation_head(x) # [batch, 160, 256,256]
         logits = self.outc(x)  # 1, 4, 128,128
         return logits
-
-"""
-# [1] get image
-image_path = 'data_sample/image/sample_200.jpg'
-image = Image.open(image_path).convert('RGB')
-
-# [2] make pipeline
-image_processor = SegformerImageProcessor.from_pretrained("nvidia/mit-b0")
-inputs = image_processor(images=image, return_tensors="pt") # shape of pixel_values: torch.Size([1, 3, 512,512])
-
-
-# [3] main model
-# mit-b0 is base model and not for segmentation model
-# model = "nvidia/segformer-b1-finetuned-cityscapes-1024-1024")
-# SegformerForSemanticSegmentation
-semantic_segmentation_0 = pipeline(task = "image-segmentation", model = "nvidia/mit-b0").model
-semantic_segmentation_1 = pipeline(task = "image-segmentation", model = "nvidia/mit-b1").model
-semantic_segmentation_2 = pipeline(task = "image-segmentation", model = "nvidia/mit-b2").model
-semantic_segmentation_3 = pipeline(task = "image-segmentation", model = "nvidia/mit-b3").model
-semantic_segmentation_4 = pipeline(task = "image-segmentation", model = "nvidia/mit-b4").model
-semantic_segmentation_5 = pipeline(task = "image-segmentation", model = "nvidia/mit-b5").model
-
-out_0 = semantic_segmentation_0(pixel_values = inputs['pixel_values'])
-out_1 = semantic_segmentation_1(pixel_values = inputs['pixel_values'])
-out_2 = semantic_segmentation_2(pixel_values = inputs['pixel_values'])
-out_3 = semantic_segmentation_3(pixel_values = inputs['pixel_values'])
-out_4 = semantic_segmentation_4(pixel_values = inputs['pixel_values'])
-out_5 = semantic_segmentation_5(pixel_values = inputs['pixel_values'])
-"""
-"""
-
-output = model(pixel_values = inputs['pixel_values'])
-
-print(output.logits.shape)
-
-# [3] segformer model
-#input_torch = torch.randn(1, 3, 1024, 1024)
-# SegformerForSemanticSegmentation
-
-#
-#from datasets import load_dataset
-
-#dataset = load_dataset("huggingface/cats-image")
-#image = dataset["test"]["image"][0]
-
-
-model = SegformerModel.from_pretrained("nvidia/mit-b0")
-
-inputs = image_processor(image, return_tensors="pt")
-
-with torch.no_grad():
-    outputs = model(**inputs)
-
-last_hidden_states = outputs.last_hidden_state
-list(last_hidden_states.shape)
-[1, 256, 16, 16]
-"""

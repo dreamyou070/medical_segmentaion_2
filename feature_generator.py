@@ -6,9 +6,8 @@ from torch import nn
 import os
 from attention_store import AttentionStore
 from data import call_dataset
-from diffusers import DDPMScheduler
 from model import call_model_package
-from model.segmentation_unet import SemanticSeg, SemanticSeg_Gen, SemanticSeg_2
+from model.segmentation_unet import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
 from model.unet import unet_passing_argument
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
@@ -17,20 +16,11 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate_3 import evaluation_check
-from model.pe import AllPositionalEmbedding
-from safetensors.torch import load_file
-from monai.utils import DiceCEReduction, LossReduction
-from utils import get_noise_noisy_latents_and_timesteps
-from model.autodecoder import AutoencoderKL
-from torch.nn import L1Loss
+from utils.evaluate import evaluation_check
+from monai.utils import LossReduction
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
-from utils.losses import PatchAdversarialLoss
 from torch.nn import functional as F
-
-# image conditioned segmentation mask generating
 
 def main(args):
 
@@ -44,59 +34,45 @@ def main(args):
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
         json.dump(vars(args), f, indent=4)
 
-    print(f'\n step 3. preparing accelerator')
+    print(f'\n step 2 preparing accelerator')
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
 
-    print(f'\n step 4. model')
+    print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes, mask_res=args.mask_res)
-    if args.light_decoder :
-        segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
-    from model.pe import AllInternalCrossAttention
-    internal_layer_net = None
-    if args.double_self_attention :
-        internal_layer_net = AllInternalCrossAttention()
+    segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                      mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm,
+                                      use_instance_norm=args.use_instance_norm,)
 
     reduction_net = None
 
     if args.reducing_redundancy :
-
-        # i think it is not that good ... (is there any other way to reduce redundancy ?)
-        # image info is much redundancy than text
-        # so, i think it is better to reduce redundancy in image info
 
         class ReductionNet(nn.Module):
             def __init__(self, cross_dim, class_num):
 
                 super(ReductionNet, self).__init__()
 
-                self.dynamic_class_dim = args.dynamic_class_dim
-                if self.dynamic_class_dim :
-                    self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
-                                               nn.Softmax(dim=-1))
-                else :
-                    self.class_embedding = nn.Parameter(data = torch.randn((class_num, 196)))
+                self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
+                                           nn.Softmax(dim=-1))
 
             def forward(self, x):
                 class_embedding = x[:, 0, :]
                 org_x = x[:, 1:, :]  # x = [1,196,768]
-                if self.dynamic_class_dim:
-                    reduct_x = self.layer(org_x)  # x = [1,196,3]
-                    if args.use_weighted_reduct :
-                        weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                        weight_scale = torch.sum(weight_x, dim=-1)
-                        reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
-                        # normalizing in channel dimention ***
-                        #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                        reduct_x = reduct_x / weight_scale.unsqueeze(-1)
-                    else :
-                        reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
-                        reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
-                        reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                reduct_x = self.layer(org_x)  # x = [1,196,3]
+
+                if args.use_weighted_reduct :
+                    weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                    weight_scale = torch.sum(weight_x, dim=-1)
+                    reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
+                    reduct_x = reduct_x / weight_scale.unsqueeze(-1)
+
                 else :
-                    reduct_x = torch.matmul(self.class_embedding, org_x)
+                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
+                    reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
+                    reduct_x = F.normalize(reduct_x, p=2, dim=-1)
 
                 if class_embedding.dim() != 3:
                     class_embedding = class_embedding.unsqueeze(0)
@@ -115,25 +91,16 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
-                                                        args.unet_lr,
-                                                        args.learning_rate) # all trainable params
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr, args.learning_rate) # all trainable params
     if args.reducing_redundancy :
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": segmentation_head.parameters(),
-                             "lr": args.learning_rate})
-    if args.double_self_attention:
-        trainable_params.append({"params": internal_layer_net.parameters(),
-                                  "lr": args.learning_rate})
+    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    #l1_loss = L1Loss()
-    l2_loss = nn.MSELoss(reduction='None')
-    adv_loss = PatchAdversarialLoss(criterion="least_squares")
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
     if args.use_monai_focal_loss:
@@ -174,9 +141,6 @@ def main(args):
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
-    if args.double_self_attention:
-        internal_layer_net = accelerator.prepare(internal_layer_net)
-        internal_layer_net = transform_models_if_DDP([internal_layer_net])[0]
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
@@ -203,7 +167,6 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    kl_weight = 1e-6
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -347,12 +310,6 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.double_self_attention:
-                save_model(args,
-                           saving_folder='self_attn_model',
-                           saving_name=f'self_attn_model-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(internal_layer_net),
-                           save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -363,7 +320,7 @@ def main(args):
 
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, internal_layer_net, args)
+                                                           reduction_net, None, args)
 
         # saving
         if is_main_process:
@@ -475,14 +432,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_position_embedder", action='store_true')
     parser.add_argument("--check_training", action='store_true')
     parser.add_argument("--pretrained_segmentation_model", type=str)
-    parser.add_argument("--use_batchnorm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
-    parser.add_argument("--aggregation_model_a", action='store_true')
-    parser.add_argument("--aggregation_model_b", action='store_true')
-    parser.add_argument("--aggregation_model_c", action='store_true')
-    parser.add_argument("--aggregation_model_d", action='store_true')
-    parser.add_argument("--norm_type", type=str, default='batchnorm',
-                        choices=['batch_norm', 'instance_norm', 'layer_norm'])
     parser.add_argument("--non_linearity", type=str, default='relu', choices=['relu', 'leakyrelu', 'gelu'])
     parser.add_argument("--neighbor_size", type=int, default=3)
     parser.add_argument("--do_semantic_position", action='store_true')
@@ -518,15 +468,14 @@ if __name__ == "__main__":
     parser.add_argument("--image_processor", default = 'vit', type = str)
     parser.add_argument("--image_model_training", action='store_true')
     parser.add_argument("--erase_position_embeddings", action='store_true')
-    parser.add_argument("--light_decoder", action='store_true')
     parser.add_argument("--use_base_prompt", action='store_true')
     parser.add_argument("--use_noise_pred_loss", action='store_true')
-    parser.add_argument("--use_vit_pix_embed", action='store_true')
+    parser.add_argument("--use_layer_norm,", action='store_true')
+    parser.add_argument("--use_instance_norm", action='store_true')
     parser.add_argument("--not_use_cls_token", action='store_true')
     parser.add_argument("--without_condition", action='store_true')
     parser.add_argument("--only_use_cls_token", action='store_true')
     parser.add_argument("--reducing_redundancy", action='store_true')
-    parser.add_argument("--dynamic_class_dim", action='store_true')
     parser.add_argument("--use_weighted_reduct", action='store_true')
     parser.add_argument("--double_self_attention", action='store_true')
     args = parser.parse_args()
