@@ -55,13 +55,8 @@ def main(args):
                                       mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm,
                                       use_instance_norm = args.use_instance_norm,)
-    from model.pe import AllInternalCrossAttention
-    internal_layer_net = None
-    if args.double_self_attention :
-        internal_layer_net = AllInternalCrossAttention()
 
     reduction_net = None
-
     if args.reducing_redundancy :
 
         # i think it is not that good ... (is there any other way to reduce redundancy ?)
@@ -72,38 +67,33 @@ def main(args):
             def __init__(self, cross_dim, class_num):
 
                 super(ReductionNet, self).__init__()
-
-                self.dynamic_class_dim = args.dynamic_class_dim
-                if self.dynamic_class_dim :
-                    self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
+                self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
                                                nn.Softmax(dim=-1))
-                else :
-                    self.class_embedding = nn.Parameter(data = torch.randn((class_num, 196)))
 
             def forward(self, x):
                 class_embedding = x[:, 0, :]
                 org_x = x[:, 1:, :]  # x = [1,196,768]
-                if self.dynamic_class_dim:
-                    reduct_x = self.layer(org_x)  # x = [1,196,3]
-                    if args.use_weighted_reduct :
-                        weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                        weight_scale = torch.sum(weight_x, dim=-1)
-                        reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
-                        # normalizing in channel dimention ***
-                        #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                        reduct_x = reduct_x / weight_scale.unsqueeze(-1)
-                    else :
-                        reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
-                        reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
-                        reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+
+                reduct_x = self.layer(org_x)  # x = [1,196,3]
+                if args.use_weighted_reduct :
+                    weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                    weight_scale = torch.sum(weight_x, dim=-1)
+                    reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
+                    # normalizing in channel dimention ***
+                    #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                    reduct_x = reduct_x / weight_scale.unsqueeze(-1)
                 else :
-                    reduct_x = torch.matmul(self.class_embedding, org_x)
+                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
+                    reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
+                    reduct_x = F.normalize(reduct_x, p=2, dim=-1)
 
                 if class_embedding.dim() != 3:
                     class_embedding = class_embedding.unsqueeze(0)
                 if class_embedding.dim() != 3:
                     class_embedding = class_embedding.unsqueeze(0)
+
                 x = torch.cat([class_embedding, reduct_x], dim=1)
+
                 return x
 
         reduction_net = ReductionNet(768, args.n_classes)
@@ -123,9 +113,6 @@ def main(args):
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
-    if args.double_self_attention:
-        trainable_params.append({"params": internal_layer_net.parameters(),
-                                  "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -172,10 +159,6 @@ def main(args):
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
-    if args.double_self_attention:
-        internal_layer_net = accelerator.prepare(internal_layer_net)
-        internal_layer_net = transform_models_if_DDP([internal_layer_net])[0]
-
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -354,12 +337,6 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.double_self_attention:
-                save_model(args,
-                           saving_folder='self_attn_model',
-                           saving_name=f'self_attn_model-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(internal_layer_net),
-                           save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -370,7 +347,7 @@ def main(args):
 
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, internal_layer_net, args)
+                                                           reduction_net, None, args)
 
         # saving
         if is_main_process:
@@ -533,9 +510,7 @@ if __name__ == "__main__":
     parser.add_argument("--without_condition", action='store_true')
     parser.add_argument("--only_use_cls_token", action='store_true')
     parser.add_argument("--reducing_redundancy", action='store_true')
-    parser.add_argument("--dynamic_class_dim", action='store_true')
     parser.add_argument("--use_weighted_reduct", action='store_true')
-    parser.add_argument("--double_self_attention", action='store_true')
     parser.add_argument("--use_layer_norm", action='store_true')
     parser.add_argument("--original_learning", action='store_true')
     args = parser.parse_args()

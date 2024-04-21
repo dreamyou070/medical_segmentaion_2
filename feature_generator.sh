@@ -6,18 +6,18 @@
 # 22_use_instance_norm_reducing_redundancy_use_weighted_reduct
 # 23_use_layer_norm_reducing_redundancy
 # 24_use_instance_norm_reducing_redundancy
-#
+# 25_reducing_redundancy
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
-port_number=50272
+port_number=52525
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="27_extract_from_noise" #
+file_name="28_reducing_redundancy_without_noise_pred" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -43,4 +43,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --use_noise_pred_loss
+ --reducing_redundancy
