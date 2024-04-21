@@ -469,7 +469,7 @@ if __name__ == "__main__":
     parser.add_argument("--erase_position_embeddings", action='store_true')
     parser.add_argument("--use_base_prompt", action='store_true')
     parser.add_argument("--use_noise_pred_loss", action='store_true')
-    parser.add_argument("--use_layer_norm,", action='store_true')
+    parser.add_argument("--use_layer_norm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
     parser.add_argument("--not_use_cls_token", action='store_true')
     parser.add_argument("--without_condition", action='store_true')
