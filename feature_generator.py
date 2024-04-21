@@ -203,7 +203,7 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
 
-            encoder_hidden_states = torch.tensor((1,1,768)).to(device)
+            encoder_hidden_states = None # torch.tensor((1,1,768)).to(device)
 
             if not args.without_condition :
                 if args.use_image_condition :
