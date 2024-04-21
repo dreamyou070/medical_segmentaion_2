@@ -135,7 +135,7 @@ class SemanticModel(nn.Module):
                                                        nn.LayerNorm([160*2, 256, 256]),
                                                        Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
                                                        nn.LayerNorm([160, 512, 512]))
-        if self.use_instance_norm :
+        elif self.use_instance_norm :
             if mask_res == 128:
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
                                                        nn.InstanceNorm2d(160),)
@@ -151,6 +151,17 @@ class SemanticModel(nn.Module):
                                                        nn.InstanceNorm2d(160*2),
                                                        Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
                                                        nn.InstanceNorm2d(160))
+        else :
+            if mask_res == 128:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                                                       )
+            if mask_res == 256:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),)
+            if mask_res == 512:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
+                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),)
         self.outc = OutConv(160, n_classes)
 
     def dim_and_res_up(self, mlp_layer, upsample_layer, x):
