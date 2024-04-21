@@ -80,13 +80,13 @@ def main(args):
                     reduct_x = torch.matmul(reduct_x, org_x)  # x = [1,3,768]
                     # normalizing in channel dimention ***
                     reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                    if class_embedding.dim() != 3:
-                        class_embedding = class_embedding.unsqueeze(0)
-                    if class_embedding.dim() != 3:
-                        class_embedding = class_embedding.unsqueeze(0)
                 else :
-                    class_embedding = torch.matmul(self.class_embedding, org_x)
+                    reduct_x = torch.matmul(self.class_embedding, org_x)
 
+                if class_embedding.dim() != 3:
+                    class_embedding = class_embedding.unsqueeze(0)
+                if class_embedding.dim() != 3:
+                    class_embedding = class_embedding.unsqueeze(0)
                 x = torch.cat([class_embedding, reduct_x], dim=1)
                 return x
 
