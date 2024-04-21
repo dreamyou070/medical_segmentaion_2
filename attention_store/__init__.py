@@ -30,7 +30,6 @@ class AttentionStore :
             self.attention_dict[layer_name] = []
             self.attention_dict[layer_name].append(attention)
 
-
     def reset(self):
 
         self.query_dict = {}
