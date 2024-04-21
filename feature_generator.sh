@@ -9,7 +9,7 @@
 #
 # 26_reducing_redundancy_use_weighted_reduct
 
-port_number=52020
+port_number=50202
 category="medical"
 obj_name="brain"
 trigger_word="brain"
