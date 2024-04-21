@@ -13,7 +13,9 @@ file_name="1_new_data_absolute_pe_segmentation_model_c_use_dice_ce_loss_network_
 accelerate launch --config_file ../../../gpu_config/gpu_0_config \
  --main_process_port $port_number ../test.py \
  --pretrained_model_name_or_path ../../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
- --network_dim 128 --network_alpha 64 \
+ --network_dim 144 --network_alpha 4 \
+ --network_weights
+ --segmentation_weights
  --data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
  --network_folder "../../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model" \
  --obj_name "${obj_name}" \
