@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50003
+port_number=50005
 category="medical"
-obj_name="brain"
-trigger_word="brain"
-benchmark="BraTS2020_Segmentation_256"
+obj_name="leader_polyp"
+trigger_word="leader_polyp"
+benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_segment_image_condition_light_decoder_use_noise_pred_loss" #
+file_name="5_segment_image_condition_light_decoder_not_use_cls_token" #
 # 3
 # except generation #\
 
@@ -27,7 +27,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 4 \
+ --n_classes 2 \
  --mask_res 256 \
  --batch_size 1 \
  --use_batchnorm \
@@ -39,4 +39,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --gt_ext_npy --light_decoder --use_noise_pred_loss
+ --light_decoder --use_noise_pred_loss \
+ --not_use_cls_token
