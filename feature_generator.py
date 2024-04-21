@@ -76,12 +76,17 @@ def main(args):
                 org_x = x[:, 1:, :]  # x = [1,196,768]
                 if self.dynamic_class_dim:
                     reduct_x = self.layer(org_x)  # x = [1,196,3]
-                    weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                    weight_scale = torch.sum(weight_x, dim=-1)
-                    reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
-                    # normalizing in channel dimention ***
-                    #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                    reduct_x = reduct_x / weight_scale.unsqueeze(-1)
+                    if args.use_weighted_reduct :
+                        weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                        weight_scale = torch.sum(weight_x, dim=-1)
+                        reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
+                        # normalizing in channel dimention ***
+                        #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                        reduct_x = reduct_x / weight_scale.unsqueeze(-1)
+                    else :
+                        reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
+                        reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
+                        reduct_x = F.normalize(reduct_x, p=2, dim=-1)
                 else :
                     reduct_x = torch.matmul(self.class_embedding, org_x)
 
@@ -501,6 +506,7 @@ if __name__ == "__main__":
     parser.add_argument("--only_use_cls_token", action='store_true')
     parser.add_argument("--reducing_redundancy", action='store_true')
     parser.add_argument("--dynamic_class_dim", action='store_true')
+    parser.add_argument("--use_weighted_reduct", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

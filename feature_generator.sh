@@ -13,7 +13,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="10_segment_image_condition_light_decoder_reduction_not_dynamic_class_dynamic_class_dim_change_normalizing" #
+file_name="10_segment_image_condition_light_decoder_reduction_not_dynamic_class_dynamic_class_dim_use_weighted_reduct" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -47,4 +47,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_model_training \
  --light_decoder \
  --use_noise_pred_loss \
+ --dynamic_class_dim --use_weighted_reduct \
  --reducing_redundancy
