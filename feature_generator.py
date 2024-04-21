@@ -262,7 +262,7 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 noise_pred = unet(latents, 0, encoder_hidden_states,
                                   trg_layer_list=args.trg_layer_list,
-                                  non_type = internal_layer_net).sample
+                                  noise_type = internal_layer_net).sample
 
             target = torch.randn_like(noise_pred)
             noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean([1, 2, 3])
