@@ -177,16 +177,16 @@ class SingleInternalCrossAttention(nn.Module):
                  max_len: int = 64 * 64,
                  d_model: int = 320, ):
         super().__init__()
-        self.layer = nn.Linear(2*d_model, 768)
+        self.layer = nn.Linear(d_model, 768)
 
     def forward(self, x: torch.Tensor):
 
         start_dim = 3
         if x.dim() == 4:
             start_dim = 4
-            x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C
-        self.fc = self.fc.to(x.device)
-        x = self.fc(x)
+            x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C # batch, len, dim
+        self.layer = self.layer.to(x.device)
+        x = self.layer(x)                                    # batch, len, dim
         return x
 
 class AllInternalCrossAttention(nn.Module):
