@@ -23,8 +23,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             if noise_type is not None and is_cross_attention :
                 #internal_layer_network = noise_type
-                print(f'layer_name {layer_name} | hidden_states {hidden_states.shape} ')
-                print(f'noise_type = {noise_type}')
                 context = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)

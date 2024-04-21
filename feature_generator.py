@@ -55,9 +55,9 @@ def main(args):
     if args.light_decoder :
         segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
     from model.pe import AllInternalCrossAttention
-    internal_layer_net = AllInternalCrossAttention()
-
-
+    internal_layer_net = None
+    if args.double_self_attention :
+        internal_layer_net = AllInternalCrossAttention()
 
     reduction_net = None
 
@@ -122,8 +122,9 @@ def main(args):
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
-    trainable_params.append({"params": internal_layer_net.parameters(),
-                              "lr": args.learning_rate})
+    if args.double_self_attention:
+        trainable_params.append({"params": internal_layer_net.parameters(),
+                                  "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -173,8 +174,9 @@ def main(args):
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
-    internal_layer_net = accelerator.prepare(internal_layer_net)
-    internal_layer_net = transform_models_if_DDP([internal_layer_net])[0]
+    if args.double_self_attention:
+        internal_layer_net = accelerator.prepare(internal_layer_net)
+        internal_layer_net = transform_models_if_DDP([internal_layer_net])[0]
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
@@ -238,8 +240,6 @@ def main(args):
                 if args.use_text_condition :
                     with torch.set_grad_enabled(True):
                         encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
-
-
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
@@ -347,6 +347,12 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
+            if args.double_self_attention:
+                save_model(args,
+                           saving_folder='self_attn_model',
+                           saving_name=f'self_attn_model-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(internal_layer_net),
+                           save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -357,7 +363,7 @@ def main(args):
 
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, None, args)
+                                                           reduction_net, internal_layer_net, args)
 
         # saving
         if is_main_process:

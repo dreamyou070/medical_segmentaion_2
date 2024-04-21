@@ -23,7 +23,7 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
-                     reduction_net, position_embedder, args):
+                     reduction_net, internal_layer_net, args):
 
     segmentation_head.eval()
 
@@ -79,7 +79,8 @@ def evaluation_check(segmentation_head, dataloader, device,
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list)
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type=internal_layer_net)
 
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
