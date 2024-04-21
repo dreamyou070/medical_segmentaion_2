@@ -33,32 +33,26 @@ def evaluation_check(segmentation_head, dataloader, device,
 
         for global_num, batch in enumerate(dataloader):
 
-            if args.use_image_condition:
+            encoder_hidden_states = torch.tensor((1, 1, 768)).to(device)
 
-                if not args.image_model_training:
-                    with torch.no_grad():
-                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [3, 224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(
-                                **batch["image_condition"])  # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
+            if not args.without_condition:
+                if args.use_image_condition:
+                    if not args.image_model_training:
+                        with torch.no_grad():
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.use_vit_pix_embed:
-                                encoder_hidden_states = encoder_hidden_states + pix_embedding
-                else:
-                    with torch.set_grad_enabled(True):
-                        cond_input = batch["image_condition"].data["pixel_values"]  # pixel_value = [batch,3,224,224]
-                        if args.image_processor == 'clip':
-                            encoder_hidden_states = condition_model.get_image_features(
-                                **batch["image_condition"])  # [Batch, 1, 768]
-                            encoder_hidden_states = encoder_hidden_states.unsqueeze(1)
-                        elif args.image_processor == 'vit':
+                            if args.not_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    else:
+                        with torch.set_grad_enabled(True):
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.use_vit_pix_embed:
-                                encoder_hidden_states = encoder_hidden_states + pix_embedding
+                            if args.not_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
 
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):

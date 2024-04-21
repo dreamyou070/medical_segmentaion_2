@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=50005
+port_number=50007
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="5_segment_image_condition_light_decoder_not_use_cls_token" #
+file_name="7_segment_image_condition_light_decoder_only_use_cls_token" #
 # 3
 # except generation #\
 
@@ -40,4 +40,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_processor 'vit' \
  --image_model_training \
  --light_decoder --use_noise_pred_loss \
- --not_use_cls_token
+ --not_use_cls_token \
+ --without_condition --only_use_cls_token

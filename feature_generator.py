@@ -151,22 +151,32 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-            if args.use_image_condition :
-                if not args.image_model_training:
-                    with torch.no_grad():
-                        output, pix_embedding = condition_model(**batch["image_condition"])
-                        encoder_hidden_states = output.last_hidden_state # [batch, 197, 768]
-                        if args.not_use_cls_token :
-                            encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                else :
+
+            encoder_hidden_states = torch.tensor((1,1,768)).to(device)
+
+            if not args.without_condition :
+                if args.use_image_condition :
+                    if not args.image_model_training:
+                        with torch.no_grad():
+                            output, pix_embedding = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state # [batch, 197, 768]
+                            if args.not_use_cls_token :
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    else :
+                        with torch.set_grad_enabled(True):
+                            output, pix_embedding = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            if args.not_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                if args.use_text_condition :
                     with torch.set_grad_enabled(True):
-                        output, pix_embedding = condition_model(**batch["image_condition"])
-                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                        if args.not_use_cls_token:
-                            encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-            if args.use_text_condition :
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
+                        encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
+
+
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
@@ -436,6 +446,9 @@ if __name__ == "__main__":
     parser.add_argument("--use_noise_pred_loss", action='store_true')
     parser.add_argument("--use_vit_pix_embed", action='store_true')
     parser.add_argument("--not_use_cls_token", action='store_true')
+    parser.add_argument("--without_condition", action='store_true')
+    parser.add_argument("--only_use_cls_token", action='store_true')
+
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
