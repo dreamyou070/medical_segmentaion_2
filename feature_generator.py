@@ -56,9 +56,14 @@ def main(args):
         segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
 
     reduction_net = None
-    if args.reducing_redundancy :
-        class ReductionNet(nn.Module):
 
+    if args.reducing_redundancy :
+
+        # i think it is not that good ... (is there any other way to reduce redundancy ?)
+        # image info is much redundancy than text
+        # so, i think it is better to reduce redundancy in image info
+
+        class ReductionNet(nn.Module):
             def __init__(self, cross_dim, class_num):
 
                 super(ReductionNet, self).__init__()
