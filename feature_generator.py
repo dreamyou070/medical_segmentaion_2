@@ -75,7 +75,6 @@ def main(args):
                 else :
                     self.class_embedding = nn.Parameter(data = torch.randn((class_num, 196)))
 
-
             def forward(self, x):
                 class_embedding = x[:, 0, :]
                 org_x = x[:, 1:, :]  # x = [1,196,768]

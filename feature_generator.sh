@@ -13,7 +13,7 @@ trigger_word="leader_polyp"
 benchmark="bkai-igh-neopolyp"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="11_segment_image_condition_light_decoder_redundancy_reduction_dynamic_class_dim_use_weighted_reduct" #
+file_name="12_segment_image_condition_light_decoder_no_condition" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -47,4 +47,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_model_training \
  --light_decoder \
  --use_noise_pred_loss \
- --reducing_redundancy --dynamic_class_dim --use_weighted_reduct
+ --without_condition
