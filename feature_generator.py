@@ -55,6 +55,22 @@ def main(args):
     if args.light_decoder :
         segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
 
+    reduction_net = None
+    if args.reducing_redundancy :
+        class ReductionNet(nn.Module):
+            def __init__(self, cross_dim, class_num):
+                super(ReductionNet, self).__init__()
+                self.linear = nn.Linear(cross_dim, class_num)
+            def forward(self, x):
+                class_embedding = x[:, 0, :]
+                org_x = x[:, 1:, :]    # x = [1,196,768]
+                reduct_x = self.linear(org_x) # x = [1,196,3]
+                reduct_x = reduct_x.permute(0, 2, 1).contiguous() # x = [1,3,196]
+                reduct_x = torch.matmul(reduct_x, x) # x = [1,3,768]
+                x = torch.cat([class_embedding, reduct_x], dim=1)
+                return x
+        reduction_net = ReductionNet(768, args.n_classes)
+
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -66,9 +82,8 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
                                                         args.unet_lr,
                                                         args.learning_rate) # all trainable params
-
-
-
+    if args.reducing_redundancy :
+        trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
@@ -117,6 +132,10 @@ def main(args):
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    if args.reducing_redundancy :
+        reduction_net = accelerator.prepare(reduction_net)
+        reduction_net = transform_models_if_DDP([reduction_net])[0]
+
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -164,6 +183,8 @@ def main(args):
                                 encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                             if args.only_use_cls_token:
                                 encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            if args.reducing_redundancy :
+                                encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else :
                         with torch.set_grad_enabled(True):
                             output, pix_embedding = condition_model(**batch["image_condition"])
@@ -172,6 +193,8 @@ def main(args):
                                 encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                             if args.only_use_cls_token:
                                 encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            if args.reducing_redundancy :
+                                encoder_hidden_states = reduction_net(encoder_hidden_states)
                 if args.use_text_condition :
                     with torch.set_grad_enabled(True):
                         encoder_hidden_states = condition_model(batch["input_ids"].to(device))["last_hidden_state"] # [batch, 77, 768]
@@ -284,9 +307,10 @@ def main(args):
         if args.check_training:
             print(f'test with training data')
             loader = train_dataloader
+
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           None, None, args)
+                                                           reduction_net, None, args)
 
         # saving
         if is_main_process:
@@ -448,7 +472,7 @@ if __name__ == "__main__":
     parser.add_argument("--not_use_cls_token", action='store_true')
     parser.add_argument("--without_condition", action='store_true')
     parser.add_argument("--only_use_cls_token", action='store_true')
-
+    parser.add_argument("--reducing_redundancy", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

@@ -23,7 +23,7 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
-                     simple_linear, position_embedder, args):
+                     reduction_net, position_embedder, args):
 
     segmentation_head.eval()
 
@@ -45,6 +45,8 @@ def evaluation_check(segmentation_head, dataloader, device,
                                 encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                             if args.only_use_cls_token:
                                 encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            if args.reducing_redundancy:
+                                encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else:
                         with torch.set_grad_enabled(True):
                             output, pix_embedding = condition_model(**batch["image_condition"])
@@ -53,6 +55,8 @@ def evaluation_check(segmentation_head, dataloader, device,
                                 encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                             if args.only_use_cls_token:
                                 encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            if args.reducing_redundancy:
+                                encoder_hidden_states = reduction_net(encoder_hidden_states)
 
             if args.use_text_condition:
                 with torch.set_grad_enabled(True):
