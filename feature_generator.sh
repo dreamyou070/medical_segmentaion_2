@@ -46,5 +46,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_processor 'vit' \
  --image_model_training \
  --light_decoder \
- --use_noise_pred_loss \
- --without_condition
+ --use_noise_pred_loss
