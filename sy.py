@@ -21,8 +21,16 @@ class ReductionNet(nn.Module):
             class_embedding = class_embedding.unsqueeze(0)
         x = torch.cat([class_embedding, reduct_x], dim=1)
         return x
-
-reduction_net = ReductionNet(768, 3)
-input = torch.randn(1, 197, 768)
-output = reduction_net(input)
-print(output.size())
+"""
+#reduction_net = ReductionNet(768, 3)
+input = torch.randn(1, 4, 7)
+input[:,0,:] = input[:,0,:] * 0
+input[:,1,:] = input[:,1,:] * 0
+linear_layer = nn.Linear(7, 3)
+output = linear_layer(input)
+print(output) # [1,4,3], 0,1 same
+"""
+class_embedding = nn.Parameter(data = torch.randn((3, 196)), requires_grad=True)
+input_hidden_states = torch.randn(1,196,768)
+output = torch.matmul(class_embedding, input_hidden_states) # [1,3,768]
+print(output.shape)

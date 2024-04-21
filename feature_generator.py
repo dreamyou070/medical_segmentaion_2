@@ -58,24 +58,35 @@ def main(args):
     reduction_net = None
     if args.reducing_redundancy :
         class ReductionNet(nn.Module):
+
             def __init__(self, cross_dim, class_num):
+
                 super(ReductionNet, self).__init__()
-                self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
-                                           nn.Softmax(dim=-1))
+
+                self.dynamic_class_dim = args.dynamic_class_dim
+                if self.dynamic_class_dim :
+                    self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
+                                               nn.Softmax(dim=-1))
+                else :
+                    self.class_embedding = nn.Parameter(data = torch.randn((3, 196)))
+
 
             def forward(self, x):
                 class_embedding = x[:, 0, :]
                 org_x = x[:, 1:, :]  # x = [1,196,768]
-                reduct_x = self.layer(org_x)  # x = [1,196,3]
-                reduct_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                reduct_x = torch.matmul(reduct_x, org_x)  # x = [1,3,768]
+                if self.dynamic_class_dim:
+                    reduct_x = self.layer(org_x)  # x = [1,196,3]
+                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                    reduct_x = torch.matmul(reduct_x, org_x)  # x = [1,3,768]
+                    # normalizing in channel dimention ***
+                    reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                    if class_embedding.dim() != 3:
+                        class_embedding = class_embedding.unsqueeze(0)
+                    if class_embedding.dim() != 3:
+                        class_embedding = class_embedding.unsqueeze(0)
+                else :
+                    class_embedding = torch.matmul(self.class_embedding, org_x)
 
-                # normalizing in channel dimention ***
-                reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                if class_embedding.dim() != 3:
-                    class_embedding = class_embedding.unsqueeze(0)
-                if class_embedding.dim() != 3:
-                    class_embedding = class_embedding.unsqueeze(0)
                 x = torch.cat([class_embedding, reduct_x], dim=1)
                 return x
 
@@ -487,6 +498,7 @@ if __name__ == "__main__":
     parser.add_argument("--without_condition", action='store_true')
     parser.add_argument("--only_use_cls_token", action='store_true')
     parser.add_argument("--reducing_redundancy", action='store_true')
+    parser.add_argument("--dynamic_class_dim", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)
