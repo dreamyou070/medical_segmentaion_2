@@ -6,16 +6,17 @@
 # 7_segment_image_condition_light_decoder_reduction
 # 8_segment_image_condition_light_decoder_no_condition
 # 9_segment_image_condition_light_decoder_reduction_not_dynamic_class
-port_number=50019
+port_number=50010
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="bkai-igh-neopolyp"
+benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="9_segment_image_condition_light_decoder_reduction_not_dynamic_class" #
+file_name="10_segment_image_condition_light_decoder_reduction_not_dynamic_class_dynamic_class_dim_change_normalizing" #
 # 3 --not_use_cls_token --without_condition
-# except generation #\
+# except generation
+# --gt_ext_npy \
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -32,7 +33,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 3 \
+ --n_classes 2 \
  --mask_res 256 \
  --batch_size 1 \
  --use_batchnorm \
@@ -45,6 +46,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_processor 'vit' \
  --image_model_training \
  --light_decoder \
- --gt_ext_npy \
  --use_noise_pred_loss \
  --reducing_redundancy

@@ -30,7 +30,10 @@ linear_layer = nn.Linear(7, 3)
 output = linear_layer(input)
 print(output) # [1,4,3], 0,1 same
 """
-class_embedding = nn.Parameter(data = torch.randn((3, 196)), requires_grad=True)
-input_hidden_states = torch.randn(1,196,768)
-output = torch.matmul(class_embedding, input_hidden_states) # [1,3,768]
-print(output.shape)
+
+weight_x = torch.randn((1,3,6))
+weight_scale = torch.sum(weight_x, dim=-1)
+print(f' (1) weight_x: {weight_x}')
+print(f'weight_scale: {weight_scale}')
+weight_x = weight_x / weight_scale.unsqueeze(-1)
+print(f'after device, weight_x: {weight_x}')

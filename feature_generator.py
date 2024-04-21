@@ -68,7 +68,7 @@ def main(args):
                     self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
                                                nn.Softmax(dim=-1))
                 else :
-                    self.class_embedding = nn.Parameter(data = torch.randn((3, 196)))
+                    self.class_embedding = nn.Parameter(data = torch.randn((class_num, 196)))
 
 
             def forward(self, x):
@@ -76,10 +76,12 @@ def main(args):
                 org_x = x[:, 1:, :]  # x = [1,196,768]
                 if self.dynamic_class_dim:
                     reduct_x = self.layer(org_x)  # x = [1,196,3]
-                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                    reduct_x = torch.matmul(reduct_x, org_x)  # x = [1,3,768]
+                    weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                    weight_scale = torch.sum(weight_x, dim=-1)
+                    reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
                     # normalizing in channel dimention ***
-                    reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                    #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                    reduct_x = reduct_x / weight_scale.unsqueeze(-1)
                 else :
                     reduct_x = torch.matmul(self.class_embedding, org_x)
 
