@@ -122,6 +122,8 @@ def main(args):
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
+    trainable_params.append({"params": internal_layer_net.parameters(),
+                              "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -171,6 +173,8 @@ def main(args):
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
+    internal_layer_net = accelerator.prepare(internal_layer_net)
+    internal_layer_net = transform_models_if_DDP([internal_layer_net])[0]
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]

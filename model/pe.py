@@ -227,8 +227,7 @@ class AllInternalCrossAttention(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
-                layer_name,
-                patch_idx=None):
+                layer_name):
 
         if layer_name in self.internal_cross_encodings.keys() :
             internal_layer = self.internal_cross_encodings[layer_name]
