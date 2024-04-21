@@ -215,14 +215,11 @@ class AllInternalCrossAttention(nn.Module):
                            'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320), }
 
     def __init__(self,
-                 pe_do_concat,
-                 do_semantic_position,) -> None:
+                 ) -> None:
         super().__init__()
 
         self.layer_dict = self.layer_names_res_dim
         self.internal_cross_encodings = {}
-        self.do_concat = pe_do_concat
-        self.do_semantic_position = do_semantic_position
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
             self.internal_cross_encodings[layer_name] = SingleInternalCrossAttention(max_len = res*res,
