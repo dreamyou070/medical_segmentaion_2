@@ -432,7 +432,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_position_embedder", action='store_true')
     parser.add_argument("--check_training", action='store_true')
     parser.add_argument("--pretrained_segmentation_model", type=str)
-    parser.add_argument("--use_instance_norm", action='store_true')
     parser.add_argument("--non_linearity", type=str, default='relu', choices=['relu', 'leakyrelu', 'gelu'])
     parser.add_argument("--neighbor_size", type=int, default=3)
     parser.add_argument("--do_semantic_position", action='store_true')
