@@ -66,7 +66,7 @@ def main(args):
                 org_x = x[:, 1:, :]    # x = [1,196,768]
                 reduct_x = self.linear(org_x) # x = [1,196,3]
                 reduct_x = reduct_x.permute(0, 2, 1).contiguous() # x = [1,3,196]
-                reduct_x = torch.matmul(reduct_x, x) # x = [1,3,768]
+                reduct_x = torch.matmul(reduct_x, org_x) # x = [1,3,768]
                 x = torch.cat([class_embedding, reduct_x], dim=1)
                 return x
         reduction_net = ReductionNet(768, args.n_classes)
