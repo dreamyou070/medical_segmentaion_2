@@ -54,6 +54,10 @@ def main(args):
     segmentation_head = SemanticSeg_Gen(n_classes=args.n_classes, mask_res=args.mask_res)
     if args.light_decoder :
         segmentation_head = SemanticSeg_2(n_classes=args.n_classes, mask_res=args.mask_res,)
+    from model.pe import AllInternalCrossAttention
+    internal_layer_net = AllInternalCrossAttention()
+
+
 
     reduction_net = None
 
@@ -252,7 +256,9 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list).sample
+                noise_pred = unet(latents, 0, encoder_hidden_states,
+                                  trg_layer_list=args.trg_layer_list,
+                                  non_type = internal_layer_net).sample
 
             target = torch.randn_like(noise_pred)
             noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean([1, 2, 3])
