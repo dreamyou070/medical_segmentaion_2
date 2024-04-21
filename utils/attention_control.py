@@ -20,6 +20,8 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             if context is not None:
                 is_cross_attention = True
             """ cross self rechecking necessary """
+            if noise_type is not None and is_cross_attention:
+                context = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
             context = context if context is not None else hidden_states

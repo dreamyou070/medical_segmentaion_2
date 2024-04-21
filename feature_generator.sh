@@ -1,6 +1,7 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
+# 20_double_self_attention
 # 21_use_layer_norm_reducing_redundancy_use_weighted_reduct
 # 22_use_instance_norm_reducing_redundancy_use_weighted_reduct
 # 23_use_layer_norm_reducing_redundancy
@@ -8,14 +9,14 @@
 #
 # 26_reducing_redundancy_use_weighted_reduct
 
-port_number=52626
+port_number=52020
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="26_reducing_redundancy_use_weighted_reduct" #
+file_name="20_double_self_attention" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \
@@ -41,5 +42,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --use_noise_pred_loss \
- --reducing_redundancy --use_weighted_reduct
+ --use_noise_pred_loss --double_self_attention
