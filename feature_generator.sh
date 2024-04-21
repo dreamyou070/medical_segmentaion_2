@@ -5,14 +5,14 @@
 # 6_segment_image_condition_light_decoder_only_use_cls_token
 # 7_segment_image_condition_light_decoder_reduction
 
-port_number=50006
+port_number=50007
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="6_segment_image_condition_light_decoder_only_use_cls_token" #
+file_name="7_segment_image_condition_light_decoder_reducing_redundancy" #
 # 3 --not_use_cls_token --without_condition
 # except generation #\
 
@@ -44,4 +44,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_processor 'vit' \
  --image_model_training \
  --light_decoder --use_noise_pred_loss \
- --only_use_cls_token
+ --reducing_redundancy
