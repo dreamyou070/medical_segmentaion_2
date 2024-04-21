@@ -259,9 +259,17 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                noise_pred = unet(latents, 0, encoder_hidden_states,
-                                  trg_layer_list=args.trg_layer_list,
-                                  noise_type=internal_layer_net).sample
+
+                if args.original_learning :
+                    noise_pred = unet(latents, 0, encoder_hidden_states,
+                                      trg_layer_list=args.trg_layer_list,
+                                      noise_type=internal_layer_net).sample
+                else :
+                    latents = torch.randn(1,4,64,64)
+                    latents = latents.to(device)
+                    noise_pred = unet(latents, 0, encoder_hidden_states,
+                                      trg_layer_list=args.trg_layer_list,
+                                      noise_type=internal_layer_net).sample
 
             target = torch.randn_like(noise_pred)
             noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
@@ -529,6 +537,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_weighted_reduct", action='store_true')
     parser.add_argument("--double_self_attention", action='store_true')
     parser.add_argument("--use_layer_norm", action='store_true')
+    parser.add_argument("--original_learning", action='store_true')
     args = parser.parse_args()
     unet_passing_argument(args)
     passing_argument(args)

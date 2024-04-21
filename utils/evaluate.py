@@ -65,8 +65,16 @@ def evaluation_check(segmentation_head, dataloader, device,
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type=internal_layer_net)
+                if args.original_learning:
+                    noise_pred = unet(latents, 0, encoder_hidden_states,
+                                      trg_layer_list=args.trg_layer_list,
+                                      noise_type=internal_layer_net).sample
+                else:
+                    latents = torch.randn(1, 4, 64, 64)
+                    latents = latents.to(device)
+                    noise_pred = unet(latents, 0, encoder_hidden_states,
+                                      trg_layer_list=args.trg_layer_list,
+                                      noise_type=internal_layer_net).sample
 
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
