@@ -11,9 +11,9 @@
 
 port_number=52020
 category="medical"
-obj_name="leader_polyp"
-trigger_word="leader_polyp"
-benchmark="Pranet"
+obj_name="brain"
+trigger_word="brain"
+benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="20_double_self_attention" #
@@ -36,10 +36,10 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 2 --mask_res 256 --batch_size 1 \
+ --n_classes 4 --mask_res 256 --batch_size 1 \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_processor 'vit' \
  --image_model_training \
- --use_noise_pred_loss --double_self_attention
+ --use_noise_pred_loss --double_self_attention --gt_ext_npy
