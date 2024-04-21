@@ -247,10 +247,11 @@ def main(args):
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             with torch.set_grad_enabled(True):
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                if encoder_hidden_states is not None :
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list).sample
 
             target = torch.randn_like(noise_pred)
