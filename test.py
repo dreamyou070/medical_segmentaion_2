@@ -54,8 +54,11 @@ class ReductionNet(nn.Module):
 
 def torch_to_pil(torch_img):
     # torch_img = [3, H, W], from -1 to 1
-    np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
-    pil = Image.fromarray(np_img)
+    if torch_img.dim() == 3 :
+        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
+    else :
+        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8)
+    pil = Image.fromarray(np_img).convert("RGB")
     return pil
 
 def main(args):
