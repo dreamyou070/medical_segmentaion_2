@@ -45,8 +45,7 @@ def main(args):
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
-                                      use_layer_norm = args.use_layer_norm,
-                                      use_instance_norm = args.use_instance_norm,)
+                                      use_layer_norm = args.use_layer_norm)
 
     reduction_net = None
     if args.reducing_redundancy :
