@@ -248,7 +248,7 @@ def main(args):
                     if not args.image_model_training:
 
                         if args.image_processor == 'pvt':
-                            output = condition_model(**batch["image_condition"])
+                            output = condition_model(batch["image_condition"])
                             encoder_hidden_states = vision_head(output)
 
                         elif args.image_processor == 'vit':
@@ -264,7 +264,7 @@ def main(args):
                     else:
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
-                                output = condition_model(**batch["image_condition"])
+                                output = condition_model(batch["image_condition"])
                                 encoder_hidden_states = vision_head(output)
 
                             elif args.image_processor == 'vit':
