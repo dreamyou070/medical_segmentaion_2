@@ -16,6 +16,7 @@ from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, 
 import numpy as np
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
+from ignite.metrics.confusion_matrix import ConfusionMatrix
 
 def eval_step(engine, batch):
     return batch
@@ -191,16 +192,17 @@ def main(args):
                 # [1] pred
                 class_num = masks_pred.shape[1]  # 4
                 mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
+
                 print(f'mask_pred_argmax : {type(mask_pred_argmax)} | shape = {mask_pred_argmax.shape} | max value = {mask_pred_argmax.max()} | min value = {mask_pred_argmax.min()}')
                 y_pred_list.append(mask_pred_argmax)
                 y_true = gt_flat.squeeze()
                 y_true_list.append(y_true)
 
                 # [2] saving image (all in 256 X 256)
-                original_pil = torch_to_pil(image.squeeze()).resize((256, 256))
-                gt_pil = torch_to_pil(gt.squeeze()).resize((256, 256))
-                #predict_pil =
-                #merged_pil =
+                original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((256, 256))
+                gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((256, 256))
+                predict_pil = torch_to_pil(mask_pred_argmax.reshape((256,256)).contiguous().detach().cpu())
+                merged_pil = Image.blend(original_pil, predict_pil, 0.4)
 
             #######################################################################################################################
             # [1] pred
