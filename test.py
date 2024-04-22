@@ -346,9 +346,8 @@ if __name__ == '__main__' :
     parser.add_argument("--original_learning", action='store_true')
     parser.add_argument("--segmentation_head_weights", type= str)
     args = parser.parse_args()
-    unet_passing_argument(args)
     passing_argument(args)
-    from data.dataset_multi import passing_mvtec_argument
+    from data.dataloader import passing_mvtec_argument
     passing_mvtec_argument(args)
     main(args)
     args = parser.parse_args()

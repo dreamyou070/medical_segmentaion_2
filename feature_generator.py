@@ -10,24 +10,16 @@ from diffusers import DDPMScheduler
 from model import call_model_package
 from model.segmentation_unet import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
-from model.unet import unet_passing_argument
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
+from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
 from utils.evaluate import evaluation_check
-from model.pe import AllPositionalEmbedding
-from safetensors.torch import load_file
 from monai.utils import DiceCEReduction, LossReduction
-from utils import get_noise_noisy_latents_and_timesteps
-from model.autodecoder import AutoencoderKL
-from torch.nn import L1Loss
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution # from diffusers
-from utils.losses import PatchAdversarialLoss
 from torch.nn import functional as F
 
 # image conditioned segmentation mask generating
@@ -243,13 +235,7 @@ def main(args):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-                if args.original_learning :
-                    noise_pred = unet(latents, 0, encoder_hidden_states,
-                                      trg_layer_list=args.trg_layer_list).sample
-                else :
-                    latents = torch.randn(1,4,64,64)
-                    latents = latents.to(device)
-                    noise_pred = unet(latents, 0, encoder_hidden_states,
+                noise_pred = unet(latents, 0, encoder_hidden_states,
                                       trg_layer_list=args.trg_layer_list).sample
 
             target = torch.randn_like(noise_pred)
@@ -510,9 +496,7 @@ if __name__ == "__main__":
     parser.add_argument("--reducing_redundancy", action='store_true')
     parser.add_argument("--use_weighted_reduct", action='store_true')
     parser.add_argument("--use_layer_norm", action='store_true')
-    parser.add_argument("--original_learning", action='store_true')
     args = parser.parse_args()
-    unet_passing_argument(args)
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
     passing_mvtec_argument(args)
