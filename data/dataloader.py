@@ -71,7 +71,6 @@ class TestDataset(Dataset):
 
         # [1] base image
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir)  # anomal
 
         rgb_folder = image_root  # anomal / image_256
         gt_folder = gt_root  # [128,128]
