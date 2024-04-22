@@ -68,6 +68,7 @@ def main(args):
     print(f' (1) stable diffusion model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+
     print(f' (2) lora network and loading model')
     network.load_weights(args.network_weights)
     print(f' (3) segmentation head and loading pretrained')
@@ -122,6 +123,7 @@ def main(args):
         test_dataloader = torch.utils.data.DataLoader(test_dataset,
                                                       batch_size=1,
                                                       shuffle=False)
+        test_dataloader = accelerator.prepare(test_dataloader)
         # [4] output dir
         device = accelerator.device
         with torch.no_grad():
