@@ -10,7 +10,7 @@
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
-port_number=52929
+port_number=53030
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
@@ -23,7 +23,7 @@ file_name="30_pvt_image_encoder" #
 # --gt_ext_npy \  --use_position_embedder
 # 29_reducing_redundancy_without_noise_pred_with_position_embedding
 
-accelerate launch --config_file ../../gpu_config/gpu_0_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

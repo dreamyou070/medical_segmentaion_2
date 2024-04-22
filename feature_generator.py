@@ -401,6 +401,12 @@ def main(args):
                            saving_name=f'position-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(position_embedder),
                            save_dtype=save_dtype)
+            if args.image_processor == 'pvt' :
+                save_model(args,
+                           saving_folder='vision_head',
+                           saving_name=f'vision-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(vision_head),
+                           save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -411,7 +417,7 @@ def main(args):
 
         score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
                                                            condition_model, unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, None, args)
+                                                           reduction_net, position_embedder, vision_head, args)
 
         # saving
         if is_main_process:

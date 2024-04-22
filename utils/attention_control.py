@@ -28,7 +28,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             context = context if context is not None else hidden_states
             if type(context) == dict :
-                print(f' dictionary context to torch')
                 p = query.shape[1]
                 res = int(p ** 0.5)
                 context = context[res]

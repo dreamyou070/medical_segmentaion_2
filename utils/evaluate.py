@@ -10,7 +10,7 @@ def eval_step(engine, batch):
 @torch.inference_mode()
 def evaluation_check(segmentation_head, dataloader, device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
-                     reduction_net, internal_layer_net, args):
+                     reduction_net, position_embedder, vision_head, args):
 
     segmentation_head.eval()
 
@@ -19,40 +19,53 @@ def evaluation_check(segmentation_head, dataloader, device,
 
         for global_num, batch in enumerate(dataloader):
 
-            encoder_hidden_states = torch.tensor((1, 1, 768)).to(device)
+            encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
 
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
-                        with torch.no_grad():
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.not_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                            if args.only_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                            if args.reducing_redundancy:
-                                encoder_hidden_states = reduction_net(encoder_hidden_states)
+
+                        if args.image_processor == 'pvt':
+                            output = condition_model(batch["image_condition"])
+                            encoder_hidden_states = vision_head(output)
+
+                        elif args.image_processor == 'vit':
+                            with torch.no_grad():
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.not_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                                if args.only_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                                if args.reducing_redundancy:
+                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else:
                         with torch.set_grad_enabled(True):
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.not_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                            if args.only_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                            if args.reducing_redundancy:
-                                encoder_hidden_states = reduction_net(encoder_hidden_states)
+                            if args.image_processor == 'pvt':
+                                output = condition_model(batch["image_condition"])
+                                encoder_hidden_states = vision_head(output)
 
-            if args.use_text_condition:
-                with torch.set_grad_enabled(True):
-                    encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                        "last_hidden_state"]  # [batch, 77, 768]
+                            elif args.image_processor == 'vit':
+
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.not_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                                if args.only_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                                if args.reducing_redundancy:
+                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
+                if args.use_text_condition:
+                    with torch.set_grad_enabled(True):
+                        encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
+                            "last_hidden_state"]  # [batch, 77, 768]
+
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
+
             # key_word_index = batch['key_word_index'][0] # torch([10,14])
             # target key word should intense
             # how can i increase the alignment between image and text ?
@@ -61,14 +74,20 @@ def evaluation_check(segmentation_head, dataloader, device,
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             with torch.set_grad_enabled(True):
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+
                 noise_pred = unet(latents, 0, encoder_hidden_states,
-                                      trg_layer_list=args.trg_layer_list,
-                                      noise_type=internal_layer_net).sample
-                
+                                  trg_layer_list=args.trg_layer_list,
+                                  noise_type=position_embedder).sample
+
+            target = torch.randn_like(noise_pred)
+            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
+                [1, 2, 3])
+
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
