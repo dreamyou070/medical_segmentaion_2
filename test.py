@@ -67,6 +67,7 @@ def main(args):
     args.logging_dir = os.path.join(args.output_dir, 'log')
     os.makedirs(args.logging_dir, exist_ok=True)
     accelerator = prepare_accelerator(args)
+    is_main_process = accelerator.is_main_process
 
     print(f' step 1. make model')
     print(f' (1) stable diffusion model')
@@ -84,12 +85,18 @@ def main(args):
     segmentation_state_dict = torch.load(args.segmentation_head_weights)
     segmentation_head.load_state_dict(segmentation_state_dict)
     segmentation_head.to(dtype=weight_dtype, device=accelerator.device)
-
+    pure_path = os.path.split(args.segmentation_head_weights)[-1]
+    pure_path = os.path.splitext(pure_path)[0]
+    num = pure_path.split('-')[-1]
     print(f' (4) reduction_net')
     reduction_net = None
     if args.reducing_redundancy:
         reduction_net = ReductionNet(cross_dim=768,
                                      class_num=args.n_classes)
+        # loading
+        reduction_folder = os.path.join(args.output_dir, 'reduction_net')
+        reduction_file = os.path.join(reduction_folder, f'reduction-{num}.pt')
+        reduction_net.load_state_dict(torch.load(reduction_file))
         reduction_net.to(dtype=weight_dtype, device=accelerator.device)
     print(f' (5) make controller')
     controller = AttentionStore()
@@ -140,8 +147,6 @@ def main(args):
                 if not args.without_condition:
                     if args.use_image_condition:
                         """ condition model is already on device and dtype """
-                        data_device = batch["image_condition"]["pixel_values"].device
-                        print(f'data device = {data_device}')
                         with torch.no_grad():
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
@@ -237,6 +242,32 @@ def main(args):
             # [1] WC Score
         segmentation_head.train()
         print(f' {_data_name} finished !')
+        # saving score
+        # saving
+        if is_main_process:
+            print(f'  - precision dictionary = {IOU_dict}')
+            print(f'  - confusion_matrix = {confusion_matrix}')
+            confusion_matrix = confusion_matrix.tolist()
+            confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
+            with open(confusion_save_dir, 'a') as f:
+                f.write(f' data_name = {_data_name} \n')
+                for i in range(len(confusion_matrix)):
+                    for j in range(len(confusion_matrix[i])):
+                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                    f.write('\n')
+                f.write('\n')
+
+            score_save_dir = os.path.join(save_base_dir, 'score.txt')
+            with open(score_save_dir, 'a') as f:
+                dices = []
+                f.write(f' data_name = {_data_name} | ')
+                for k in IOU_dict:
+                    dice = float(IOU_dict[k])
+                    f.write(f'class {k} = {dice} ')
+                    dices.append(dice)
+                dice_coeff = sum(dices) / len(dices)
+                f.write(f'| dice_coeff = {dice_coeff}')
+                f.write(f'\n')
 
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser()
