@@ -13,7 +13,8 @@ from torch import nn
 from attention_store import AttentionStore
 from utils.attention_control import passing_argument, register_attention_control
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
-
+import numpy as np
+from PIL import Image
 def eval_step(engine, batch):
     return batch
 class ReductionNet(nn.Module):
@@ -48,6 +49,11 @@ class ReductionNet(nn.Module):
         return x
 
 
+def torch_to_pil(torch_img):
+    # torch_img = [3, H, W], from -1 to 1
+    np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
+    pil = Image.fromarray(np_img)
+    return pil
 
 def main(args):
 
@@ -64,13 +70,12 @@ def main(args):
     network.load_weights(args.network_weights)
     print(f' (3) segmentation head and loading pretrained')
     segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                      mask_res=args.mask_res, )
+                                      mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm,)
     # pt file
     segmentation_state_dict = torch.load(args.segmentation_head_weights)
-    for k in list(segmentation_state_dict.keys()):
-        print(f'segment model key name = {k}')
-    """
-    segmentation_head.load_state_dict()
+    segmentation_head.load_state_dict(segmentation_state_dict)
+
     print(f' (4) reduction_net')
     reduction_net = None
     if args.reducing_redundancy:
@@ -113,13 +118,11 @@ def main(args):
         test_dataloader = torch.utils.data.DataLoader(test_dataset,
                                                       batch_size=1,
                                                       shuffle=False)
-
         # [4] output dir
         device = accelerator.device
         with torch.no_grad():
             y_true_list, y_pred_list = [], []
             for global_num, batch in enumerate(test_dataloader):
-                encoder_hidden_states = torch.tensor((1, 1, 768)).to(device)
                 if not args.without_condition:
                     if args.use_image_condition:
                         if not args.image_model_training:
@@ -142,23 +145,23 @@ def main(args):
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
                                 if args.reducing_redundancy:
                                     encoder_hidden_states = reduction_net(encoder_hidden_states)
-
                 if args.use_text_condition:
                     with torch.set_grad_enabled(True):
                         encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
                             "last_hidden_state"]  # [batch, 77, 768]
-                image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+                # [1] original image (1,3,512,512)
+                image = batch['image'].to(dtype=weight_dtype)
+
+                # [2] gt image
                 gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
                 gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-                gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-                gt = gt.view(-1, gt.shape[-1]).contiguous()
-                # key_word_index = batch['key_word_index'][0] # torch([10,14])
-                # target key word should intense
-                # how can i increase the alignment between image and text ?
+                #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
+                #gt = gt.view(-1, gt.shape[-1]).contiguous()
+
+
 
                 with torch.no_grad():
                     latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
                 with torch.set_grad_enabled(True):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
@@ -186,9 +189,16 @@ def main(args):
                 # [1] pred
                 class_num = masks_pred.shape[1]  # 4
                 mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
+                print(f'mask_pred_argmax : {type(mask_pred_argmax)} | shape = {mask_pred_argmax.shape} | max value = {mask_pred_argmax.max()} | min value = {mask_pred_argmax.min()}')
                 y_pred_list.append(mask_pred_argmax)
                 y_true = gt_flat.squeeze()
                 y_true_list.append(y_true)
+
+                # [2] saving image (all in 256 X 256)
+                original_pil = torch_to_pil(image.squeeze()).resize((256, 256))
+                gt_pil = torch_to_pil(gt.squeeze()).resize((256, 256))
+                #predict_pil =
+                #merged_pil =
 
             #######################################################################################################################
             # [1] pred
@@ -212,7 +222,6 @@ def main(args):
             # [1] WC Score
         segmentation_head.train()
         print(f' {_data_name} finished !')
-    """
 
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser()

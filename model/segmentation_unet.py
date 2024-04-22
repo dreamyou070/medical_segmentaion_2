@@ -98,12 +98,8 @@ class OutConv(nn.Module):
 class SemanticModel(nn.Module):
     def __init__(self,
                  n_classes,
-                 bilinear=False,
                  use_layer_norm=True,
-                 use_instance_norm=True,
-                 mask_res=128,
-                 high_latent_feature=False,
-                 init_latent_p=1):
+                 mask_res=128,):
         super(SemanticModel, self).__init__()
 
         c = 320
@@ -118,7 +114,6 @@ class SemanticModel(nn.Module):
         self.upsample_layer_3 = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
 
         self.use_layer_norm = use_layer_norm
-        self.use_instance_norm = use_instance_norm
         if self.use_layer_norm:
             if mask_res == 128:
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
@@ -135,22 +130,6 @@ class SemanticModel(nn.Module):
                                                        nn.LayerNorm([160*2, 256, 256]),
                                                        Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
                                                        nn.LayerNorm([160, 512, 512]))
-        elif self.use_instance_norm :
-            if mask_res == 128:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
-                                                       nn.InstanceNorm2d(160),)
-            if mask_res == 256:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
-                                                       nn.InstanceNorm2d(160*3),
-                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
-                                                       nn.InstanceNorm2d(160))
-            if mask_res == 512:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
-                                                       nn.InstanceNorm2d(160*3),
-                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
-                                                       nn.InstanceNorm2d(160*2),
-                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
-                                                       nn.InstanceNorm2d(160))
         else :
             if mask_res == 128:
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
