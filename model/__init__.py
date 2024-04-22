@@ -29,7 +29,8 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         # ViTModel
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
 
-    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
+    image_model = image_model.to(accelerator.device,
+                                 dtype=weight_dtype)
     image_model.requires_grad_(False)
 
     # [2] lora network
@@ -39,7 +40,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
             key, value = net_arg.split("=")
             net_kwargs[key] = value
     if args.use_image_condition :
-        condition_model = image_model
+        condition_model = image_model # image model is a condition
         condition_modality = 'image'
     else :
         condition_model = text_encoder

@@ -68,6 +68,9 @@ def main(args):
     print(f' (1) stable diffusion model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+    print(f' condition model = {condition_model}')
+    print(f' device of condition model = {condition_model.device}')
+    print(f' type of condition model = {condition_model.dtype}')
 
     print(f' (2) lora network and loading model')
     network.load_weights(args.network_weights)
@@ -78,12 +81,14 @@ def main(args):
     # pt file
     segmentation_state_dict = torch.load(args.segmentation_head_weights)
     segmentation_head.load_state_dict(segmentation_state_dict)
+    segmentation_head.to(dtype=weight_dtype, device=accelerator.device)
 
     print(f' (4) reduction_net')
     reduction_net = None
     if args.reducing_redundancy:
         reduction_net = ReductionNet(cross_dim=768,
                                      class_num=args.n_classes)
+        reduction_net.to(dtype=weight_dtype, device=accelerator.device)
     print(f' (5) make controller')
     controller = AttentionStore()
     register_attention_control(unet, controller)
@@ -131,26 +136,17 @@ def main(args):
             for global_num, batch in enumerate(test_dataloader):
                 if not args.without_condition:
                     if args.use_image_condition:
-                        if not args.image_model_training:
-                            with torch.no_grad():
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
-                        else:
-                            with torch.set_grad_enabled(True):
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
+                        """ condition model is already on device and dtype """
+                        with torch.no_grad():
+                            output, pix_embedding = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            if args.not_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            if args.reducing_redundancy:
+                                encoder_hidden_states = reduction_net(encoder_hidden_states)
+
                 if args.use_text_condition:
                     with torch.set_grad_enabled(True):
                         encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
