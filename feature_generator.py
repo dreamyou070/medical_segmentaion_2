@@ -88,7 +88,10 @@ def main(args):
                 return x
 
         reduction_net = ReductionNet(768, args.n_classes)
-
+    position_embedder = None
+    if args.use_position_embedder :
+        from model.pe import AllPositionEmbedding
+        position_embedder = AllPositionEmbedding()
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -102,6 +105,8 @@ def main(args):
                                                         args.learning_rate) # all trainable params
     if args.reducing_redundancy :
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
+    if args.use_position_embedder :
+        trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
@@ -150,6 +155,9 @@ def main(args):
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
+    if args.use_position_embedder :
+        position_embedder = accelerator.prepare(position_embedder)
+        position_embedder = transform_models_if_DDP([position_embedder])[0]
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -235,7 +243,8 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
                 noise_pred = unet(latents, 0, encoder_hidden_states,
-                                      trg_layer_list=args.trg_layer_list).sample
+                                  trg_layer_list=args.trg_layer_list,
+                                  noise_type = position_embedder).sample
 
             target = torch.randn_like(noise_pred)
             noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
@@ -325,6 +334,12 @@ def main(args):
                            saving_folder='reduction_net',
                            saving_name=f'reduction-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(reduction_net),
+                           save_dtype=save_dtype)
+            if args.use_position_embedder :
+                save_model(args,
+                           saving_folder='position_embedder',
+                           saving_name=f'position-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
                            save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
