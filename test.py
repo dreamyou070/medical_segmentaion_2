@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 from ignite.metrics.confusion_matrix import ConfusionMatrix
+from ignite.engine import *
 
 def eval_step(engine, batch):
     return batch
@@ -115,7 +116,7 @@ def main(args):
     print(f' step 2. check data path')
     sae_base = os.path.join(args.output_dir, 'thesis_output')
     os.makedirs(sae_base, exist_ok=True)
-    
+
     for _data_name in ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']:
 
         # [1] data_path here
