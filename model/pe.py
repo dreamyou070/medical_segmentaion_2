@@ -140,15 +140,7 @@ class AllPositionalEmbedding(nn.Module):
         self.positional_encodings = {}
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
-
-            if self.do_concat :
-                self.positional_encodings[layer_name] = SinglePositionalEmbedding_concat(max_len = res*res, d_model = dim)
-
-            elif self.do_semantic_position :
-                self.positional_encodings[layer_name] = SinglePositional_Semantic_Embedding(max_len = res*res, d_model = dim)
-
-            else :
-                self.positional_encodings[layer_name] = SinglePositionalEmbedding(max_len = res*res, d_model = dim)
+            self.positional_encodings[layer_name] = SinglePositionalEmbedding(max_len = res*res, d_model = dim)
 
 
 
