@@ -115,6 +115,7 @@ def main(args):
         # [2] save_path
         os.makedirs(args.output_dir, exist_ok=True)
         save_base_dir = os.path.join(args.output_dir, _data_name)
+        os.makedirs(save_base_dir, exist_ok=True)
 
         image_root = os.path.join(data_path, 'images')
         gt_root = os.path.join(data_path, 'masks')
@@ -195,17 +196,24 @@ def main(args):
                 # [1] pred
                 class_num = masks_pred.shape[1]  # 4
                 mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
-
-                print(f'mask_pred_argmax : {type(mask_pred_argmax)} | shape = {mask_pred_argmax.shape} | max value = {mask_pred_argmax.max()} | min value = {mask_pred_argmax.min()}')
+                r = int(mask_pred_argmax.shape[0] ** .5)
                 y_pred_list.append(mask_pred_argmax)
                 y_true = gt_flat.squeeze()
                 y_true_list.append(y_true)
 
                 # [2] saving image (all in 256 X 256)
-                original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((256, 256))
-                gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((256, 256))
-                predict_pil = torch_to_pil(mask_pred_argmax.reshape((256,256)).contiguous().detach().cpu())
+                original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r,r))
+                gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
+                predict_pil = torch_to_pil(mask_pred_argmax.reshape((r,r)).contiguous().detach().cpu())
                 merged_pil = Image.blend(original_pil, predict_pil, 0.4)
+
+                total_img = Image.new('RGB', (r * 4, r))
+                total_img.paste(original_pil, (0, 0))
+                total_img.paste(gt_pil, (r, 0))
+                total_img.paste(predict_pil, (r * 2, 0))
+                total_img.paste(merged_pil, (r * 3, 0))
+                pure_path = batch['pure_path'][0]
+                total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
 
             #######################################################################################################################
             # [1] pred
