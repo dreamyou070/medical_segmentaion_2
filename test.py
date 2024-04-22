@@ -203,6 +203,8 @@ def main(args):
                 # [1] pred
                 class_num = masks_pred.shape[1]  # 4
                 mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
+                # masks_pred = [batch, 2, 256,256]
+
                 r = int(mask_pred_argmax.shape[0] ** .5)
                 y_pred_list.append(mask_pred_argmax)
                 y_true = gt_flat.squeeze()
@@ -211,7 +213,8 @@ def main(args):
                 # [2] saving image (all in 256 X 256)
                 original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r,r))
                 gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
-                predict_pil = torch_to_pil(mask_pred_argmax.reshape((r,r)).contiguous().detach().cpu())
+                pred_torch = masks_pred[:,1,:,:].unsqueeze(0)
+                predict_pil = torch_to_pil(pred_torch.detach().cpu())
                 merged_pil = Image.blend(original_pil, predict_pil, 0.4)
 
                 total_img = Image.new('RGB', (r * 4, r))
