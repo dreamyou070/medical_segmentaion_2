@@ -133,14 +133,11 @@ class AllPositionalEmbedding(nn.Module):
                            'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320), }
 
     def __init__(self,
-                 pe_do_concat,
-                 do_semantic_position,) -> None:
+                 ) -> None:
         super().__init__()
 
         self.layer_dict = self.layer_names_res_dim
         self.positional_encodings = {}
-        self.do_concat = pe_do_concat
-        self.do_semantic_position = do_semantic_position
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
 
@@ -157,8 +154,7 @@ class AllPositionalEmbedding(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
-                layer_name,
-                patch_idx=None):
+                layer_name,):
 
 
         if layer_name in self.positional_encodings.keys() :
