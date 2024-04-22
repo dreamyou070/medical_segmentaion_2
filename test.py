@@ -215,10 +215,9 @@ def main(args):
                 gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
 
 
-                pred_torch = masks_pred[:,1,:,:].unsqueeze(0)
-                print(f'pred_torch = {pred_torch.shape}')
+                pred_torch = masks_pred[:,1,:,:].squeeze()
                 predict_pil = torch_to_pil(pred_torch.detach().cpu())
-                
+
 
 
 
