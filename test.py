@@ -214,16 +214,8 @@ def main(args):
                 original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r,r))
                 gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
 
-
-                pred_torch = masks_pred[:,1,:,:].squeeze()
-                predict_pil = torch_to_pil(pred_torch.detach().cpu())
-
-
-
-
-
+                predict_pil = torch_to_pil(mask_pred_argmax.reshape((r,r)).contiguous().detach().cpu())
                 merged_pil = Image.blend(original_pil, predict_pil, 0.4)
-
                 total_img = Image.new('RGB', (r * 4, r))
                 total_img.paste(original_pil, (0, 0))
                 total_img.paste(gt_pil, (r, 0))
