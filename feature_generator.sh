@@ -17,10 +17,11 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="29_reducing_redundancy_without_noise_pred_with_position_embedding" #
+file_name="30_pvt_image_encoder" #
 # 3 --not_use_cls_token --without_condition
 # except generation
-# --gt_ext_npy \
+# --gt_ext_npy \  --use_position_embedder
+# 29_reducing_redundancy_without_noise_pred_with_position_embedding
 
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
@@ -43,4 +44,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --use_image_condition \
  --image_processor 'pvt' \
  --image_model_training \
- --reducing_redundancy --use_position_embedder
+ --reducing_redundancy
