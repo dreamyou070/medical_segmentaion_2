@@ -66,7 +66,11 @@ def main(args):
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res, )
     # pt file
-    segmentation_head.load_state_dict(torch.load(args.segmentation_head_weights))
+    segmentation_state_dict = torch.load(args.segmentation_head_weights)
+    for k in list(segmentation_state_dict.keys()):
+        print(f'segment model key name = {k}')
+    """
+    segmentation_head.load_state_dict()
     print(f' (4) reduction_net')
     reduction_net = None
     if args.reducing_redundancy:
@@ -208,7 +212,7 @@ def main(args):
             # [1] WC Score
         segmentation_head.train()
         print(f' {_data_name} finished !')
-
+    """
 
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser()
