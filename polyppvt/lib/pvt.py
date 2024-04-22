@@ -162,7 +162,9 @@ class PolypPVT(nn.Module):
         super(PolypPVT, self).__init__()
 
         self.backbone = pvt_v2_b2()  # [64, 128, 320, 512]
-        path = './pretrained_pth/pvt_v2_b2.pth'
+        path = r'/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/pretrained_pth/pvt_v2_b2.pth'
+
+
         save_model = torch.load(path)
         model_dict = self.backbone.state_dict()
         state_dict = {k: v for k, v in save_model.items() if k in model_dict.keys()}
