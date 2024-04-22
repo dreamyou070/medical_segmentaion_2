@@ -28,8 +28,6 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     elif args.image_processor == 'vit':
         # ViTModel
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-    elif args.image_processor == 'resnet' :
-        image_model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=True)
 
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
