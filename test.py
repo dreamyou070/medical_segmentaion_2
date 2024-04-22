@@ -68,10 +68,7 @@ def main(args):
     print(f' (1) stable diffusion model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
-    print(f' condition model = {condition_model}')
-    print(f' device of condition model = {condition_model.device}')
-    print(f' type of condition model = {condition_model.dtype}')
-
+    
     print(f' (2) lora network and loading model')
     network.load_weights(args.network_weights)
     print(f' (3) segmentation head and loading pretrained')
@@ -137,6 +134,8 @@ def main(args):
                 if not args.without_condition:
                     if args.use_image_condition:
                         """ condition model is already on device and dtype """
+                        data_device = batch["image_condition"].device
+                        print(f'data device = {deta_device}')
                         with torch.no_grad():
                             output, pix_embedding = condition_model(**batch["image_condition"])
                             encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
