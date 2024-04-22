@@ -31,7 +31,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     elif args.image_processor == 'pvt' :
         from polyppvt.lib.pvt import PolypPVT
         model = PolypPVT()
-        pretrained_pth_path = './model_pth/PolypPVT.pth'
+        pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
         model.load_state_dict(torch.load(pretrained_pth_path))
         image_model = model.backbone  # pvtv2_b2 model
 
