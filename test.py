@@ -64,7 +64,7 @@ def torch_to_pil(torch_img):
 def main(args):
 
     print(f' step 0. accelerator')
-    args.logging_dir = os.path.join(args.output_dir, 'log')
+    args.logging_dir = os.path.join(args.output_dir, 'log_infer')
     os.makedirs(args.logging_dir, exist_ok=True)
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
@@ -113,15 +113,16 @@ def main(args):
         condition_transform = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
     print(f' step 2. check data path')
-
+    sae_base = os.path.join(args.output_dir, 'thesis_output')
+    os.makedirs(sae_base, exist_ok=True)
+    
     for _data_name in ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']:
 
         # [1] data_path here
         data_path = os.path.join(args.base_path, _data_name)
 
         # [2] save_path
-        os.makedirs(args.output_dir, exist_ok=True)
-        save_base_dir = os.path.join(args.output_dir, _data_name)
+        save_base_dir = os.path.join(sae_base, _data_name)
         os.makedirs(save_base_dir, exist_ok=True)
 
         image_root = os.path.join(data_path, 'images')
