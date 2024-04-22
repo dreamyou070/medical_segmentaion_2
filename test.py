@@ -90,10 +90,8 @@ def main(args):
         data_path = os.path.join(args.base_path, _data_name)
 
         # [2] save_path
-        save_path = os.path.join(args.save_base, _data_name)  # './result_map/PolypPVT/{}/'.format()
-        os.makedirs(save_path, exist_ok=True)
-
-        os.makedirs(save_path, exist_ok=True)
+        os.makedirs(args.output_dir, exist_ok=True)
+        save_base_dir = os.path.join(args.output_dir, _data_name)
 
         image_root = os.path.join(data_path, 'images')
         gt_root = os.path.join(data_path, 'masks')
@@ -111,8 +109,6 @@ def main(args):
                                                       shuffle=False)
 
         # [4] output dir
-        os.makedirs(args.output_dir, exist_ok=True)
-        save_base_dir = os.path.join(args.output_dir, _data_name)
         device = accelerator.device
         with torch.no_grad():
             y_true_list, y_pred_list = [], []
@@ -224,7 +220,6 @@ if __name__ == '__main__' :
     parser.add_argument('--base_path', type=str,
                         default=r'/home/dreamyou070/MyData/anomaly_detection/medical/leader_polyp/Pranet/test')
     parser.add_argument('--save_base', type=str, default='./result_sy')
-    parser.add_argument('--image_processor', type=str, default='vit')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--output_dir', type=str, default='output')
     # step 2. dataset
