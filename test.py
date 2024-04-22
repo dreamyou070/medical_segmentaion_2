@@ -52,6 +52,8 @@ class ReductionNet(nn.Module):
 def main(args):
 
     print(f' step 0. accelerator')
+    args.logging_dir = os.path.join(args.output_dir, 'log')
+    os.makedirs(args.logging_dir, exist_ok=True)
     accelerator = prepare_accelerator(args)
 
     print(f' step 1. make model')
