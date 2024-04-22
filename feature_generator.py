@@ -90,8 +90,8 @@ def main(args):
         reduction_net = ReductionNet(768, args.n_classes)
     position_embedder = None
     if args.use_position_embedder :
-        from model.pe import AllPositionEmbedding
-        position_embedder = AllPositionEmbedding()
+        from model.pe import AllPositionalEmbedding
+        position_embedder = AllPositionalEmbedding()
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
