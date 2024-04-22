@@ -28,6 +28,12 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     elif args.image_processor == 'vit':
         # ViTModel
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+    elif args.image_processor == 'pvt' :
+        from polyppvt.lib.pvt import PolypPVT
+        model = PolypPVT()
+        pretrained_pth_path = './model_pth/PolypPVT.pth'
+        model.load_state_dict(torch.load(pretrained_pth_path))
+        image_model = model.backbone  # pvtv2_b2 model
 
     image_model = image_model.to(accelerator.device,
                                  dtype=weight_dtype)

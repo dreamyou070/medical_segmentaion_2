@@ -959,8 +959,12 @@ class LoRANetwork(torch.nn.Module):
     UNET_TEXT_PART = 'attentions_0'
 
     TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
-    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention","ViTPooler","ViTSelfOutput","ViTIntermediate"]
-
+    IMAGE_ENCODER_TARGET_REPLACE_MODULE = ["ViTSelfAttention",
+                                           "ViTPooler",
+                                           "ViTSelfOutput",
+                                           "ViTIntermediate",
+                                           "Attention",
+                                           "Mlp"]
     LORA_PREFIX_UNET = "lora_unet"
     LORA_PREFIX_TEXT_ENCODER = "lora_te"
     LORA_PREFIX_IMAGE_ENCODER = "lora_im"

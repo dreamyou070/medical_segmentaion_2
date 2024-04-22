@@ -27,6 +27,11 @@ def call_dataset(args) :
                                                           interpolation=InterpolationMode.BICUBIC),
                                         transforms.ToTensor(),
                                         normalize,])
+    elif args.image_processor == 'pvt' :
+        processor = transforms.Compose([transforms.Resize((384,384)),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize([0.485, 0.456, 0.406],
+                                                             [0.229, 0.224, 0.225])])
 
     # [2] train & test dataset
     train_dataset = TrainDataset_Seg(root_dir=args.train_data_path,

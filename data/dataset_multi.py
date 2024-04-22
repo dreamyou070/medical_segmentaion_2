@@ -271,6 +271,11 @@ class TrainDataset_Seg(Dataset):
         if argument.image_processor == 'blip' :
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)  # [3,224,224]
+
+        elif argument.image_processor == 'pvt' :
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
+
         else :
 
             image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),

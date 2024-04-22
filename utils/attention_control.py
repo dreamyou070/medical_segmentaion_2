@@ -15,6 +15,7 @@ def passing_argument(args):
 def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
     def ca_forward(self, layer_name):
+
         def forward(hidden_states, context=None, trg_layer_list=None, noise_type=None, **model_kwargs):
             is_cross_attention = False
             if context is not None:
@@ -24,7 +25,13 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 hidden_states = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
+
             context = context if context is not None else hidden_states
+            if type(context) == dict :
+                print(f' dictionary context to torch')
+                p = query.shape[1]
+                res = int(p ** 0.5)
+                context = context[res]
             key_ = self.to_k(context)
             value = self.to_v(context)
 

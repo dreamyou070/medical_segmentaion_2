@@ -88,6 +88,47 @@ def main(args):
                 return x
 
         reduction_net = ReductionNet(768, args.n_classes)
+
+    if args.image_processor == 'pvt' :
+
+        class vision_condition_head(nn.Module):
+
+            def __init__(self) :
+
+                super(vision_condition_head, self).__init__()
+                multi_dims = [64, 128, 320, 512]
+                condition_dim = 768
+
+                self.fc_1 = nn.Linear(multi_dims[0], condition_dim)
+                self.fc_2 = nn.Linear(multi_dims[1], condition_dim)
+                self.fc_3 = nn.Linear(multi_dims[2], condition_dim)
+                self.fc_4 = nn.Linear(multi_dims[3], condition_dim)
+
+            def forward(self, x):
+                x1 = x[0].permute(0, 2, 3, 1)
+                x2 = x[1].permute(0, 2, 3, 1)
+                x3 = x[2].permute(0, 2, 3, 1)
+                x4 = x[3].permute(0, 2, 3, 1)
+
+                x1 = x1.reshape(1, -1, 64)
+                x2 = x2.reshape(1, -1, 128)
+                x3 = x3.reshape(1, -1, 320)
+                x4 = x4.reshape(1, -1, 512)
+
+                y1 = self.fc_1(x1)  # batch, pixnum, 768
+                y2 = self.fc_2(x2)  # batch, pixnum, 768
+                y3 = self.fc_3(x3)  # batch, pixnum, 768
+                y4 = self.fc_4(x4)  # batch, pixnum, 768 (much deep features)
+
+                condition_dict = {}
+                condition_dict[64] = y4
+                condition_dict[32] = y3
+                condition_dict[16] = y2
+                condition_dict[8] = y1
+
+                return condition_dict
+
+        vision_head = vision_condition_head()
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
@@ -107,6 +148,9 @@ def main(args):
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     if args.use_position_embedder :
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
+    if args.image_processor == 'pvt' :
+        trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
+
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
@@ -158,6 +202,10 @@ def main(args):
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
+    if args.image_processor == 'pvt' :
+        vision_head = accelerator.prepare(vision_head)
+        vision_head = transform_models_if_DDP([vision_head])[0]
+
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -198,25 +246,37 @@ def main(args):
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
-                        with torch.no_grad():
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.not_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                            if args.only_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                            if args.reducing_redundancy:
-                                encoder_hidden_states = reduction_net(encoder_hidden_states)
+
+                        if args.image_processor == 'pvt':
+                            output = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = vision_head(output)
+
+                        elif args.image_processor == 'vit':
+                            with torch.no_grad():
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.not_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                                if args.only_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                                if args.reducing_redundancy:
+                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else:
                         with torch.set_grad_enabled(True):
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.not_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                            if args.only_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                            if args.reducing_redundancy:
-                                encoder_hidden_states = reduction_net(encoder_hidden_states)
+                            if args.image_processor == 'pvt':
+                                output = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = vision_head(output)
+
+                            elif args.image_processor == 'vit':
+
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.not_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                                if args.only_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                                if args.reducing_redundancy:
+                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
                 if args.use_text_condition:
                     with torch.set_grad_enabled(True):
                         encoder_hidden_states = condition_model(batch["input_ids"].to(device))[

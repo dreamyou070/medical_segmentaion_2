@@ -41,6 +41,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
- --image_processor 'vit' \
+ --image_processor 'pvt' \
  --image_model_training \
  --reducing_redundancy --use_position_embedder

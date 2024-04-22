@@ -171,9 +171,6 @@ def main(args):
                 gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
                 #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
                 #gt = gt.view(-1, gt.shape[-1]).contiguous()
-
-
-
                 with torch.no_grad():
                     latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
                 with torch.set_grad_enabled(True):
