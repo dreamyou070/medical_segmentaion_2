@@ -321,6 +321,12 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
+            if args.reducing_redundancy :
+                save_model(args,
+                           saving_folder='reduction_net',
+                           saving_name=f'reduction-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(reduction_net),
+                           save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate

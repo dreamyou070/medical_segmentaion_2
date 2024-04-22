@@ -6,7 +6,7 @@
 # 22_use_instance_norm_reducing_redundancy_use_weighted_reduct
 # 23_use_layer_norm_reducing_redundancy
 # 24_use_instance_norm_reducing_redundancy
-# 25_reducing_redundancy
+# 25_reducing_redundancy (I will do this!)
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
