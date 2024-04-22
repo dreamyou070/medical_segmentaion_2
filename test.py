@@ -70,7 +70,8 @@ def main(args):
     condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
 
     print(f' (2) lora network and loading model')
-    network.load_weights(args.network_weights)
+    network.to(dtype=weight_dtype, device=accelerator.device)
+
     print(f' (3) segmentation head and loading pretrained')
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
