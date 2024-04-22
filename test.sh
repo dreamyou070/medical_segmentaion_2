@@ -19,7 +19,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/thesis_output" \
  --base_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
  --obj_name "${obj_name}" \
- --prompt "${trigger_word}" \
  --latent_res 64 \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
