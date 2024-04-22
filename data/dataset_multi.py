@@ -274,8 +274,8 @@ class TrainDataset_Seg(Dataset):
         else :
 
             image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
-                                                    return_tensors="pt",
-                                                    padding=True)  # .data['pixel_values'] # [1,3,224,224]
+                                                   return_tensors="pt",
+                                                   padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 

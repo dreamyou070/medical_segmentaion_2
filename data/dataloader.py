@@ -84,8 +84,8 @@ class TestDataset(Dataset):
                 gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
-        self.image_processor = image_processor
-        self.transform = transforms.Compose([transforms.ToTensor(),
+        self.image_processor = image_processor # condition image processor
+        self.transform = transforms.Compose([transforms.ToTensor(), # original image processor
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
         self.gt_paths = gt_paths

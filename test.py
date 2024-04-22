@@ -15,6 +15,8 @@ from utils.attention_control import passing_argument, register_attention_control
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D, reshape_batch_dim_to_heads_3D_3D
 import numpy as np
 from PIL import Image
+from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
+
 def eval_step(engine, batch):
     return batch
 class ReductionNet(nn.Module):
@@ -87,11 +89,13 @@ def main(args):
 
     # [2] image model
     if args.image_processor == 'clip':
-        condition_transform = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+        #condition_transform = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+        condition_transform = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         # ViTModel
-        args.testsize = 384
-        condition_transform = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+        #args.testsize = 384
+        #condition_transform = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+        condition_transform = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
     print(f' step 2. check data path')
 
