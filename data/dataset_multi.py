@@ -143,8 +143,8 @@ class TrainDataset_Seg(Dataset):
                 number = 3
             elif 0.75 <= random_p:
                 number = 4
-
             img = np.rot90(img, k=number) # ok, because it is 3 channel image
+
         img = self.transform(img.copy())
 
         # [2] gt dir
@@ -169,6 +169,8 @@ class TrainDataset_Seg(Dataset):
 
         else :
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            if self.use_data_aug :
+                gt_img = np.rot90(gt_img, k=number)
             gt_arr = np.array(gt_img) # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
@@ -228,35 +230,7 @@ class TrainDataset_Seg(Dataset):
                                        padding="max_length",
                                        truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
-        """
-        key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
 
-        def get_target_index(target_words, caption):
-
-            target_word_index = []
-            for target_word in target_words:
-                target_word_token = self.tokenizer(target_word, return_tensors="pt")
-                target_word_input_ids = target_word_token.input_ids[:, 1]
-
-                # [1] get target word index from sentence token
-                sentence_token = self.tokenizer(caption, return_tensors="pt")
-                sentence_token = sentence_token.input_ids
-                batch_size = sentence_token.size(0)
-
-                for i in range(batch_size):
-                    # same number from sentence token to target_word_inpud_ids
-                    s_tokens = sentence_token[i]
-                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
-                    target_word_index.append(idx)
-            return target_word_index
-        
-        if argument.use_cls_token:
-            default = [0]  # cls token index
-            default.extend(get_target_index(key_words, caption))
-            key_word_index = default
-        else:
-            key_word_index = get_target_index(key_words, caption)
-        """
         # [3] image pixel
 
         # condition image = [384,384]
@@ -270,21 +244,31 @@ class TrainDataset_Seg(Dataset):
 
         if argument.image_processor == 'blip' :
             pil = Image.open(img_path).convert('RGB')
+            if self.use_data_aug :
+                np_pil = np.rot90(np.array(pil), k=number)
+                pil = Image.fromarray(np_pil)
             image_condition = self.image_processor(pil)  # [3,224,224]
 
         elif argument.image_processor == 'pvt' :
             pil = Image.open(img_path).convert('RGB')
+            if self.use_data_aug :
+                np_pil = np.rot90(np.array(pil), k=number)
+                pil = Image.fromarray(np_pil)
             image_condition = self.image_processor(pil)
 
         else :
-
-            image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
-                                                   return_tensors="pt",
-                                                   padding=True)  # .data['pixel_values'] # [1,3,224,224]
+            if self.use_data_aug :
+                pil = Image.open(img_path).convert('RGB')
+                np_pil = np.rot90(np.array(pil), k=number)
+                image_condition = self.image_processor(images=Image.fromarray(np_pil),
+                                                       return_tensors="pt",
+                                                       padding=True)  # .data['pixel_values'] # [1,3,224,224]
+            else :
+                image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
+                                                       return_tensors="pt",
+                                                       padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
-
-
 
         # can i use visual attention mask in ViT ?
         return {'image': img,  # [3,512,512]
