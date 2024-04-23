@@ -58,7 +58,8 @@ def main(args):
     reduction_net = None
     if args.reducing_redundancy:
         reduction_net = ReductionNet(cross_dim=768,
-                                     class_num=args.n_classes)
+                                     class_num=args.n_classes,
+                                     use_weighted_reduct = args.use_weighted_reduct,)
         # loading
         reduction_folder = os.path.join(args.output_dir, 'reduction_net')
         reduction_file = os.path.join(reduction_folder, f'reduction-{num}.pt')
