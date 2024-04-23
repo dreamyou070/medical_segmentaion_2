@@ -10,20 +10,20 @@
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
-port_number=59685
+port_number=57415
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="test" #
+file_name="32_pvt_image_encoder_with_position_embedder_reverse" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \  --use_position_embedder
 # 29_reducing_redundancy_without_noise_pred_with_position_embedding
 
-accelerate launch --config_file ../../gpu_config/gpu_0_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generator.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
@@ -44,4 +44,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --use_image_condition \
  --image_processor 'pvt' \
  --image_model_training \
- --reducing_redundancy
+ --reducing_redundancy --reverse

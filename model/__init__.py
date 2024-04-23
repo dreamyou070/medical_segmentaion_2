@@ -39,6 +39,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
             pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
             model.load_state_dict(torch.load(pretrained_pth_path))
             image_model = model.backbone  # pvtv2_b2 model
+
         image_model = image_model.to(accelerator.device,dtype=weight_dtype)
         image_model.requires_grad_(False)
         condition_model = image_model # image model is a condition

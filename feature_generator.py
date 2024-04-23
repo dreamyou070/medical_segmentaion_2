@@ -52,7 +52,7 @@ def main(args):
                                      use_weighted_reduct=args.use_weighted_reduct)
     vision_head = None
     if args.image_processor == 'pvt' :
-        vision_head = vision_condition_head()
+        vision_head = vision_condition_head(reverse = args.reverse)
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
@@ -191,6 +191,8 @@ def main(args):
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
+
+                                # encoder hidden states is dictionary
                                 encoder_hidden_states = vision_head(output)
 
                             elif args.image_processor == 'vit':
@@ -506,6 +508,7 @@ if __name__ == "__main__":
     parser.add_argument("--reducing_redundancy", action='store_true')
     parser.add_argument("--use_weighted_reduct", action='store_true')
     parser.add_argument("--use_layer_norm", action='store_true')
+    parser.add_argument("--reverse", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
