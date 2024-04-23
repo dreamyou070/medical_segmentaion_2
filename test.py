@@ -72,7 +72,7 @@ def main(args):
         position_embedder = AllPositionalEmbedding()
         # loading
         position_embedder_folder = os.path.join(args.output_dir, 'position_embedder')
-        position_embedder_file = os.path.join(position_embedder_folder, f'position_embedder-{num}.pt')
+        position_embedder_file = os.path.join(position_embedder_folder, f'position-{num}.pt')
         position_embedder.load_state_dict(torch.load(position_embedder_file))
         position_embedder.to(dtype=weight_dtype, device=accelerator.device)
 
