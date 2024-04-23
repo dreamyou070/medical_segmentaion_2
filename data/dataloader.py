@@ -117,6 +117,9 @@ class TestDataset(Dataset):
         img = np.array(image, np.uint8)
         return img
 
+
+
+
     def __getitem__(self, idx):
 
         # [1] base
@@ -230,6 +233,11 @@ class TestDataset(Dataset):
         if argument.image_processor == 'blip':
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)  # [3,224,224]
+
+        elif argument.image_processor == 'pvt':
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
+
         else:
 
             image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
@@ -246,3 +254,146 @@ class TestDataset(Dataset):
                 "image_condition": image_condition,
                 'pure_path' : pure_path}  # [197,1]
 
+
+    """
+    def __getitem__(self, idx):
+
+        # [1] base
+        img_path = self.image_paths[idx]
+        img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
+
+        if self.use_data_aug:
+            # rotating
+            random_p = np.random.rand()
+            if random_p < 0.25:
+                number = 1
+            elif 0.25 <= random_p < 0.5:
+                number = 2
+            elif 0.5 <= random_p < 0.75:
+                number = 3
+            elif 0.75 <= random_p:
+                number = 4
+
+            img = np.rot90(img, k=number)  # ok, because it is 3 channel image
+        img = self.transform(img.copy())
+
+        # [2] gt dir
+        gt_path = self.gt_paths[idx]  #
+        if argument.gt_ext_npy:
+            gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_arr, k=number)
+            gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
+            # make image from numpy
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_arr, k=number)
+
+            # [1] get final image
+            H, W = gt_arr.shape[0], gt_arr.shape[1]
+            mask_rgb = np.zeros((H, W, 3))
+            for h_index in range(H):
+                for w_index in range(W):
+                    mask_rgb[h_index, w_index] = class_matching_map[gt_arr[h_index, w_index]]
+            mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
+            mask_pil = mask_pil.resize((384, 384), Image.BICUBIC)
+            mask_img = self.transform(np.array(mask_pil))
+
+
+        else:
+            gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_img, k=number)
+            gt_arr = np.array(gt_img)  # 128,128
+            gt_arr = np.where(gt_arr > 100, 1, 0)
+
+        # [3] make semantic pseudo mal
+
+        # ex) 0, 1, 2
+        class_es = np.unique(gt_arr)
+
+        gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
+        class_num = gt_arr_.shape[-1]
+        gt = np.zeros((self.mask_res,  # 256
+                       self.mask_res,  # 256
+                       self.n_classes))  # 3
+
+        # 256,256,3
+        gt[:, :, :class_num] = gt_arr_
+        gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
+        # [3] gt flatten
+        gt_flat = gt_arr.flatten()  # 128*128
+
+        if argument.use_image_by_caption:
+
+            # [3] caption
+            if argument.obj_name == 'brain':
+                class_map = brain_class_map
+            elif argument.obj_name == 'cardiac':
+                class_map = cardiac_class_map
+            elif argument.obj_name == 'abdomen':
+                class_map = abdomen_class_map
+            elif argument.obj_name == 'leader_polyp':
+                class_map = leader_polyp_class_map
+
+            if argument.use_base_prompt:
+                caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            else:
+                caption = ''
+            caption = base_prompts[np.random.randint(0, len(base_prompts))]
+            for i, class_idx in enumerate(class_es):
+                if argument.use_key_word:
+                    caption += class_map[class_idx][0]
+                else:
+                    caption += class_map[class_idx][1]
+
+                if i == class_es.shape[0] - 1:
+                    caption += ''
+                else:
+                    # caption += ', '
+                    caption += ' '
+        else:
+            if argument.use_base_prompt:
+                base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
+            else:
+                base_prompt = ''
+            caption = f'{base_prompt}{argument.obj_name}'
+
+        caption_token = self.tokenizer(caption,
+                                       padding="max_length",
+                                       truncation=True, return_tensors="pt")
+        input_ids = caption_token.input_ids
+        
+        # [3] image pixel
+
+        # condition image = [384,384]
+        # gt =[3,256,256]
+        gt_pil = gt.permute(1, 2, 0).cpu().numpy() * 255
+        gt_pil = gt_pil.astype(np.uint8)
+        # remove r channel to zero
+        gt_pil[:, :, 0] = gt_pil[:, :, 0] * 0
+        gt_pil = Image.fromarray(gt_pil)  # [256,256,3], RGB mask
+
+        if argument.image_processor == 'blip':
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)  # [3,224,224]
+
+        elif argument.image_processor == 'pvt':
+            pil = Image.open(img_path).convert('RGB')
+            image_condition = self.image_processor(pil)
+
+        else:
+
+            image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
+                                                   return_tensors="pt",
+                                                   padding=True)  # .data['pixel_values'] # [1,3,224,224]
+            image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
+            pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
+
+        # can i use visual attention mask in ViT ?
+        return {'image': img,  # [3,512,512]
+                "gt": gt,  # [3,256,256]
+                "gt_flat": gt_flat,  # [128*128]
+                "input_ids": input_ids,
+                'caption': caption,
+                "image_condition": image_condition}  # [197,1]
+    """
