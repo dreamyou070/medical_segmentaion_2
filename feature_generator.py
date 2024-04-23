@@ -42,7 +42,7 @@ def main(args):
 
     print(f'\n step 4. model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+    condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm)
@@ -143,7 +143,8 @@ def main(args):
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
                                                         args.unet_lr,
-                                                        args.learning_rate) # all trainable params
+                                                        args.learning_rate,
+                                                        conditional_modality=condition_modality,)
     if args.reducing_redundancy :
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     if args.use_position_embedder :

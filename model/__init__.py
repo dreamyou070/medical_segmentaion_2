@@ -78,4 +78,4 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     vae = vae.to(accelerator.device, dtype=weight_dtype)
     vae.eval()
 
-    return condition_model, vae, unet, network
+    return condition_model, vae, unet, network, condition_modality

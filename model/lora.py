@@ -1234,7 +1234,7 @@ class LoRANetwork(torch.nn.Module):
                 lora.apply_to()
                 self.add_module(lora.lora_name, lora)
 
-        
+
     def is_mergeable(self):
         return True
 
@@ -1298,7 +1298,7 @@ class LoRANetwork(torch.nn.Module):
 
     # 二つのText Encoderに別々の学習率を設定できるようにするといいかも
 
-    def prepare_optimizer_params(self, text_encoder_lr, unet_lr, default_lr):
+    def prepare_optimizer_params(self, text_encoder_lr, unet_lr, default_lr, condition_modality = 'text'):
 
         self.requires_grad_(True)
         all_params = [] # list
@@ -1309,11 +1309,19 @@ class LoRANetwork(torch.nn.Module):
                 params.extend(lora.parameters())
             return params
 
-        if self.text_encoder_loras:
-            param_data = {"params": enumerate_params(self.text_encoder_loras)}
-            if text_encoder_lr is not None:
-                param_data["lr"] = text_encoder_lr
-            all_params.append(param_data) # len 2 (unet, image_encoder)
+        if condition_modality == 'text':
+
+            if self.text_encoder_loras:
+                param_data = {"params": enumerate_params(self.text_encoder_loras)}
+                if text_encoder_lr is not None:
+                    param_data["lr"] = text_encoder_lr
+                all_params.append(param_data) # len 2 (unet, image_encoder)
+        elif condition_modality == 'image':
+            if self.image_encoder_loras:
+                param_data = {"params": enumerate_params(self.image_encoder_loras)}
+                if text_encoder_lr is not None:
+                    param_data["lr"] = text_encoder_lr
+                all_params.append(param_data)
 
         if self.unet_loras:
 
