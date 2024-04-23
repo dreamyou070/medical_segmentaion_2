@@ -9,7 +9,7 @@ sub_folder="up_16_32_64"
 file_name="31_pvt_image_encoder_with_position_embedder"
 # --use_position_embedder \
 # 64 / 4
-# 128 / 64
+# 128 / 64  --reducing_redundancy
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number test.py \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
@@ -25,4 +25,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 2 \
  --use_position_embedder \
- --mask_res 256 --use_image_condition --reducing_redundancy --image_processor 'pvt'
+ --mask_res 256 --use_image_condition --image_processor 'pvt'

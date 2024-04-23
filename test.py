@@ -140,7 +140,7 @@ def main(args):
                             with torch.no_grad():
                                 if args.image_processor == 'pvt':
                                     output = condition_model(batch["image_condition"])
-                                    encoder_hidden_states = vision_head(output)
+                                    encoder_hidden_states = vision_head(output) #
 
                                 elif args.image_processor == 'vit':
                                     with torch.no_grad():
