@@ -370,7 +370,7 @@ def main(args):
             # [1] generator loss
             pseudo_masks_pred_ = pseudo_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1,args.n_classes).contiguous() # [256*256,2]
             from tensorflow.keras.utils import to_categorical
-            pseudo_gt = to_categorical(pseud_label, num_classes=args.n_classes).permute(2, 0, 1).contiguous().unsqueeze(0) # [1,2,256,256]
+            pseudo_gt = torch.tensor(to_categorical(pseud_label, num_classes=args.n_classes)).permute(2, 0, 1).contiguous().unsqueeze(0) # [1,2,256,256]
             if args.use_dice_ce_loss:
                 pseudo_loss = loss_dicece(input=pseudo_sample_pred,
                                           target=pseudo_gt.to(device, dtype=weight_dtype)) # [batch, class, res, res]
