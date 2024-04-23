@@ -10,7 +10,7 @@
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
-port_number=53030
+port_number=53333
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
