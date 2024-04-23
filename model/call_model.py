@@ -1,9 +1,5 @@
 from model.lora import create_network
-from model.pe import AllPositionalEmbedding, SinglePositionalEmbedding
 from model.diffusion_model import load_target_model
-import os
-from safetensors.torch import load_file
-from model.unet import TimestepEmbedding
 from transformers import CLIPModel
 from model.modeling_vit import ViTModel
 def call_model_package_2(args, weight_dtype, accelerator, text_encoder_lora = True, unet_lora = True ):

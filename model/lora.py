@@ -597,7 +597,7 @@ def create_network(multiplier: float,
 
     net_key_names = kwargs.get('key_layers', None)
     # すごく引数が多いな ( ^ω^)･･･
-    network = LoRANetwork(text_encoder=condition_model,
+    network = LoRANetwork(condition_model=condition_model,
                           unet=unet,
                           multiplier=multiplier,
                           lora_dim=network_dim,
@@ -971,7 +971,7 @@ class LoRANetwork(torch.nn.Module):
 
     def __init__(
         self,
-        text_encoder: Union[List[CLIPTextModel], CLIPTextModel],
+        condition_model: Union[List[CLIPTextModel], CLIPTextModel],
         unet,
         block_wise : Optional[List[int]] = None,
         multiplier: float = 1.0,
@@ -1096,33 +1096,6 @@ class LoRANetwork(torch.nn.Module):
             return loras, skipped
 
         # ------------------------------------------------------------------------------------------------------------------------
-        text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
-        self.text_encoder_loras = []
-        skipped_te = [] # 1 model
-        for i, text_encoder in enumerate(text_encoders):
-            if len(text_encoders) > 1:
-                index = i + 1
-                print(f"create LoRA for Text Encoder {index}:")
-            else:
-                index = None
-                #print(f"create LoRA for Text Encoder:") # Here is the problem
-            if condition_modality == 'image':
-                prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
-                target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
-            else :
-                prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
-                target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
-            text_encoder_loras, skipped = create_modules(False,
-                                                         index,
-                                                         text_encoder,
-                                                         target_replace_modules = target_replace_module_condition,
-                                                         prefix = prefix_)
-            self.text_encoder_loras.extend(text_encoder_loras)
-            skipped_te += skipped
-
-
-        print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.") # Here (61 modules)
-        # ------------------------------------------------------------------------------------------------------------------------
         # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
         target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
         if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
@@ -1130,9 +1103,66 @@ class LoRANetwork(torch.nn.Module):
         self.unet_loras, skipped_un = create_modules(True,
                                                      None,
                                                      unet,
-                                                     target_replace_modules = target_modules,
-                                                     prefix = LoRANetwork.LORA_PREFIX_UNET)
-        skipped = skipped_te + skipped_un
+                                                     target_replace_modules=target_modules,
+                                                     prefix=LoRANetwork.LORA_PREFIX_UNET)
+        # ------------------------------------------------------------------------------------------------------------------------
+        # [1] text encoder
+        if condition_modality == 'text':
+            text_encoder = condition_model
+            text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
+            self.text_encoder_loras = []
+            skipped_te = []  # 1 model
+            for i, text_encoder in enumerate(text_encoders):
+                if len(text_encoders) > 1:
+                    index = i + 1
+                    print(f"create LoRA for Text Encoder {index}:")
+                else:
+                    index = None
+                    # print(f"create LoRA for Text Encoder:") # Here is the problem
+                if condition_modality == 'image':
+                    prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
+                    target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
+                else:
+                    prefix_ = LoRANetwork.LORA_PREFIX_TEXT_ENCODER
+                    target_replace_module_condition = LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE
+                text_encoder_loras, skipped = create_modules(False,
+                                                             index,
+                                                             text_encoder,
+                                                             target_replace_modules=target_replace_module_condition,
+                                                             prefix=prefix_)
+                self.text_encoder_loras.extend(text_encoder_loras)
+                skipped_te += skipped
+
+            print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.")  # Here (61 modules)
+            skipped = skipped_te + skipped_un
+
+        else :
+            image_condition = condition_model
+            image_encoders = image_condition if type(image_condition) == list else [image_condition]
+            self.image_encoder_loras = []
+            skipped_ie = []  # 1 model
+            if image_condition is not None:
+                for i, image_encoder in enumerate(image_encoders):
+                    if len(image_encoders) > 1:
+                        index = i + 1
+                        print(f"create LoRA for Image Encoder {index}:")
+                    else:
+                        index = None
+                    # ---------------------------------------------------------------------------------------------------------------------
+                    # create image encoder LoRA
+                    prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
+                    target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
+
+                    image_encoder_loras, skipped = create_modules(False,
+                                                                  index,
+                                                                  root_module=image_encoder,
+                                                                  target_replace_modules=target_replace_module_condition,
+                                                                  prefix=prefix_)
+                    self.image_encoder_loras.extend(image_encoder_loras)
+                    skipped_ie += skipped
+                print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
+                skipped = skipped_ie + skipped_un
+
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
             print(f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:")
@@ -1170,12 +1200,18 @@ class LoRANetwork(torch.nn.Module):
             lora.restore()
 
 
-    def apply_to(self, text_encoder, unet, apply_text_encoder=True, apply_unet=True):
+    def apply_to(self, text_encoder, unet, apply_text_encoder=True, apply_unet=True, modality = 'text'):
 
-        if apply_text_encoder:
-            print("enable LoRA for text encoder")
-        else:
-            self.text_encoder_loras = []
+        if modality == 'text':
+            if apply_text_encoder:
+                print("enable LoRA for text encoder")
+            else:
+                self.text_encoder_loras = []
+        elif modality == 'image':
+            if apply_text_encoder:
+                print("enable LoRA for image encoder")
+            else:
+                self.image_encoder_loras = []
 
         if apply_unet:
             print("enable LoRA for U-Net")

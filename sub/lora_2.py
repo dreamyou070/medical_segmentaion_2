@@ -542,10 +542,10 @@ def create_network_2(multiplier: float,
                      network_dim: Optional[int],
                      network_alpha: Optional[float],
                      vae: AutoencoderKL,
-                     image_condition = None,
-                     text_condition = None,
+                     condition_model = None,
                      unet=None,
                      neuron_dropout: Optional[float] = None,
+                     condition_modality=None,
                      **kwargs,):
 
     if network_dim is None:
@@ -1104,7 +1104,6 @@ class LoRANetwork(torch.nn.Module):
                     print(f"create LoRA for Image Encoder {index}:")
                 else:
                     index = None
-
                 # ---------------------------------------------------------------------------------------------------------------------
                 # create image encoder LoRA
                 prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER

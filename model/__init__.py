@@ -1,8 +1,6 @@
 from model.lora import create_network
 from model.pe import AllPositionalEmbedding, SinglePositionalEmbedding
 from model.diffusion_model import load_target_model
-import os
-from safetensors.torch import load_file
 from model.unet import TimestepEmbedding
 from transformers import CLIPModel
 from model.modeling_vit import ViTModel
@@ -45,26 +43,32 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
         for net_arg in args.network_args:
             key, value = net_arg.split("=")
             net_kwargs[key] = value
+
     if args.use_image_condition :
         condition_model = image_model # image model is a condition
         condition_modality = 'image'
+
     else :
         condition_model = text_encoder
         condition_modality = 'text'
+
     """ see well how the model is trained """
     network = create_network(1.0,
                              args.network_dim,
                              args.network_alpha,
                              vae,
-                             condition_model,
-                             unet,
+                             condition_model=condition_model,
+                             unet=unet,
                              neuron_dropout=args.network_dropout,
                              condition_modality=condition_modality,
                              **net_kwargs, )
+
     network.apply_to(condition_model,
                      unet,
                      True,
-                     True)
+                     True,
+                     modality = condition_modality,)
+
     if args.network_weights is not None :
         print(f' * loading network weights')
         info = network.load_weights(args.network_weights)
