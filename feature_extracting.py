@@ -18,6 +18,7 @@ from PIL import Image
 from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
+import json
 
 def eval_step(engine, batch):
     return batch
@@ -64,11 +65,20 @@ def torch_to_pil(torch_img):
 
 def main(args):
 
-    print(f' step 0. accelerator')
-    args.logging_dir = os.path.join(args.output_dir, 'log_infer')
+    print(f'\n step 1. setting')
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    args.logging_dir = os.path.join(output_dir, 'log')
     os.makedirs(args.logging_dir, exist_ok=True)
+    record_save_dir = os.path.join(output_dir, 'record')
+    os.makedirs(record_save_dir, exist_ok=True)
+    with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
+        json.dump(vars(args), f, indent=4)
+
+    print(f'\n step 3. preparing accelerator')
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
+
 
     print(f' step 1. make model')
     print(f' (1) stable diffusion model')
@@ -85,6 +95,21 @@ def main(args):
     # pt file
     segmentation_state_dict = torch.load(args.segmentation_head_weights)
     segmentation_head.load_state_dict(segmentation_state_dict)
+
+    print(f' (4) student segmentation model')
+    student_segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                      mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm,)
+    student_segmentation_state_dict = torch.load(args.student_segmentation_head_weights)
+    student_segmentation_head.load_state_dict(student_segmentation_state_dict)
+    # freeze all parameters except for the self.outc
+    for name, param in student_segmentation_head.named_parameters():
+        if 'outc' not in name:
+            param.requires_grad = False
+        else :
+            param.requires_grad = True
+
+
     segmentation_head.to(dtype=weight_dtype, device=accelerator.device)
     pure_path = os.path.split(args.segmentation_head_weights)[-1]
     pure_path = os.path.splitext(pure_path)[0]
@@ -135,10 +160,11 @@ def main(args):
     test_dataloader = accelerator.prepare(test_dataloader)
     # [4] output dir
     device = accelerator.device
-    class_1_features = []
+
     with torch.no_grad():
-        y_true_list, y_pred_list = [], []
+
         for global_num, batch in enumerate(test_dataloader):
+            class_1_features = []
             if not args.without_condition:
                 if args.use_image_condition:
                     """ condition model is already on device and dtype """
@@ -157,11 +183,12 @@ def main(args):
                     encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
                         "last_hidden_state"]  # [batch, 77, 768]
             # [1] original image (1,3,512,512)
-            image = batch['image'].to(dtype=weight_dtype)
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 256*256
+            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-            # gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-            # gt = gt.view(-1, gt.shape[-1]).contiguous()
+            gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
+            gt = gt.view(-1, gt.shape[-1]).contiguous()
+
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
@@ -193,10 +220,42 @@ def main(args):
                 feat = feature[:, pix_i, :].unsqueeze(0)
                 if gt_flat[pix_i] == 1 :
                     class_1_features.append(feat)
-            break
-    #
-    class_1_features = torch.cat(class_1_features, dim=0)
-    print(f' class_1_features shape : {class_1_features.shape}')
+            class_1_features = torch.cat(class_1_features, dim=0)
+            class_1_mean = torch.mean(class_1_features, dim=0)
+            class_1_std = torch.std(class_1_features, dim=0)
+            # generate pseudo feature
+            pseudo_feature = class_1_mean + class_1_std * torch.randn_like(feature)
+            pseudo_mask_pred = student_segmentation_head.segment_feature(pseudo_feature)
+            pseudo_feature_label = batch['gt']
+            pseudo_feature_label[:, 0, :, :, ] = 0
+            pseudo_feature_label[:, 1, :, :, ] = 1
+
+            if args.use_dice_ce_loss:
+                loss = loss_dicece(input=pseudo_mask_pred,  # [class, 256,256]
+                                   target=pseudo_feature_label.to(dtype=weight_dtype))  # [class, 256,256]
+            loss = loss.mean()
+            current_loss = loss.detach().item()
+
+            if epoch == args.start_epoch:
+                loss_list.append(current_loss)
+            else:
+                epoch_loss_total -= loss_list[step]
+                loss_list[step] = current_loss
+            epoch_loss_total += current_loss
+            avr_loss = epoch_loss_total / len(loss_list)
+            loss_dict['avr_loss'] = avr_loss
+            accelerator.backward(loss)
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                global_step += 1
+            if is_main_process:
+                progress_bar.set_postfix(**loss_dict)
+            if global_step >= args.max_train_steps:
+                break
+
 
 
 
