@@ -245,6 +245,6 @@ class SemanticModel(nn.Module):
     def forward(self, x16_out, x32_out, x64_out):
 
         x = self.gen_feature(x16_out, x32_out, x64_out)
-
         logits = self.outc(x)  # 1, 4, 128,128
         return x, logits
+

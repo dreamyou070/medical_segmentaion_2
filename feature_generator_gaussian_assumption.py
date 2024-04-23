@@ -308,8 +308,7 @@ def main(args):
                                   noise_type=position_embedder).sample
 
             target = torch.randn_like(noise_pred)
-            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
-                [1, 2, 3])
+            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean([1, 2, 3])
 
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
@@ -344,7 +343,7 @@ def main(args):
             class_0_mean = torch.mean(class_0_feat, dim=0)
             class_1_mean = torch.mean(class_1_feat, dim=0)
             class_0_std_vector = torch.std(class_0_feat, dim=0)
-            class_1_std_vector = torch.std(class_1_feat, dim=0)
+            class_1_std_vector = torch.std(class_1_feat, dim=0) 
             # generating random feature map
             random_feat = torch.randn(1, 160, 256, 256)
             pseud_label = torch.zeros(256, 256)
