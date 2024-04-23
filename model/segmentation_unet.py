@@ -164,4 +164,4 @@ class SemanticModel(nn.Module):
         # non linear model ?
         x = self.segmentation_head(x) # [batch, 160, 256,256]
         logits = self.outc(x)  # 1, 4, 128,128
-        return logits
+        return x, logits

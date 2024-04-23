@@ -22,10 +22,10 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from torch.nn import functional as F
 
+
 # image conditioned segmentation mask generating
 
 def main(args):
-
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -45,10 +45,10 @@ def main(args):
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
-                                      use_layer_norm = args.use_layer_norm)
+                                      use_layer_norm=args.use_layer_norm)
 
     reduction_net = None
-    if args.reducing_redundancy :
+    if args.reducing_redundancy:
 
         # i think it is not that good ... (is there any other way to reduce redundancy ?)
         # image info is much redundancy than text
@@ -59,23 +59,23 @@ def main(args):
 
                 super(ReductionNet, self).__init__()
                 self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
-                                               nn.Softmax(dim=-1))
+                                           nn.Softmax(dim=-1))
 
             def forward(self, x):
                 class_embedding = x[:, 0, :]
                 org_x = x[:, 1:, :]  # x = [1,196,768]
 
                 reduct_x = self.layer(org_x)  # x = [1,196,3]
-                if args.use_weighted_reduct :
+                if args.use_weighted_reduct:
                     weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
                     weight_scale = torch.sum(weight_x, dim=-1)
                     reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
                     # normalizing in channel dimention ***
-                    #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
+                    # reduct_x = F.normalize(reduct_x, p=2, dim=-1)
                     reduct_x = reduct_x / weight_scale.unsqueeze(-1)
-                else :
-                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
-                    reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
+                else:
+                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
+                    reduct_x = torch.matmul(reduct_x, org_x)  # [1,3,196] [1,196,768] = [1,3,768]
                     reduct_x = F.normalize(reduct_x, p=2, dim=-1)
 
                 if class_embedding.dim() != 3:
@@ -89,12 +89,10 @@ def main(args):
 
         reduction_net = ReductionNet(768, args.n_classes)
     vision_head = None
-    if args.image_processor == 'pvt' :
-
+    if args.image_processor == 'pvt':
         class vision_condition_head(nn.Module):
 
-            def __init__(self) :
-
+            def __init__(self):
                 super(vision_condition_head, self).__init__()
                 multi_dims = [64, 128, 320, 512]
                 condition_dim = 768
@@ -130,7 +128,7 @@ def main(args):
 
         vision_head = vision_condition_head()
     position_embedder = None
-    if args.use_position_embedder :
+    if args.use_position_embedder:
         from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
     print(f'\n step 4. dataset and dataloader')
@@ -144,12 +142,12 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
                                                         args.unet_lr,
                                                         args.learning_rate,
-                                                        condition_modality=condition_modality,)
-    if args.reducing_redundancy :
+                                                        condition_modality=condition_modality, )
+    if args.reducing_redundancy:
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
-    if args.use_position_embedder :
+    if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
 
     trainable_params.append({"params": segmentation_head.parameters(),
@@ -196,14 +194,15 @@ def main(args):
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    if args.reducing_redundancy :
+        accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
+                            lr_scheduler)
+    if args.reducing_redundancy:
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
-    if args.use_position_embedder :
+    if args.use_position_embedder:
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
 
@@ -298,7 +297,7 @@ def main(args):
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             with torch.set_grad_enabled(True):
-                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
+                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
@@ -306,7 +305,7 @@ def main(args):
 
                 noise_pred = unet(latents, 0, encoder_hidden_states,
                                   trg_layer_list=args.trg_layer_list,
-                                  noise_type = position_embedder).sample
+                                  noise_type=position_embedder).sample
 
             target = torch.randn_like(noise_pred)
             noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
@@ -327,7 +326,42 @@ def main(args):
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            feature_map, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            # feature_map = [batch, 160, 256,256]
+            # ------------------------------------------------------------------------------------------------------------
+            # [0] mahalanobis loss
+            # (feature_map) batch, dim, res, res --> batch, res*res, dim
+            b,d = feature_map.shape[0], feature_map.shape[1]
+            feature_map = feature_map.permute(0, 2, 3, 1).contiguous().view(b,-1,d).contiguous()
+            pix_num = feature_map.shape[1]
+            class_0_feat, class_1_feat = [], []
+            for i in range(pix_num):
+                feat = feature_map[:,i,:].squeeze()
+                class_index = gt_flat.squeeze()[i]
+                if class_index == 0:
+                    class_0_feat.append(feat)
+                else:
+                    class_1_feat.append(feat)
+            class_0_feat = torch.stack(class_0_feat, dim=0) # N, 160
+            class_1_feat = torch.stack(class_1_feat, dim=0) # N, 160
+
+            # restruction of gaussian distribution
+            class_0_mean = torch.mean(class_0_feat, dim=0)
+            class_1_mean = torch.mean(class_1_feat, dim=0)
+            class_0_cov = torch.mm((class_0_feat - class_0_mean).T, (class_0_feat - class_0_mean)) / class_0_feat.shape[0]
+            class_1_cov = torch.mm((class_1_feat - class_1_mean).T, (class_1_feat - class_1_mean)) / class_1_feat.shape[0]
+            class_0_std = torch.sqrt(torch.diag(class_0_cov))
+            class_1_std = torch.sqrt(torch.diag(class_1_cov))
+            print(f'class_0_mean = {class_0_mean} | class_1_mean = {class_1_mean}')
+            print(f'class_0_std = {class_0_std} | class_1_std = {class_1_std}')
+
+
+
+
+
+
+
+
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
             # ------------------------------------------------------------------------------------------------------------
@@ -391,19 +425,19 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.reducing_redundancy :
+            if args.reducing_redundancy:
                 save_model(args,
                            saving_folder='reduction_net',
                            saving_name=f'reduction-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(reduction_net),
                            save_dtype=save_dtype)
-            if args.use_position_embedder :
+            if args.use_position_embedder:
                 save_model(args,
                            saving_folder='position_embedder',
                            saving_name=f'position-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(position_embedder),
                            save_dtype=save_dtype)
-            if args.image_processor == 'pvt' :
+            if args.image_processor == 'pvt':
                 save_model(args,
                            saving_folder='vision_head',
                            saving_name=f'vision-{saving_epoch}.pt',
@@ -450,6 +484,7 @@ def main(args):
                 f.write(f'| dice_coeff = {dice_coeff}')
                 f.write(f'\n')
     accelerator.end_training()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -590,5 +625,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
+
     passing_mvtec_argument(args)
     main(args)
