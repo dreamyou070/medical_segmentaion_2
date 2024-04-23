@@ -97,6 +97,7 @@ def main(args):
         vision_head_folder = os.path.join(args.output_dir, 'vision_head')
         vision_head_file = os.path.join(vision_head_folder, f'vision-{num}.pt')
         vision_head.load_state_dict(torch.load(vision_head_file))
+        vision_head.to(dtype=weight_dtype, device=accelerator.device)
 
 
 
