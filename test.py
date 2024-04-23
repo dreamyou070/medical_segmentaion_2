@@ -17,7 +17,7 @@ from PIL import Image
 from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
-
+from torchvision import transforms
 def eval_step(engine, batch):
     return batch
 def torch_to_pil(torch_img):
@@ -86,6 +86,11 @@ def main(args):
         # ViTModel
         condition_transform = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
     elif args.image_processor == 'pvt':
+        condition_transform = transforms.Compose([transforms.Resize((384,384)),
+                                                transforms.ToTensor(),
+                                                transforms.Normalize([0.485, 0.456, 0.406],
+                                                                     [0.229, 0.224, 0.225])])
+
 
 
     print(f' step 2. check data path')
@@ -98,7 +103,7 @@ def main(args):
             data_path = os.path.join(args.base_path, _data_name)
 
             # [2] save_path
-            save_base_dir = os.path.join(sae_base, _data_name)
+            save_base_dir = os.path.join(save_base, _data_name)
             os.makedirs(save_base_dir, exist_ok=True)
 
             image_root = os.path.join(data_path, 'images')
