@@ -326,7 +326,9 @@ def main(args):
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            feature_map, masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            #feature_map, masks_pred = segmentation_head(
+
+            feature_map = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
             # feature_map = [batch, 160, 256,256]
             # ------------------------------------------------------------------------------------------------------------
             # [0] mahalanobis loss
@@ -348,38 +350,49 @@ def main(args):
             # restruction of gaussian distribution
             class_0_mean = torch.mean(class_0_feat, dim=0)
             class_1_mean = torch.mean(class_1_feat, dim=0)
-            class_0_cov = torch.mm((class_0_feat - class_0_mean).T, (class_0_feat - class_0_mean)) / class_0_feat.shape[0]
-            class_1_cov = torch.mm((class_1_feat - class_1_mean).T, (class_1_feat - class_1_mean)) / class_1_feat.shape[0]
-            class_0_std = torch.sqrt(torch.diag(class_0_cov))
-            class_1_std = torch.sqrt(torch.diag(class_1_cov))
-            print(f'class_0_mean = {class_0_mean} | class_1_mean = {class_1_mean}')
-            print(f'class_0_std = {class_0_std} | class_1_std = {class_1_std}')
+            class_0_std_vector = torch.std(class_0_feat, dim=0)
+            class_1_std_vector = torch.std(class_1_feat, dim=0)
 
-
-
-
-
-
-
+            random_feat = torch.randn(1,160,256,256)
+            pseud_label = torch.zeros(1,256,256)
+            for i in range(256):
+                for j in range(256):
+                    random_p = random.random()
+                    if random_p < 0.5:
+                        random_noise = torch.rand_like(class_0_mean)
+                        class_0_virtual_feat = class_0_mean + random_noise * class_0_std_vector  # N, 160
+                        random_feat[:,:,i,j] = class_0_virtual_feat
+                        pseud_label[0,i,j] = 0
+                    else:
+                        random_noise = torch.rand_like(class_0_mean)
+                        class_1_virtual_feat = class_1_mean + random_noise * class_1_std_vector
+                        random_feat[:,:,i,j] = class_1_virtual_feat
+                        pseud_label[0,i,j] = 1
+            # ------------------------------------------------------------------------------------------------------------
+            # pseudo sample segmentation
+            pseudo_sample_pred = segmentation_head.segment_feature(random_feat)  # [1,3,256,256]
+            real_sample_pred = segmentation_head.segment_feature(feature_map)  # [1,3,256,256]
 
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
+
+
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+            masks_pred_ = real_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1, real_sample_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=real_sample_pred, target=batch['gt'].to(dtype=weight_dtype))
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(real_sample_pred.device))  # N
                 if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
                 loss += focal_loss
                 loss_dict['focal_loss'] = focal_loss.item()
                 # [5.3] Dice Loss
                 if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
+                    dice_loss = loss_Dice(real_sample_pred, gt)
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()

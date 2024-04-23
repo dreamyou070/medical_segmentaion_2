@@ -165,3 +165,86 @@ class SemanticModel(nn.Module):
         x = self.segmentation_head(x) # [batch, 160, 256,256]
         logits = self.outc(x)  # 1, 4, 128,128
         return x, logits
+
+class SemanticModel(nn.Module):
+    def __init__(self,
+                 n_classes,
+                 use_layer_norm=True,
+                 mask_res=128,):
+        super(SemanticModel, self).__init__()
+
+        c = 320
+
+        self.mlp_layer_1 = torch.nn.Linear(1280, c)
+        self.upsample_layer_1 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
+
+        self.mlp_layer_2 = torch.nn.Linear(640, c)
+        self.upsample_layer_2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.mlp_layer_3 = torch.nn.Linear(320, c)
+        self.upsample_layer_3 = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
+
+        self.use_layer_norm = use_layer_norm
+        if self.use_layer_norm:
+            if mask_res == 128:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160 , 128, 128]),)
+            if mask_res == 256:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.LayerNorm([160*3, 128, 128]),
+                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160, 256,256]))
+            if mask_res == 512:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       nn.LayerNorm([160*3, 128, 128]),
+                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
+                                                       nn.LayerNorm([160*2, 256, 256]),
+                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),
+                                                       nn.LayerNorm([160, 512, 512]))
+        else :
+            if mask_res == 128:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                                                       )
+            if mask_res == 256:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),)
+            if mask_res == 512:
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                                                       Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
+                                                       Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),)
+        self.outc = OutConv(160, n_classes)
+
+    def dim_and_res_up(self, mlp_layer, upsample_layer, x):
+        # [batch, dim, res, res] -> [batch, res*res, dim]
+        batch, dim, res, res = x.shape
+        x = x.permute(0, 2, 3, 1).contiguous().reshape(1, res * res, dim)
+        # [1] dim change
+        x = mlp_layer(x)  # x = [batch, res*res, new_dim]
+        new_dim = x.shape[-1]
+        x = x.permute(0, 2, 1).contiguous().reshape(1, new_dim, res, res)
+        # [2] res change
+        x = upsample_layer(x)
+        return x
+
+    def gen_feature(self, x16_out, x32_out, x64_out):
+
+        x16_out = self.dim_and_res_up(self.mlp_layer_1, self.upsample_layer_1, x16_out)  # [batch, 320, 64,64]
+        x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)  # [batch, 320, 64,64]
+        x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)  # [batch, 320, 64,64]
+        x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
+        # non linear model ?
+        x = self.segmentation_head(x)  # [batch, 160, 256,256]
+        return x
+
+    def segment_feature(self, feature):
+        # feature = [batch, 160, 256,256]
+        # out = [batch, 2, 256,256]
+        segment_out = self.outc(feature)
+        return segment_out
+
+    def forward(self, x16_out, x32_out, x64_out):
+
+        x = self.gen_feature(x16_out, x32_out, x64_out)
+
+        logits = self.outc(x)  # 1, 4, 128,128
+        return x, logits
