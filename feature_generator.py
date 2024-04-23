@@ -144,7 +144,7 @@ def main(args):
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
                                                         args.unet_lr,
                                                         args.learning_rate,
-                                                        conditional_modality=condition_modality,)
+                                                        condition_modality=condition_modality,)
     if args.reducing_redundancy :
         trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     if args.use_position_embedder :
