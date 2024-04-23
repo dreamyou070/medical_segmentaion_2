@@ -114,29 +114,180 @@ def main(args):
         condition_transform = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
     print(f' step 2. check data path')
-    sae_base = os.path.join(args.output_dir, 'thesis_output')
-    os.makedirs(sae_base, exist_ok=True)
+    if not args.inference_with_training_data :
+        save_base = os.path.join(args.output_dir, 'thesis_output')
+        os.makedirs(save_base, exist_ok=True)
+        for _data_name in ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']:
 
-    for _data_name in ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']:
+            # [1] data_path here
+            data_path = os.path.join(args.base_path, _data_name)
 
+            # [2] save_path
+            save_base_dir = os.path.join(sae_base, _data_name)
+            os.makedirs(save_base_dir, exist_ok=True)
+
+            image_root = os.path.join(data_path, 'images')
+            gt_root = os.path.join(data_path, 'masks')
+
+            test_dataset = TestDataset(image_root = image_root,
+                                       gt_root = gt_root,
+                                       resize_shape = (512,512),
+                                       image_processor = condition_transform,
+                                       latent_res = 64,
+                                       n_classes = 4,
+                                       mask_res = 256,
+                                       use_data_aug=False,)
+            test_dataloader = torch.utils.data.DataLoader(test_dataset,
+                                                          batch_size=1,
+                                                          shuffle=False)
+            test_dataloader = accelerator.prepare(test_dataloader)
+            # [4] output dir
+            device = accelerator.device
+            with torch.no_grad():
+                y_true_list, y_pred_list = [], []
+                for global_num, batch in enumerate(test_dataloader):
+                    if not args.without_condition:
+                        if args.use_image_condition:
+                            """ condition model is already on device and dtype """
+                            with torch.no_grad():
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.not_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                                if args.only_use_cls_token:
+                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                                if args.reducing_redundancy:
+                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
+
+                    if args.use_text_condition:
+                        with torch.set_grad_enabled(True):
+                            encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
+                                "last_hidden_state"]  # [batch, 77, 768]
+                    # [1] original image (1,3,512,512)
+                    image = batch['image'].to(dtype=weight_dtype)
+
+                    # [2] gt image
+                    gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
+                    gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
+                    #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
+                    #gt = gt.view(-1, gt.shape[-1]).contiguous()
+                    with torch.no_grad():
+                        latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                    with torch.set_grad_enabled(True):
+                        if encoder_hidden_states.dim() != 3:
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                        if encoder_hidden_states.dim() != 3:
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                        noise_pred = unet(latents, 0, encoder_hidden_states,
+                                              trg_layer_list=args.trg_layer_list).sample
+                    query_dict, key_dict = controller.query_dict, controller.key_dict
+                    controller.reset()
+                    q_dict = {}
+                    for layer in args.trg_layer_list:
+                        query = query_dict[layer][0]  # head, pix_num, dim
+                        res = int(query.shape[1] ** 0.5)
+                        if args.text_before_query:
+                            query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                        else:
+                            query = query.reshape(1, res, res, -1)
+                            query = query.permute(0, 3, 1, 2).contiguous()
+                        q_dict[res] = query
+
+                    x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+                    masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
+                    #######################################################################################################################
+                    # [1] pred
+                    class_num = masks_pred.shape[1]  # 4
+                    mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
+                    # masks_pred = [batch, 2, 256,256]
+
+                    r = int(mask_pred_argmax.shape[0] ** .5)
+                    y_pred_list.append(mask_pred_argmax)
+                    y_true = gt_flat.squeeze()
+                    y_true_list.append(y_true)
+
+                    # [2] saving image (all in 256 X 256)
+                    original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r,r))
+                    gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
+
+                    predict_pil = torch_to_pil(mask_pred_argmax.reshape((r,r)).contiguous().detach().cpu())
+                    merged_pil = Image.blend(original_pil, predict_pil, 0.4)
+                    total_img = Image.new('RGB', (r * 4, r))
+                    total_img.paste(original_pil, (0, 0))
+                    total_img.paste(gt_pil, (r, 0))
+                    total_img.paste(predict_pil, (r * 2, 0))
+                    total_img.paste(merged_pil, (r * 3, 0))
+                    pure_path = batch['pure_path'][0]
+                    total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
+
+                #######################################################################################################################
+                # [1] pred
+                y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
+                y_pred = F.one_hot(y_pred, num_classes=class_num)  # [pixel_num, C]
+                y_true = torch.cat(y_true_list).detach().cpu().long()  # [pixel_num]
+                # [2] make confusion engine
+                default_evaluator = Engine(eval_step)
+                cm = ConfusionMatrix(num_classes=class_num)
+                cm.attach(default_evaluator, 'confusion_matrix')
+                state = default_evaluator.run([[y_pred, y_true]])
+                confusion_matrix = state.metrics['confusion_matrix']
+                actual_axis, pred_axis = confusion_matrix.shape
+                IOU_dict = {}
+                eps = 1e-15
+                for actual_idx in range(actual_axis):
+                    total_actual_num = sum(confusion_matrix[actual_idx])
+                    total_predict_num = sum(confusion_matrix[:, actual_idx])
+                    dice_coeff = 2 * confusion_matrix[actual_idx, actual_idx] / (total_actual_num + total_predict_num + eps)
+                    IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
+                # [1] WC Score
+            segmentation_head.train()
+            print(f' {_data_name} finished !')
+            # saving score
+            # saving
+            if is_main_process:
+                print(f'  - precision dictionary = {IOU_dict}')
+                print(f'  - confusion_matrix = {confusion_matrix}')
+                confusion_matrix = confusion_matrix.tolist()
+                confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
+                with open(confusion_save_dir, 'a') as f:
+                    f.write(f' data_name = {_data_name} \n')
+                    for i in range(len(confusion_matrix)):
+                        for j in range(len(confusion_matrix[i])):
+                            f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                        f.write('\n')
+                    f.write('\n')
+
+                score_save_dir = os.path.join(save_base_dir, 'score.txt')
+                with open(score_save_dir, 'a') as f:
+                    dices = []
+                    f.write(f' data_name = {_data_name} | ')
+                    for k in IOU_dict:
+                        dice = float(IOU_dict[k])
+                        f.write(f'class {k} = {dice} ')
+                        dices.append(dice)
+                    dice_coeff = sum(dices) / len(dices)
+                    f.write(f'| dice_coeff = {dice_coeff}')
+                    f.write(f'\n')
+    else :
+
+        save_base = os.path.join(args.output_dir, 'inference_with_training_data')
+        os.makedirs(save_base, exist_ok=True)
         # [1] data_path here
-        data_path = os.path.join(args.base_path, _data_name)
-
+        data_path = os.path.join(args.base_path, 'res_256')
         # [2] save_path
-        save_base_dir = os.path.join(sae_base, _data_name)
-        os.makedirs(save_base_dir, exist_ok=True)
 
-        image_root = os.path.join(data_path, 'images')
-        gt_root = os.path.join(data_path, 'masks')
+        image_root = os.path.join(data_path, 'image_256')
+        gt_root = os.path.join(data_path, 'mask_256')
 
-        test_dataset = TestDataset(image_root = image_root,
-                                   gt_root = gt_root,
-                                   resize_shape = (512,512),
-                                   image_processor = condition_transform,
-                                   latent_res = 64,
-                                   n_classes = 4,
-                                   mask_res = 256,
-                                   use_data_aug=False,)
+        test_dataset = TestDataset(image_root=image_root,
+                                   gt_root=gt_root,
+                                   resize_shape=(512, 512),
+                                   image_processor=condition_transform,
+                                   latent_res=64,
+                                   n_classes=4,
+                                   mask_res=256,
+                                   use_data_aug=False, )
         test_dataloader = torch.utils.data.DataLoader(test_dataset,
                                                       batch_size=1,
                                                       shuffle=False)
@@ -169,8 +320,8 @@ def main(args):
                 # [2] gt image
                 gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
                 gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
-                #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-                #gt = gt.view(-1, gt.shape[-1]).contiguous()
+                # gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
+                # gt = gt.view(-1, gt.shape[-1]).contiguous()
                 with torch.no_grad():
                     latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
                 with torch.set_grad_enabled(True):
@@ -179,7 +330,7 @@ def main(args):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     noise_pred = unet(latents, 0, encoder_hidden_states,
-                                          trg_layer_list=args.trg_layer_list).sample
+                                      trg_layer_list=args.trg_layer_list).sample
                 query_dict, key_dict = controller.query_dict, controller.key_dict
                 controller.reset()
                 q_dict = {}
@@ -208,10 +359,10 @@ def main(args):
                 y_true_list.append(y_true)
 
                 # [2] saving image (all in 256 X 256)
-                original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r,r))
-                gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r,r))
+                original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
+                gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r))
 
-                predict_pil = torch_to_pil(mask_pred_argmax.reshape((r,r)).contiguous().detach().cpu())
+                predict_pil = torch_to_pil(mask_pred_argmax.reshape((r, r)).contiguous().detach().cpu())
                 merged_pil = Image.blend(original_pil, predict_pil, 0.4)
                 total_img = Image.new('RGB', (r * 4, r))
                 total_img.paste(original_pil, (0, 0))
@@ -219,7 +370,7 @@ def main(args):
                 total_img.paste(predict_pil, (r * 2, 0))
                 total_img.paste(merged_pil, (r * 3, 0))
                 pure_path = batch['pure_path'][0]
-                total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
+                total_img.save(os.path.join(save_base, f'{pure_path}'))
 
             #######################################################################################################################
             # [1] pred
@@ -242,26 +393,23 @@ def main(args):
                 IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
             # [1] WC Score
         segmentation_head.train()
-        print(f' {_data_name} finished !')
         # saving score
         # saving
         if is_main_process:
             print(f'  - precision dictionary = {IOU_dict}')
             print(f'  - confusion_matrix = {confusion_matrix}')
             confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
+            confusion_save_dir = os.path.join(save_base, 'confusion.txt')
             with open(confusion_save_dir, 'a') as f:
-                f.write(f' data_name = {_data_name} \n')
                 for i in range(len(confusion_matrix)):
                     for j in range(len(confusion_matrix[i])):
                         f.write(' ' + str(confusion_matrix[i][j]) + ' ')
                     f.write('\n')
                 f.write('\n')
 
-            score_save_dir = os.path.join(save_base_dir, 'score.txt')
+            score_save_dir = os.path.join(save_base, 'score.txt')
             with open(score_save_dir, 'a') as f:
                 dices = []
-                f.write(f' data_name = {_data_name} | ')
                 for k in IOU_dict:
                     dice = float(IOU_dict[k])
                     f.write(f'class {k} = {dice} ')
@@ -407,6 +555,7 @@ if __name__ == '__main__' :
     parser.add_argument("--use_layer_norm", action='store_true')
     parser.add_argument("--original_learning", action='store_true')
     parser.add_argument("--segmentation_head_weights", type= str)
+    parser.add_argument("--inference_with_training_data", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataloader import passing_mvtec_argument
