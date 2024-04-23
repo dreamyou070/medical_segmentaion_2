@@ -370,6 +370,8 @@ def main(args):
                         pseud_label[0,i,j] = 1
             # ------------------------------------------------------------------------------------------------------------
             # pseudo sample segmentation
+            random_feat = random_feat.to(device)
+            pseud_label = pseud_label.to(device)
             pseudo_sample_pred = segmentation_head.segment_feature(random_feat)  # [1,3,256,256]
             real_sample_pred = segmentation_head.segment_feature(feature_map)  # [1,3,256,256]
 
