@@ -379,8 +379,7 @@ def main(args):
             # [1] generator loss
             pseudo_masks_pred_ = pseudo_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                                    pseudo_sample_pred.shape[-1]).contiguous()
-
-            pseudo_gt = pseud_label.unsquzee(0).unsqueeze(1)
+            pseudo_gt = pseud_label.unsqueeze(0).unsqueeze(0)
             if args.use_dice_ce_loss:
                 pseudo_loss = loss_dicece(input=pseudo_sample_pred,
                                    target=pseudo_gt.to(dtype=weight_dtype))
