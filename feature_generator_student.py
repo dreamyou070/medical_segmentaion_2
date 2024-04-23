@@ -300,7 +300,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--segmentation_head_weights", type=str)
     parser.add_argument("--reduction_net_weights", type=str)
-    parser.add_argument("--position_embedder_weights", type=str)
     parser.add_argument("--vision_condition_head_weights", type=str)
     parser.add_argument("--reduction_net_weights", type=str)
 
