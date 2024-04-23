@@ -334,7 +334,8 @@ def main(args):
             # [2] origin loss
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred, target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
+                                   target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()

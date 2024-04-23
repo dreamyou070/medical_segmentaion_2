@@ -325,25 +325,18 @@ def main(args):
                 q_dict[res] = query
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-            #feature_map, masks_pred = segmentation_head(
-
-            feature_map = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
-            # feature_map = [batch, 160, 256,256]
             # ------------------------------------------------------------------------------------------------------------
-            # [0] mahalanobis loss
-            # (feature_map) batch, dim, res, res --> batch, res*res, dim
-            b,d = feature_map.shape[0], feature_map.shape[1]
-            feature_map_ = feature_map.permute(0, 2, 3, 1).contiguous().view(b, -1, d).contiguous().squeeze() # 1, 256*256, 160
-            pix_num = feature_map_.shape[0]
+            # [0] mahalanobis loss : (feature_map) batch, dim, res, res --> batch, res*res, dim
+            feature_map = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+            b, d = feature_map.shape[0], feature_map.shape[1]
+            feature_map_ = feature_map.permute(0, 2, 3, 1).contiguous().view(b, -1, d).contiguous().squeeze() # [256*256, 160]
             class_0_feat, class_1_feat = [], []
-            for i in range(pix_num):
-                feat = feature_map_[i,:].squeeze()
+            for i in range(feature_map_.shape[0]):
                 class_index = gt_flat.squeeze()[i]
                 if class_index == 0:
-                    class_0_feat.append(feat)
+                    class_0_feat.append(feature_map_[i,:].squeeze())
                 else:
-                    class_1_feat.append(feat)
+                    class_1_feat.append(feature_map_[i,:].squeeze())
             class_0_feat = torch.stack(class_0_feat, dim=0) # N, 160
             class_1_feat = torch.stack(class_1_feat, dim=0) # N, 160
 
@@ -352,7 +345,7 @@ def main(args):
             class_1_mean = torch.mean(class_1_feat, dim=0)
             class_0_std_vector = torch.std(class_0_feat, dim=0)
             class_1_std_vector = torch.std(class_1_feat, dim=0)
-
+            # generating random feature map
             random_feat = torch.randn(1, 160, 256, 256)
             pseud_label = torch.zeros(256, 256)
             for i in range(256):
@@ -360,35 +353,34 @@ def main(args):
                     random_p = random.random()
                     if random_p < 0.5:
                         random_noise = torch.rand_like(class_0_mean)
-                        class_0_virtual_feat = class_0_mean + random_noise * class_0_std_vector  # N, 160
-                        random_feat[:,:,i,j] = class_0_virtual_feat
+                        random_feat[:,:,i,j] = (class_0_mean + random_noise * class_0_std_vector)
                         pseud_label[i,j] = 0
                     else:
                         random_noise = torch.rand_like(class_0_mean)
-                        class_1_virtual_feat = class_1_mean + random_noise * class_1_std_vector
-                        random_feat[:,:,i,j] = class_1_virtual_feat
+                        random_feat[:,:,i,j] = (class_1_mean + random_noise * class_1_std_vector)
                         pseud_label[i,j] = 1
             # ------------------------------------------------------------------------------------------------------------
             # pseudo sample segmentation
             random_feat = random_feat.to(device)
             pseud_label = pseud_label.to(device)
-            pseudo_sample_pred = segmentation_head.segment_feature(random_feat)  # [1,3,256,256]
+            pseudo_sample_pred = segmentation_head.segment_feature(random_feat)  # [1,256,256,160]
             real_sample_pred = segmentation_head.segment_feature(feature_map)  # [1,3,256,256]
 
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
-            pseudo_masks_pred_ = pseudo_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1,
-                                                                                   pseudo_sample_pred.shape[-1]).contiguous()
-            pseudo_gt = pseud_label.unsqueeze(0).unsqueeze(0)
+            pseudo_masks_pred_ = pseudo_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1,args.n_classes).contiguous() # [256*256,2]
+            from tensorflow.keras.utils import to_categorical
+            pseudo_gt = to_categorical(pseud_label, num_classes=args.n_classes).permute(2, 0, 1).contiguous().unsqueeze(0) # [1,2,256,256]
             if args.use_dice_ce_loss:
                 pseudo_loss = loss_dicece(input=pseudo_sample_pred,
-                                   target=pseudo_gt.to(dtype=weight_dtype))
+                                          target=pseudo_gt.to(dtype=weight_dtype)) # [batch, class, res, res]
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
             masks_pred_ = real_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1, real_sample_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=real_sample_pred, target=batch['gt'].to(dtype=weight_dtype))
+                loss = loss_dicece(input=real_sample_pred,
+                                   target=batch['gt'].to(dtype=weight_dtype)) # [class, 256, 256]
             else:  # [5.1] Multiclassification Loss
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
