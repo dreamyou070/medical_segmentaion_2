@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="test" #
+file_name="32_pvt_image_encoder_with_position_embedder_student" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \  --use_position_embedder
@@ -32,10 +32,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --n_classes 2 --mask_res 256 --batch_size 1 \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
- --use_image_condition \
- --image_processor 'pvt' \
- --image_model_training \
- --reducing_redundancy \
+ --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/31_pvt_image_encoder_with_position_embedder/model/lora-000112.safetensors" \
  --use_position_embedder \
- --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000112.safetensors" \
- --segmentation_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000112.pt"
+ --use_image_condition --image_processor 'pvt' --image_model_training --reducing_redundancy \
+ --segmentation_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/31_pvt_image_encoder_with_position_embedder/segmentation/segmentation-000112.pt"
