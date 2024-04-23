@@ -246,5 +246,5 @@ class SemanticModel(nn.Module):
 
         x = self.gen_feature(x16_out, x32_out, x64_out)
         logits = self.outc(x)  # 1, 4, 128,128
-        return x, logits
+        return logits
 
