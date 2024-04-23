@@ -6,7 +6,6 @@ from torch import nn
 import os
 from attention_store import AttentionStore
 from data import call_dataset
-from diffusers import DDPMScheduler
 from model import call_model_package
 from model.segmentation_unet import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
@@ -20,7 +19,8 @@ from utils.evaluate import evaluation_check
 from monai.utils import DiceCEReduction, LossReduction
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from torch.nn import functional as F
+from model.reduction_model import ReductionNet
+from model.vision_condition_head import vision_condition_head
 
 # image conditioned segmentation mask generating
 
@@ -46,93 +46,18 @@ def main(args):
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm)
-
     reduction_net = None
     if args.reducing_redundancy :
-
-        # i think it is not that good ... (is there any other way to reduce redundancy ?)
-        # image info is much redundancy than text
-        # so, i think it is better to reduce redundancy in image info
-
-        class ReductionNet(nn.Module):
-            def __init__(self, cross_dim, class_num):
-
-                super(ReductionNet, self).__init__()
-                self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
-                                               nn.Softmax(dim=-1))
-
-            def forward(self, x):
-                class_embedding = x[:, 0, :]
-                org_x = x[:, 1:, :]  # x = [1,196,768]
-
-                reduct_x = self.layer(org_x)  # x = [1,196,3]
-                if args.use_weighted_reduct :
-                    weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-                    weight_scale = torch.sum(weight_x, dim=-1)
-                    reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
-                    # normalizing in channel dimention ***
-                    #reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-                    reduct_x = reduct_x / weight_scale.unsqueeze(-1)
-                else :
-                    reduct_x = reduct_x.permute(0, 2, 1).contiguous()    # x = [1,3,196]
-                    reduct_x = torch.matmul(reduct_x, org_x) # [1,3,196] [1,196,768] = [1,3,768]
-                    reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-
-                if class_embedding.dim() != 3:
-                    class_embedding = class_embedding.unsqueeze(0)
-                if class_embedding.dim() != 3:
-                    class_embedding = class_embedding.unsqueeze(0)
-
-                x = torch.cat([class_embedding, reduct_x], dim=1)
-
-                return x
-
-        reduction_net = ReductionNet(768, args.n_classes)
+        reduction_net = ReductionNet(768, args.n_classes,
+                                     use_weighted_reduct=args.use_weighted_reduct)
     vision_head = None
     if args.image_processor == 'pvt' :
-
-        class vision_condition_head(nn.Module):
-
-            def __init__(self) :
-
-                super(vision_condition_head, self).__init__()
-                multi_dims = [64, 128, 320, 512]
-                condition_dim = 768
-
-                self.fc_1 = nn.Linear(multi_dims[0], condition_dim)
-                self.fc_2 = nn.Linear(multi_dims[1], condition_dim)
-                self.fc_3 = nn.Linear(multi_dims[2], condition_dim)
-                self.fc_4 = nn.Linear(multi_dims[3], condition_dim)
-
-            def forward(self, x):
-                x1 = x[0].permute(0, 2, 3, 1)
-                x2 = x[1].permute(0, 2, 3, 1)
-                x3 = x[2].permute(0, 2, 3, 1)
-                x4 = x[3].permute(0, 2, 3, 1)
-
-                x1 = x1.reshape(1, -1, 64)
-                x2 = x2.reshape(1, -1, 128)
-                x3 = x3.reshape(1, -1, 320)
-                x4 = x4.reshape(1, -1, 512)
-
-                y1 = self.fc_1(x1)  # batch, pixnum, 768
-                y2 = self.fc_2(x2)  # batch, pixnum, 768
-                y3 = self.fc_3(x3)  # batch, pixnum, 768
-                y4 = self.fc_4(x4)  # batch, pixnum, 768 (much deep features)
-
-                condition_dict = {}
-                condition_dict[64] = y4
-                condition_dict[32] = y3
-                condition_dict[16] = y2
-                condition_dict[8] = y1
-
-                return condition_dict
-
         vision_head = vision_condition_head()
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
+
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -290,10 +215,6 @@ def main(args):
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
 
-            # key_word_index = batch['key_word_index'][0] # torch([10,14])
-            # target key word should intense
-            # how can i increase the alignment between image and text ?
-
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
@@ -327,16 +248,13 @@ def main(args):
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
-            # ------------------------------------------------------------------------------------------------------------
-            # [1] generator loss
-            # ------------------------------------------------------------------------------------------------------------
-            # [2] origin loss
+            features   = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
-            else:  # [5.1] Multiclassification Loss
+            else:
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
