@@ -556,6 +556,7 @@ if __name__ == '__main__' :
     parser.add_argument("--original_learning", action='store_true')
     parser.add_argument("--segmentation_head_weights", type= str)
     parser.add_argument("--inference_with_training_data", action='store_true')
+    parser.add_argument("--use_position_embedding", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataloader import passing_mvtec_argument
