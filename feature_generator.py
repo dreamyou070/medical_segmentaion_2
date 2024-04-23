@@ -36,11 +36,11 @@ def main(args):
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
         json.dump(vars(args), f, indent=4)
 
-    print(f'\n step 3. preparing accelerator')
+    print(f'\n step 2. preparing accelerator')
     accelerator = prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
 
-    print(f'\n step 4. model')
+    print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
     segmentation_head = SemanticModel(n_classes=args.n_classes,

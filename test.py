@@ -3,11 +3,10 @@ import torch.nn.functional as F
 import os
 import argparse
 from model import call_model_package
-from utils import prepare_dtype
+from model.pe import AllPositionalEmbedding
 from utils.accelerator_utils import prepare_accelerator
 from model.segmentation_unet import SemanticModel
-from transformers import CLIPModel
-from model.modeling_vit import ViTModel
+from model.reduction_model import ReductionNet
 from data.dataloader import TestDataset
 from torch import nn
 from attention_store import AttentionStore
@@ -21,38 +20,6 @@ from ignite.engine import *
 
 def eval_step(engine, batch):
     return batch
-class ReductionNet(nn.Module):
-    def __init__(self, cross_dim, class_num):
-
-        super(ReductionNet, self).__init__()
-        self.layer = nn.Sequential(nn.Linear(cross_dim, class_num),
-                                   nn.Softmax(dim=-1))
-
-    def forward(self, x):
-        class_embedding = x[:, 0, :]
-        org_x = x[:, 1:, :]  # x = [1,196,768]
-
-        reduct_x = self.layer(org_x)  # x = [1,196,3]
-        if args.use_weighted_reduct:
-            weight_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-            weight_scale = torch.sum(weight_x, dim=-1)
-            reduct_x = torch.matmul(weight_x, org_x)  # x = [1,3,768]
-            reduct_x = reduct_x / weight_scale.unsqueeze(-1)
-        else:
-            reduct_x = reduct_x.permute(0, 2, 1).contiguous()  # x = [1,3,196]
-            reduct_x = torch.matmul(reduct_x, org_x)  # [1,3,196] [1,196,768] = [1,3,768]
-            reduct_x = F.normalize(reduct_x, p=2, dim=-1)
-
-        if class_embedding.dim() != 3:
-            class_embedding = class_embedding.unsqueeze(0)
-        if class_embedding.dim() != 3:
-            class_embedding = class_embedding.unsqueeze(0)
-
-        x = torch.cat([class_embedding, reduct_x], dim=1)
-
-        return x
-
-
 def torch_to_pil(torch_img):
     # torch_img = [3, H, W], from -1 to 1
     if torch_img.dim() == 3 :
@@ -74,10 +41,8 @@ def main(args):
     print(f' (1) stable diffusion model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, _ = call_model_package(args, weight_dtype, accelerator)
-
     print(f' (2) lora network and loading model')
     network.to(dtype=weight_dtype, device=accelerator.device)
-
     print(f' (3) segmentation head and loading pretrained')
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
@@ -99,19 +64,29 @@ def main(args):
         reduction_file = os.path.join(reduction_folder, f'reduction-{num}.pt')
         reduction_net.load_state_dict(torch.load(reduction_file))
         reduction_net.to(dtype=weight_dtype, device=accelerator.device)
+
+    print(f' (5) position_embedder')
+    position_embedder = None
+    if args.use_position_embedder:
+        position_embedder = AllPositionalEmbedding()
+        # loading
+        position_embedder_folder = os.path.join(args.output_dir, 'position_embedder')
+        position_embedder_file = os.path.join(position_embedder_folder, f'position_embedder-{num}.pt')
+        position_embedder.load_state_dict(torch.load(position_embedder_file))
+        position_embedder.to(dtype=weight_dtype, device=accelerator.device)
+
     print(f' (5) make controller')
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
     # [2] image model
     if args.image_processor == 'clip':
-        #condition_transform = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
         condition_transform = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     elif args.image_processor == 'vit':
         # ViTModel
-        #args.testsize = 384
-        #condition_transform = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
         condition_transform = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
+    elif args.image_processor == 'pvt':
+
 
     print(f' step 2. check data path')
     if not args.inference_with_training_data :
