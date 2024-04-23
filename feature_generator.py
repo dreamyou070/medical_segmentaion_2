@@ -88,7 +88,7 @@ def main(args):
                 return x
 
         reduction_net = ReductionNet(768, args.n_classes)
-
+    vision_head = None
     if args.image_processor == 'pvt' :
 
         class vision_condition_head(nn.Module):
