@@ -415,8 +415,11 @@ def main(args):
             print(f'test with training data')
             loader = train_dataloader
 
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head, loader, accelerator.device,
-                                                           condition_model, unet, vae, controller, weight_dtype, epoch,
+        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head,
+                                                           loader,
+                                                           accelerator.device,
+                                                           condition_model,
+                                                           unet, vae, controller, weight_dtype, epoch,
                                                            reduction_net, position_embedder, vision_head, args)
 
         # saving

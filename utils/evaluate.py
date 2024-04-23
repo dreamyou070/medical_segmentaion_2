@@ -8,7 +8,9 @@ import torch.nn.functional as F
 def eval_step(engine, batch):
     return batch
 @torch.inference_mode()
-def evaluation_check(segmentation_head, dataloader, device,
+def evaluation_check(segmentation_head,
+                     dataloader,
+                     device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
                      reduction_net, position_embedder, vision_head, args):
 

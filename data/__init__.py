@@ -43,13 +43,13 @@ def call_dataset(args) :
                                          mask_res = args.mask_res,
                                          use_data_aug = args.use_data_aug,)
     test_dataset = TestDataset_Seg(root_dir=args.test_data_path,
-                                       resize_shape=[args.resize_shape,args.resize_shape],
-                                       tokenizer=tokenizer,
-                                       image_processor=processor,
-                                       latent_res=args.latent_res,
-                                       n_classes=args.n_classes,
-                                       mask_res = args.mask_res,
-                                       use_data_aug = False)
+                                   resize_shape=[args.resize_shape, args.resize_shape],
+                                   tokenizer=tokenizer,
+                                   image_processor=processor,
+                                   latent_res=args.latent_res,
+                                   n_classes=args.n_classes,
+                                   mask_res=args.mask_res,
+                                   use_data_aug=False)
 
     train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                    batch_size=args.batch_size,

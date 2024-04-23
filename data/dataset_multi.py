@@ -294,6 +294,7 @@ class TrainDataset_Seg(Dataset):
                 'caption' : caption,
                 "image_condition" : image_condition} # [197,1]
 
+
 class TestDataset_Seg(Dataset):
 
     def __init__(self,
@@ -303,24 +304,25 @@ class TestDataset_Seg(Dataset):
                  image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
-                 mask_res = 128,
-                 use_data_aug = False,):
+                 mask_res=128,
+                 use_data_aug=False, ):
 
         # [1] base image
         self.root_dir = root_dir
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir) # anomal
-        for folder in folders :
-            folder_dir = os.path.join(self.root_dir, folder) # anomal
-            rgb_folder = os.path.join(folder_dir, f'images') # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'masks')    # [128,128]
-            files = os.listdir(rgb_folder) #
+        folders = os.listdir(self.root_dir)  # anomal
+        for folder in folders:
+            folder_dir = os.path.join(self.root_dir, folder)  # anomal
+            folder_res = folder.split('_')[-1]
+            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}')  # anomal / image_256
+            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')  # [128,128]
+            files = os.listdir(rgb_folder)  #
             for file in files:
                 name, ext = os.path.splitext(file)
                 image_paths.append(os.path.join(rgb_folder, file))
-                if argument.gt_ext_npy :
+                if argument.gt_ext_npy:
                     gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
-                else :
+                else:
                     gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
@@ -383,18 +385,33 @@ class TestDataset_Seg(Dataset):
 
             img = np.rot90(img, k=number)  # ok, because it is 3 channel image
         img = self.transform(img.copy())
+
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
         if argument.gt_ext_npy:
             gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
             if self.use_data_aug:
                 gt_arr = np.rot90(gt_arr, k=number)
-            if argument.obj_name == 'brain':
-                gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
+            gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
+            # make image from numpy
+
+            # [1] get final image
+            H, W = gt_arr.shape[0], gt_arr.shape[1]
+            mask_rgb = np.zeros((H, W, 3))
+            for h_index in range(H):
+                for w_index in range(W):
+                    mask_rgb[h_index, w_index] = class_matching_map[gt_arr[h_index, w_index]]
+            mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
+            mask_pil = mask_pil.resize((384, 384), Image.BICUBIC)
+            mask_img = self.transform(np.array(mask_pil))
+
+
         else:
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
             gt_arr = np.array(gt_img)  # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
+
+        # [3] make semantic pseudo mal
 
         # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
@@ -412,6 +429,7 @@ class TestDataset_Seg(Dataset):
         gt_flat = gt_arr.flatten()  # 128*128
 
         if argument.use_image_by_caption:
+
             # [3] caption
             if argument.obj_name == 'brain':
                 class_map = brain_class_map
@@ -426,15 +444,17 @@ class TestDataset_Seg(Dataset):
                 caption = base_prompts[np.random.randint(0, len(base_prompts))]
             else:
                 caption = ''
-
+            caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                if argument.use_key_word :
+                if argument.use_key_word:
                     caption += class_map[class_idx][0]
-                else :
+                else:
                     caption += class_map[class_idx][1]
+
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
+                    # caption += ', '
                     caption += ' '
         else:
             if argument.use_base_prompt:
@@ -447,33 +467,65 @@ class TestDataset_Seg(Dataset):
                                        padding="max_length",
                                        truncation=True, return_tensors="pt")
         input_ids = caption_token.input_ids
+        """
+        key_words = [class_map[i][0] for i in class_es]  # [b,n,e]
 
+        def get_target_index(target_words, caption):
+
+            target_word_index = []
+            for target_word in target_words:
+                target_word_token = self.tokenizer(target_word, return_tensors="pt")
+                target_word_input_ids = target_word_token.input_ids[:, 1]
+
+                # [1] get target word index from sentence token
+                sentence_token = self.tokenizer(caption, return_tensors="pt")
+                sentence_token = sentence_token.input_ids
+                batch_size = sentence_token.size(0)
+
+                for i in range(batch_size):
+                    # same number from sentence token to target_word_inpud_ids
+                    s_tokens = sentence_token[i]
+                    idx = (torch.where(s_tokens == target_word_input_ids))[0].item()
+                    target_word_index.append(idx)
+            return target_word_index
+
+        if argument.use_cls_token:
+            default = [0]  # cls token index
+            default.extend(get_target_index(key_words, caption))
+            key_word_index = default
+        else:
+            key_word_index = get_target_index(key_words, caption)
+        """
+        # [3] image pixel
+
+        # condition image = [384,384]
+        # gt =[3,256,256]
         gt_pil = gt.permute(1, 2, 0).cpu().numpy() * 255
         gt_pil = gt_pil.astype(np.uint8)
         # remove r channel to zero
         gt_pil[:, :, 0] = gt_pil[:, :, 0] * 0
         gt_pil = Image.fromarray(gt_pil)  # [256,256,3], RGB mask
 
-        # [3] image pixel
         if argument.image_processor == 'blip':
             pil = Image.open(img_path).convert('RGB')
-            image_condition = self.image_processor(pil)
-        elif argument.image_processor == 'resnet':
+            image_condition = self.image_processor(pil)  # [3,224,224]
+
+        elif argument.image_processor == 'pvt':
             pil = Image.open(img_path).convert('RGB')
             image_condition = self.image_processor(pil)
+
         else:
-            """ preprocessor process image """
-            # transformer based image
-            # different from text not tokenizing ...
+
             image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
                                                    return_tensors="pt",
                                                    padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
             pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
+        # can i use visual attention mask in ViT ?
         return {'image': img,  # [3,512,512]
                 "gt": gt,  # [3,256,256]
                 "gt_flat": gt_flat,  # [128*128]
                 "input_ids": input_ids,
                 'caption': caption,
-                "image_condition": image_condition}  # [0,3,4]
+                "image_condition": image_condition}  # [197,1]
