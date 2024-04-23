@@ -73,7 +73,7 @@ def main(args):
     print(f' step 1. make model')
     print(f' (1) stable diffusion model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    condition_model, vae, unet, network = call_model_package(args, weight_dtype, accelerator)
+    condition_model, vae, unet, network, _ = call_model_package(args, weight_dtype, accelerator)
 
     print(f' (2) lora network and loading model')
     network.to(dtype=weight_dtype, device=accelerator.device)
