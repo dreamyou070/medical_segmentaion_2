@@ -401,6 +401,8 @@ def main(args):
                 loss = loss + noise_loss.mean()
 
             loss = loss.mean()
+            if args.use_pseudo_sample :
+                loss = loss + pseudo_loss.mean()
             current_loss = loss.detach().item()
 
             if epoch == args.start_epoch:
@@ -634,6 +636,8 @@ if __name__ == "__main__":
     parser.add_argument("--reducing_redundancy", action='store_true')
     parser.add_argument("--use_weighted_reduct", action='store_true')
     parser.add_argument("--use_layer_norm", action='store_true')
+    parser.add_argument("--use_pseudo_sample", action='store_true')
+
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
