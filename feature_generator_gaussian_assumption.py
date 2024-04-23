@@ -334,8 +334,8 @@ def main(args):
             # [0] mahalanobis loss
             # (feature_map) batch, dim, res, res --> batch, res*res, dim
             b,d = feature_map.shape[0], feature_map.shape[1]
-            feature_map = feature_map.permute(0, 2, 3, 1).contiguous().view(b,-1,d).contiguous()
-            pix_num = feature_map.shape[1]
+            feature_map_ = feature_map.permute(0, 2, 3, 1).contiguous().view(b,-1,d).contiguous()
+            pix_num = feature_map_.shape[1]
             class_0_feat, class_1_feat = [], []
             for i in range(pix_num):
                 feat = feature_map[:,i,:].squeeze()
