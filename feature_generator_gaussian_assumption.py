@@ -362,7 +362,7 @@ def main(args):
             # ------------------------------------------------------------------------------------------------------------
             # pseudo sample segmentation
             random_feat = random_feat.to(device)
-            pseud_label = pseud_label.to(device)
+            #pseud_label = pseud_label.to(device)
             pseudo_sample_pred = segmentation_head.segment_feature(random_feat)  # [1,256,256,160]
             real_sample_pred = segmentation_head.segment_feature(feature_map)  # [1,3,256,256]
 
@@ -373,7 +373,7 @@ def main(args):
             pseudo_gt = to_categorical(pseud_label, num_classes=args.n_classes).permute(2, 0, 1).contiguous().unsqueeze(0) # [1,2,256,256]
             if args.use_dice_ce_loss:
                 pseudo_loss = loss_dicece(input=pseudo_sample_pred,
-                                          target=pseudo_gt.to(dtype=weight_dtype)) # [batch, class, res, res]
+                                          target=pseudo_gt.to(device, dtype=weight_dtype)) # [batch, class, res, res]
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
