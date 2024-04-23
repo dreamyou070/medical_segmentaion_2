@@ -6,7 +6,7 @@ obj_name="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="28_reducing_redundancy_without_noise_pred"
+file_name="31_pvt_image_encoder_with_position_embedder"
 # --use_position_embedder \
 # 64 / 4
 # 128 / 64
