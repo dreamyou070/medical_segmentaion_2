@@ -334,11 +334,11 @@ def main(args):
             # [0] mahalanobis loss
             # (feature_map) batch, dim, res, res --> batch, res*res, dim
             b,d = feature_map.shape[0], feature_map.shape[1]
-            feature_map_ = feature_map.permute(0, 2, 3, 1).contiguous().view(b,-1,d).contiguous()
-            pix_num = feature_map_.shape[1]
+            feature_map_ = feature_map.permute(0, 2, 3, 1).contiguous().view(b, -1, d).contiguous().squeeze() # 1, 256*256, 160
+            pix_num = feature_map_.shape[0]
             class_0_feat, class_1_feat = [], []
             for i in range(pix_num):
-                feat = feature_map[:,i,:].squeeze()
+                feat = feature_map[i,:].squeeze()
                 class_index = gt_flat.squeeze()[i]
                 if class_index == 0:
                     class_0_feat.append(feat)
@@ -353,8 +353,8 @@ def main(args):
             class_0_std_vector = torch.std(class_0_feat, dim=0)
             class_1_std_vector = torch.std(class_1_feat, dim=0)
 
-            random_feat = torch.randn(1,160,256,256)
-            pseud_label = torch.zeros(1,256,256)
+            random_feat = torch.randn(1, 160, 256, 256)
+            pseud_label = torch.zeros(256, 256)
             for i in range(256):
                 for j in range(256):
                     random_p = random.random()
@@ -362,12 +362,12 @@ def main(args):
                         random_noise = torch.rand_like(class_0_mean)
                         class_0_virtual_feat = class_0_mean + random_noise * class_0_std_vector  # N, 160
                         random_feat[:,:,i,j] = class_0_virtual_feat
-                        pseud_label[0,i,j] = 0
+                        pseud_label[i,j] = 0
                     else:
                         random_noise = torch.rand_like(class_0_mean)
                         class_1_virtual_feat = class_1_mean + random_noise * class_1_std_vector
                         random_feat[:,:,i,j] = class_1_virtual_feat
-                        pseud_label[0,i,j] = 1
+                        pseud_label[i,j] = 1
             # ------------------------------------------------------------------------------------------------------------
             # pseudo sample segmentation
             random_feat = random_feat.to(device)
@@ -377,7 +377,13 @@ def main(args):
 
             # ------------------------------------------------------------------------------------------------------------
             # [1] generator loss
+            pseudo_masks_pred_ = pseudo_sample_pred.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                                   pseudo_sample_pred.shape[-1]).contiguous()
 
+            pseudo_gt = pseud_label.unsquzee(0).unsqueeze(1)
+            if args.use_dice_ce_loss:
+                pseudo_loss = loss_dicece(input=pseudo_sample_pred,
+                                   target=pseudo_gt.to(dtype=weight_dtype))
 
             # ------------------------------------------------------------------------------------------------------------
             # [2] origin loss
