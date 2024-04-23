@@ -18,6 +18,7 @@ from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
 from torchvision import transforms
+from model.vision_condition_head import vision_condition_head
 def eval_step(engine, batch):
     return batch
 def torch_to_pil(torch_img):
@@ -91,6 +92,11 @@ def main(args):
                                                 transforms.ToTensor(),
                                                 transforms.Normalize([0.485, 0.456, 0.406],
                                                                      [0.229, 0.224, 0.225])])
+        vision_head = vision_condition_head(reverse = args.reverse)
+        # loading
+        vision_head_folder = os.path.join(args.output_dir, 'vision_head')
+        vision_head_file = os.path.join(vision_head_folder, f'vision-{num}.pt')
+        vision_head.load_state_dict(torch.load(vision_head_file))
 
 
 
@@ -131,8 +137,18 @@ def main(args):
                         if args.use_image_condition:
                             """ condition model is already on device and dtype """
                             with torch.no_grad():
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                                if args.image_processor == 'pvt':
+                                    output = condition_model(batch["image_condition"])
+                                    encoder_hidden_states = vision_head(output)
+
+                                elif args.image_processor == 'vit':
+                                    with torch.no_grad():
+                                        output, pix_embedding = condition_model(**batch["image_condition"])
+                                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+
+
+
+
                                 if args.not_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                                 if args.only_use_cls_token:
@@ -538,6 +554,7 @@ if __name__ == '__main__' :
     parser.add_argument("--segmentation_head_weights", type= str)
     parser.add_argument("--inference_with_training_data", action='store_true')
     parser.add_argument("--use_position_embedding", action='store_true')
+    parser.add_argument("--reverse", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataloader import passing_mvtec_argument
