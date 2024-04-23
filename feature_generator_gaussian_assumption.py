@@ -338,7 +338,7 @@ def main(args):
             pix_num = feature_map_.shape[0]
             class_0_feat, class_1_feat = [], []
             for i in range(pix_num):
-                feat = feature_map[i,:].squeeze()
+                feat = feature_map_[i,:].squeeze()
                 class_index = gt_flat.squeeze()[i]
                 if class_index == 0:
                     class_0_feat.append(feat)
