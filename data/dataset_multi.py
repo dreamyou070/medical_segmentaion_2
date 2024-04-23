@@ -314,8 +314,8 @@ class TestDataset_Seg(Dataset):
         for folder in folders:
             folder_dir = os.path.join(self.root_dir, folder)  # anomal
             folder_res = folder.split('_')[-1]
-            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}')  # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')  # [128,128]
+            rgb_folder = os.path.join(folder_dir, f'images')  # anomal / image_256
+            gt_folder = os.path.join(folder_dir, f'masks')  # [128,128]
             files = os.listdir(rgb_folder)  #
             for file in files:
                 name, ext = os.path.splitext(file)
