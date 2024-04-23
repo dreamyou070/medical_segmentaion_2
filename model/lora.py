@@ -1096,7 +1096,7 @@ class LoRANetwork(torch.nn.Module):
             return loras, skipped
 
         # ------------------------------------------------------------------------------------------------------------------------
-        # extend U-Net target modules if conv2d 3x3 is enabled, or load from weights
+        # [1] Unet
         target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
         if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
             target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
@@ -1132,9 +1132,14 @@ class LoRANetwork(torch.nn.Module):
                                                              prefix=prefix_)
                 self.text_encoder_loras.extend(text_encoder_loras)
                 skipped_te += skipped
-
             print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.")  # Here (61 modules)
             skipped = skipped_te + skipped_un
+
+            # assertion
+            names = set()
+            for lora in self.text_encoder_loras + self.unet_loras:
+                assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                names.add(lora.lora_name)
 
         else :
             image_condition = condition_model
@@ -1163,6 +1168,12 @@ class LoRANetwork(torch.nn.Module):
                 print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
                 skipped = skipped_ie + skipped_un
 
+                # assertion
+                names = set()
+                for lora in self.image_encoder_loras + self.unet_loras:
+                    assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                    names.add(lora.lora_name)
+
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
             print(f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:")
@@ -1174,11 +1185,6 @@ class LoRANetwork(torch.nn.Module):
         self.mid_lr_weight: float = None
         self.block_lr = False
 
-        # assertion
-        names = set()
-        for lora in self.text_encoder_loras + self.unet_loras:
-            assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
-            names.add(lora.lora_name)
 
     def set_multiplier(self, multiplier):
         self.multiplier = multiplier
@@ -1200,29 +1206,35 @@ class LoRANetwork(torch.nn.Module):
             lora.restore()
 
 
-    def apply_to(self, text_encoder, unet, apply_text_encoder=True, apply_unet=True, modality = 'text'):
+    def apply_to(self, text_encoder, unet, apply_condition_model=True, apply_unet=True, condition_modality = 'text'):
 
-        if modality == 'text':
-            if apply_text_encoder:
-                print("enable LoRA for text encoder")
-            else:
-                self.text_encoder_loras = []
-        elif modality == 'image':
-            if apply_text_encoder:
-                print("enable LoRA for image encoder")
-            else:
-                self.image_encoder_loras = []
+
 
         if apply_unet:
             print("enable LoRA for U-Net")
         else:
             self.unet_loras = []
 
-        for lora in self.text_encoder_loras + self.unet_loras:
-            lora.apply_to()
-            self.add_module(lora.lora_name, lora)
+        if condition_modality == 'text':
+            if apply_condition_model:
+                print("enable LoRA for text encoder")
+            else:
+                self.text_encoder_loras = []
+            for lora in self.text_encoder_loras + self.unet_loras:
+                lora.apply_to()
+                self.add_module(lora.lora_name, lora)
 
+        elif condition_modality == 'image':
+            if apply_condition_model:
+                print("enable LoRA for image encoder")
+            else:
+                self.image_encoder_loras = []
 
+            for lora in self.image_encoder_loras + self.unet_loras:
+                lora.apply_to()
+                self.add_module(lora.lora_name, lora)
+
+        
     def is_mergeable(self):
         return True
 

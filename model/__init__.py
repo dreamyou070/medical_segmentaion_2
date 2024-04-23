@@ -5,6 +5,7 @@ from model.unet import TimestepEmbedding
 from transformers import CLIPModel
 from model.modeling_vit import ViTModel
 import torch
+from polyppvt.lib.pvt import PolypPVT
 def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True, unet_lora = True ):
 
     # [1] diffusion
@@ -20,23 +21,6 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     unet.requires_grad_(False)
     unet.to(dtype=weight_dtype)
 
-    # [2] image model
-    if args.image_processor == 'clip':
-        image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    elif args.image_processor == 'vit':
-        # ViTModel
-        image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
-    elif args.image_processor == 'pvt' :
-        from polyppvt.lib.pvt import PolypPVT
-        model = PolypPVT()
-        pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
-        model.load_state_dict(torch.load(pretrained_pth_path))
-        image_model = model.backbone  # pvtv2_b2 model
-
-    image_model = image_model.to(accelerator.device,
-                                 dtype=weight_dtype)
-    image_model.requires_grad_(False)
-
     # [2] lora network
     net_kwargs = {}
     if args.network_args is not None:
@@ -45,9 +29,20 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
             net_kwargs[key] = value
 
     if args.use_image_condition :
+
+        if args.image_processor == 'clip':
+            image_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+        elif args.image_processor == 'vit': # ViTModel
+            image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+        elif args.image_processor == 'pvt':
+            model = PolypPVT()
+            pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
+            model.load_state_dict(torch.load(pretrained_pth_path))
+            image_model = model.backbone  # pvtv2_b2 model
+        image_model = image_model.to(accelerator.device,dtype=weight_dtype)
+        image_model.requires_grad_(False)
         condition_model = image_model # image model is a condition
         condition_modality = 'image'
-
     else :
         condition_model = text_encoder
         condition_modality = 'text'
@@ -62,12 +57,11 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
                              neuron_dropout=args.network_dropout,
                              condition_modality=condition_modality,
                              **net_kwargs, )
-
     network.apply_to(condition_model,
                      unet,
                      True,
                      True,
-                     modality = condition_modality,)
+                     condition_modality=condition_modality)
 
     if args.network_weights is not None :
         print(f' * loading network weights')
