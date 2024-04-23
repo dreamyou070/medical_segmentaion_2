@@ -394,6 +394,8 @@ class TestDataset_Seg(Dataset):
                 gt_arr = np.rot90(gt_arr, k=number)
             gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
             # make image from numpy
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_arr, k=number)
 
             # [1] get final image
             H, W = gt_arr.shape[0], gt_arr.shape[1]
@@ -408,6 +410,8 @@ class TestDataset_Seg(Dataset):
 
         else:
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            if self.use_data_aug:
+                gt_arr = np.rot90(gt_img, k=number)
             gt_arr = np.array(gt_img)  # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
