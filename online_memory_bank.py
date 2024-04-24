@@ -43,6 +43,7 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
+    network.to(accelerator.device, dtype=weight_dtype)
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
                                       use_layer_norm=args.use_layer_norm)
