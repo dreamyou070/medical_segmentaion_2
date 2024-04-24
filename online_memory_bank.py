@@ -26,6 +26,7 @@ from model.vision_condition_head import vision_condition_head
 # image conditioned segmentation mask generating
 
 def main(args):
+
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -44,15 +45,19 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
     network.to(accelerator.device, dtype=weight_dtype)
+    network.eval()
+    unet.to(accelerator.device, dtype=weight_dtype)
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
                                       use_layer_norm=args.use_layer_norm)
     student_segmentation_head = SemanticModel(n_classes=args.n_classes,
                                               mask_res=args.mask_res,
                                               use_layer_norm=args.use_layer_norm)
-    # segmentation_head loading
     if args.pretrained_segmentation_model is not None:
         segmentation_head.load_state_dict(torch.load(args.pretrained_segmentation_model))
+        segmentation_head.to(accelerator.device, dtype=weight_dtype)
+        segmentation_head.eval()
+        student_segmentation_head.load_state_dict(torch.load(args.pretrained_segmentation_model))
 
     reduction_net = None
     if args.reducing_redundancy:
@@ -60,12 +65,16 @@ def main(args):
                                      use_weighted_reduct=args.use_weighted_reduct)
         if args.pretrained_reduction_net is not None:
             reduction_net.load_state_dict(torch.load(args.reduction_weights))
+        reduction_net.to(accelerator.device, dtype=weight_dtype)
+        reduction_net.eval()
 
     vision_head = None
     if args.image_processor == 'pvt':
         vision_head = vision_condition_head(reverse=args.reverse)
         if args.pretrained_vision_head is not None:
             vision_head.load_state_dict(torch.load(args.pretrained_vision_head))
+        vision_head.to(accelerator.device, dtype=weight_dtype)
+        vision_head.eval()
 
     position_embedder = None
     if args.use_position_embedder:
@@ -73,6 +82,8 @@ def main(args):
         position_embedder = AllPositionalEmbedding()
         if args.position_embedder_weights is not None:
             position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
+        position_embedder.to(accelerator.device, dtype=weight_dtype)
+        position_embedder.eval()
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -82,35 +93,20 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = [{"params": student_segmentation_head.parameters(), "lr": args.learning_rate}]
+    trainable_params = []
+    # only outc training
+    for name,  param in student_segmentation_head.named_parameters():
+        if 'outc' not in name:
+            param.requires_grad = False
+        else :
+            param.requires_grad = True
+            trainable_params.append({"params": param, "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
-    loss_CE = nn.CrossEntropyLoss()
-    loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
-    loss_Dice = DiceLoss(include_background=False,
-                         to_onehot_y=False,
-                         sigmoid=False,
-                         softmax=True,
-                         other_act=None,
-                         squared_pred=False,
-                         jaccard=False,
-                         reduction=LossReduction.MEAN,
-                         smooth_nr=1e-5,
-                         smooth_dr=1e-5,
-                         batch=False,
-                         weight=None)
-
     loss_dicece = DiceCELoss(include_background=False,
                              to_onehot_y=False,
                              sigmoid=False,
@@ -122,10 +118,9 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    student_segmentation_head, optimizer, test_dataloader, lr_scheduler = \
-        accelerator.prepare(student_segmentation_head, optimizer, test_dataloader, lr_scheduler)
+    student_segmentation_head, optimizer, test_dataloader, lr_scheduler = accelerator.prepare(student_segmentation_head, optimizer, test_dataloader, lr_scheduler)
     student_segmentation_head = transform_models_if_DDP([student_segmentation_head])[0]
-
+    """
     if args.reducing_redundancy:
         reduction_net.to(accelerator.device, dtype=weight_dtype)
     if args.use_position_embedder:
@@ -133,13 +128,14 @@ def main(args):
     if args.image_processor == 'pvt':
         vision_head.to(accelerator.device, dtype=weight_dtype)
     segmentation_head.to(accelerator.device, dtype=weight_dtype)
+    """
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
-    feature_save_dir = os.path.join(output_dir, 'feature')
-    os.makedirs(feature_save_dir, exist_ok=True)
+    #feature_save_dir = os.path.join(output_dir, 'feature')
+    #os.makedirs(feature_save_dir, exist_ok=True)
 
     print(f'\n step 10. Make Memory Bank')
     global_step = 0
@@ -151,14 +147,12 @@ def main(args):
 
         memory_bank = []
         image = batch['image'].to(dtype=weight_dtype, device = device)  # 1,3,512,512
-        gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
+        #gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
         gt = batch['gt'].to(dtype=weight_dtype, device = device)
-
         with torch.no_grad():
             if args.image_processor == 'pvt':
                 output = condition_model(batch["image_condition"].to(dtype=weight_dtype, device = device))
                 encoder_hidden_states = vision_head(output)
-
             elif args.image_processor == 'vit':
                 with torch.no_grad():
                     output, pix_embedding = condition_model(**batch["image_condition"].to(dtype=weight_dtype, device = device))
@@ -180,7 +174,6 @@ def main(args):
                  encoder_hidden_states,
                  trg_layer_list=args.trg_layer_list,
                  noise_type=position_embedder).sample
-
         query_dict, key_dict = controller.query_dict, controller.key_dict
         controller.reset()
         q_dict = {}
@@ -213,6 +206,7 @@ def main(args):
         # ----------------------------------------------------------------------------------------------------------- #
         # Student Model Learning
         for epoch in range(args.start_epoch, args.max_train_epochs):
+            optimizer.zero_grad(set_to_none=True)
             sample = torch.randn(1,160,256,256).to(dtype=weight_dtype, device = accelerator.device)
             x = mean + std * sample
             masks_pred = student_segmentation_head.segment_feature(x) # 1,2,265,265
@@ -224,7 +218,7 @@ def main(args):
             accelerator.backward(loss)
             optimizer.step()
             lr_scheduler.step()
-            optimizer.zero_grad(set_to_none=True)
+
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
