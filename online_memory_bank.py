@@ -254,7 +254,7 @@ def main(args):
 
         # saving model
         if is_main_process:
-            saving_epoch = str(epoch + 1).zfill(6)
+            saving_epoch = str(step+1).zfill(6)
             save_model(args,
                        saving_folder='student_segmentation',
                        saving_name=f'segmentation-{saving_epoch}.pt',
