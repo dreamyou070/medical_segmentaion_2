@@ -202,18 +202,16 @@ def main(args):
         x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
         features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
         # extracting class 1 samples
-        h,w = features.shape[2], features.shape[3]
-        for h_index in range(h) :
-            for w_index in range(w) :
-                feat = features[0,:,h_index,w_index].squeeze()
-                label = gt[0,1,h_index,w_index].squeeze().item()
-                if label == 1 :
-                    if accelerator.is_main_process:
-                        torch.save(feat,
-                                   os.path.join(feature_save_dir, f'feature_{step_i}_{h_index}_{w_index}.pt'))
 
-
-
+        gt_map = gt[0, 1, :, :].squeeze()
+        gt_map = torch.where(gt_map == 1, True, False) * 1  # 256,256
+        pix_num = gt_map.sum()
+        gt_map = gt_map.repeat(160, 1, 1).unsqueeze(0)  # 1,160,256,256
+        features = features * gt_map  # average pooling
+        features = (features.sum(dim=(2, 3)) / pix_num).squeeze()
+        if accelerator.is_main_process:
+            torch.save(features,
+                       os.path.join(feature_save_dir, f'feature_{step_i}.pt'))
         print(f'Finish Sample {step_i} Memory Bank')
 
     """
