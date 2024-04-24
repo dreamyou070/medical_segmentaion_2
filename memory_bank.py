@@ -212,7 +212,7 @@ def main(args):
         for h_index in range(h) :
             for w_index in range(w) :
                 feat = features[0,:,h_index,w_index].squeeze()
-                label = gt[0,:,h_index,w_index].squeeze().item()
+                label = gt[0,1,h_index,w_index].squeeze().item()
                 if label == 1 :
                     memory_bank.append(feat)
     memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
@@ -231,7 +231,7 @@ def main(args):
         pseudo_label[:,0,:,:] = 0
         loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                            target=pseudo_label.to(dtype=weight_dtype, device = accelerator.device))  # [class, 256,256]
-        
+
 
     """
         masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
