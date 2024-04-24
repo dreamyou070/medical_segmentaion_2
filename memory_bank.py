@@ -155,6 +155,9 @@ def main(args):
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
+    feature_save_dir = os.path.join(output_dir, 'feature')
+    os.makedirs(feature_save_dir, exist_ok=True)
+
     print(f'\n step 10. Make Memory Bank')
     memory_bank = []
     for step, batch in enumerate(train_dataloader):
@@ -214,7 +217,13 @@ def main(args):
                 feat = features[0,:,h_index,w_index].squeeze()
                 label = gt[0,1,h_index,w_index].squeeze().item()
                 if label == 1 :
-                    memory_bank.append(feat)
+                    #memory_bank.append(feat)
+                    # saving feature torch
+                    if accelerator.is_main_process:
+                        torch.save(feat,
+                                   os.path.join(feature_save_dir, f'feature_{step}_{h_index}_{w_index}.pt'))
+                    #memory_bank.append(feat)
+    """
     memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
     mean = memory_bank.mean(dim=0).unsqueeze(0)
     std = memory_bank.std(dim=0).unsqueeze(0)
@@ -231,7 +240,7 @@ def main(args):
         pseudo_label[:,0,:,:] = 0
         loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                            target=pseudo_label.to(dtype=weight_dtype, device = accelerator.device))  # [class, 256,256]
-
+    """
 
     """
         masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
