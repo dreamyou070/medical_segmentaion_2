@@ -139,6 +139,7 @@ def main(args):
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    student_segmentation_head = transform_models_if_DDP([student_segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
         segmentation_head.train()
