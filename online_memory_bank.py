@@ -126,6 +126,7 @@ def main(args):
     student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
         accelerator.prepare(student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
                             lr_scheduler)
+    segmentation_head = accelerator.prepare(segmentation_head)
     if args.reducing_redundancy:
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
