@@ -7,9 +7,9 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="34_online_memory_bank" #
+file_name="31_pvt_image_encoder_with_position_embedder_memorybank_student" #
 
-save_folder="31_pvt_image_encoder_with_position_embedder_memorybank_student"
+save_folder="31_pvt_image_encoder_with_position_embedder"
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number memory_bank_student.py --log_with wandb \
