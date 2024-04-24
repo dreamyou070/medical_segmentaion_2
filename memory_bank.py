@@ -160,7 +160,9 @@ def main(args):
 
     print(f'\n step 10. Make Memory Bank')
     for step_i, batch in enumerate(train_dataloader):
+
         print(f'step_i : {step_i}')
+
         image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
         gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
         with torch.no_grad():
@@ -209,8 +211,11 @@ def main(args):
                     if accelerator.is_main_process:
                         torch.save(feat,
                                    os.path.join(feature_save_dir, f'feature_{step_i}_{h_index}_{w_index}.pt'))
+
+
+
         print(f'Finish Sample {step_i} Memory Bank')
- 
+
     """
     memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
     mean = memory_bank.mean(dim=0).unsqueeze(0)
