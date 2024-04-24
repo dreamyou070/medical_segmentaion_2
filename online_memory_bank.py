@@ -121,38 +121,17 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    condition_model = accelerator.prepare(condition_model)
-    condition_models = transform_models_if_DDP([condition_model])
-    student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-        accelerator.prepare(student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
-                            lr_scheduler)
-    segmentation_head = accelerator.prepare(segmentation_head)
-    if args.reducing_redundancy:
-        reduction_net = accelerator.prepare(reduction_net)
-        reduction_net = transform_models_if_DDP([reduction_net])[0]
-    if args.use_position_embedder:
-        position_embedder = accelerator.prepare(position_embedder)
-        position_embedder = transform_models_if_DDP([position_embedder])[0]
-    if args.image_processor == 'pvt':
-        vision_head = accelerator.prepare(vision_head)
-        vision_head = transform_models_if_DDP([vision_head])[0]
-
-    unet, network = transform_models_if_DDP([unet, network])
-    segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    student_segmentation_head, optimizer, test_dataloader, lr_scheduler = \
+        accelerator.prepare(student_segmentation_head, optimizer, test_dataloader, lr_scheduler)
     student_segmentation_head = transform_models_if_DDP([student_segmentation_head])[0]
-    if args.gradient_checkpointing:
-        unet.train()
-        segmentation_head.train()
-        for t_enc in condition_models:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-    else:
-        unet.eval()
-        for t_enc in condition_models:
-            t_enc.eval()
-        del t_enc
-        network.prepare_grad_etc()
+
+    if args.reducing_redundancy:
+        reduction_net.to(accelerator.device, dtype=weight_dtype)
+    if args.use_position_embedder:
+        position_embedder.to(accelerator.device, dtype=weight_dtype)
+    if args.image_processor == 'pvt':
+        vision_head.to(accelerator.device, dtype=weight_dtype)
+    segmentation_head.to(accelerator.device, dtype=weight_dtype)
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
@@ -166,42 +145,41 @@ def main(args):
     progress_bar = tqdm(range(args.max_train_steps * len(train_dataloader)),
                         smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
+    device = accelerator.device
     for step, batch in enumerate(train_dataloader):
+
         memory_bank = []
-        if not args.without_condition:
-            with torch.no_grad():
-                if args.image_processor == 'pvt':
-                    output = condition_model(batch["image_condition"])
-                    encoder_hidden_states = vision_head(output)
-
-                elif args.image_processor == 'vit':
-                    with torch.no_grad():
-                        output, pix_embedding = condition_model(**batch["image_condition"])
-                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                        if args.not_use_cls_token:
-                            encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                        if args.only_use_cls_token:
-                            encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                        if args.reducing_redundancy:
-                            encoder_hidden_states = reduction_net(encoder_hidden_states)
-
-        image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+        image = batch['image'].to(dtype=weight_dtype, device = device)  # 1,3,512,512
         gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-        gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-        # gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-        # gt = gt.view(-1, gt.shape[-1]).contiguous()
+        gt = batch['gt'].to(dtype=weight_dtype, device = device)
 
         with torch.no_grad():
+            if args.image_processor == 'pvt':
+                output = condition_model(batch["image_condition"].to(dtype=weight_dtype, device = device))
+                encoder_hidden_states = vision_head(output)
+
+            elif args.image_processor == 'vit':
+                with torch.no_grad():
+                    output, pix_embedding = condition_model(**batch["image_condition"].to(dtype=weight_dtype, device = device))
+                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                    if args.not_use_cls_token:
+                        encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                    if args.only_use_cls_token:
+                        encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    if args.reducing_redundancy:
+                        encoder_hidden_states = reduction_net(encoder_hidden_states)
             latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-        with torch.no_grad():
             if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-            noise_pred = unet(latents, 0, encoder_hidden_states,
-                              trg_layer_list=args.trg_layer_list,
-                              noise_type=position_embedder).sample
+            unet(latents,
+                 0,
+                 encoder_hidden_states,
+                 trg_layer_list=args.trg_layer_list,
+                 noise_type=position_embedder).sample
+
         query_dict, key_dict = controller.query_dict, controller.key_dict
         controller.reset()
         q_dict = {}
@@ -223,11 +201,6 @@ def main(args):
                 feat = features[0, :, h_index, w_index].squeeze()
                 label = gt[0, 1, h_index, w_index].squeeze().item()
                 if label == 1:
-                    # memory_bank.append(feat)
-                    # saving feature torch
-                    #if accelerator.is_main_process:
-                    #    torch.save(feat,
-                    #               os.path.join(feature_save_dir, f'feature_{step}_{h_index}_{w_index}.pt'))
                     memory_bank.append(feat)
 
         memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
@@ -236,6 +209,7 @@ def main(args):
         mean = mean.unsqueeze(-1).unsqueeze(-1)
         std = std.unsqueeze(-1).unsqueeze(-1)
 
+        # ----------------------------------------------------------------------------------------------------------- #
         # Student Model Learning
         for epoch in range(args.start_epoch, args.max_train_epochs):
             sample = torch.randn(1,160,256,256).to(dtype=weight_dtype, device = accelerator.device)
