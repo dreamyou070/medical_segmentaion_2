@@ -458,7 +458,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_focal_loss", action='store_true')
     parser.add_argument("--use_position_embedder", action='store_true')
     parser.add_argument("--check_training", action='store_true')
-    parser.add_argument("--pretrained_segmentation_model", type=str)
     parser.add_argument("--use_batchnorm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
     parser.add_argument("--aggregation_model_a", action='store_true')
