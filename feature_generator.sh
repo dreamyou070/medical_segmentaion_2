@@ -10,14 +10,14 @@
 # 26_reducing_redundancy_use_weighted_reduct
 # 27_extract_from_noise
 
-port_number=50032
+port_number=53132
 category="medical"
-obj_name="leader_polyp"
-trigger_word="leader_polyp"
-benchmark="Pranet"
+obj_name="brain"
+trigger_word="brain"
+benchmark="BraTS2020_Segmentation_256"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="32_vit_image_encoder_with_position_embedder" #
+file_name="31_pvt_image_encoder_with_position_embedder" #
 # 3 --not_use_cls_token --without_condition
 # except generation
 # --gt_ext_npy \  --use_position_embedder
@@ -44,5 +44,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
- --image_processor 'vit' \
- --image_model_training
+ --image_processor 'pvt' \
+ --image_model_training --gt_ext_npy
