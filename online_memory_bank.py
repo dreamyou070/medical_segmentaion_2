@@ -123,8 +123,8 @@ def main(args):
     print(f'\n step 8. model to device')
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-        accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
+    student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
+        accelerator.prepare(student_segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader,
                             lr_scheduler)
     if args.reducing_redundancy:
         reduction_net = accelerator.prepare(reduction_net)
