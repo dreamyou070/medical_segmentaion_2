@@ -159,43 +159,31 @@ def main(args):
     os.makedirs(feature_save_dir, exist_ok=True)
 
     print(f'\n step 10. Make Memory Bank')
-    memory_bank = []
-    for step, batch in enumerate(train_dataloader):
-
-        if not args.without_condition:
-            with torch.no_grad():
-                if args.image_processor == 'pvt':
-                    output = condition_model(batch["image_condition"])
-                    encoder_hidden_states = vision_head(output)
-
-                elif args.image_processor == 'vit':
-                    with torch.no_grad():
-                        output, pix_embedding = condition_model(**batch["image_condition"])
-                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                        if args.not_use_cls_token:
-                            encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                        if args.only_use_cls_token:
-                            encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                        if args.reducing_redundancy:
-                            encoder_hidden_states = reduction_net(encoder_hidden_states)
-
+    for step_i, batch in enumerate(train_dataloader):
         image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-        gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
         gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-        #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-        #gt = gt.view(-1, gt.shape[-1]).contiguous()
-
         with torch.no_grad():
+            if args.image_processor == 'pvt':
+                output = condition_model(batch["image_condition"])
+                encoder_hidden_states = vision_head(output)
+            elif args.image_processor == 'vit':
+                with torch.no_grad():
+                    output, pix_embedding = condition_model(**batch["image_condition"])
+                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                    if args.not_use_cls_token:
+                        encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                    if args.only_use_cls_token:
+                        encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    if args.reducing_redundancy:
+                        encoder_hidden_states = reduction_net(encoder_hidden_states)
             latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-        with torch.no_grad():
             if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-            noise_pred = unet(latents, 0, encoder_hidden_states,
-                              trg_layer_list=args.trg_layer_list,
-                              noise_type=position_embedder).sample
+            unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                 noise_type=position_embedder).sample
         query_dict, key_dict = controller.query_dict, controller.key_dict
         controller.reset()
         q_dict = {}
@@ -217,12 +205,11 @@ def main(args):
                 feat = features[0,:,h_index,w_index].squeeze()
                 label = gt[0,1,h_index,w_index].squeeze().item()
                 if label == 1 :
-                    #memory_bank.append(feat)
-                    # saving feature torch
                     if accelerator.is_main_process:
                         torch.save(feat,
-                                   os.path.join(feature_save_dir, f'feature_{step}_{h_index}_{w_index}.pt'))
-                    #memory_bank.append(feat)
+                                   os.path.join(feature_save_dir, f'feature_{step_i}_{h_index}_{w_index}.pt'))
+    print(f'Finish Sample {step_i} Memory Bank')
+
     """
     memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
     mean = memory_bank.mean(dim=0).unsqueeze(0)
