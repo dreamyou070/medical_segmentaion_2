@@ -13,7 +13,7 @@ file_name="33_pvt_image_encoder_with_position_embedder_reverse" #
 # --gt_ext_npy \  --use_position_embedder
 # 29_reducing_redundancy_without_noise_pred_with_position_embedding
 # --reverse --reducing_redundancy
-save_folder='31_pvt_image_encoder_with_position_embedder'
+save_folder="31_pvt_image_encoder_with_position_embedder"
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number memory_bank.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
@@ -21,10 +21,10 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/test" \
- --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/model/lora-000182.safetensors" \
- --pretrained_segmentation_model "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/segmentation/segmentation-000182.pt" \
- --pretrained_vision_head "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/vision_head/vision-000182.pt" \
- --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/position_embedder/position-000182.pt" \
+ --network_weights r"../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/model/lora-000143.safetensors" \
+ --pretrained_segmentation_model r"../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/segmentation/segmentation-000143.pt" \
+ --pretrained_vision_head r"../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/vision_head/vision-000143.pt" \
+ --position_embedder_weights r"../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/position_embedder/position-000143.pt" \
  --network_dim 144 --network_alpha 4 \
  --resize_shape 512 \
  --latent_res 64 \
