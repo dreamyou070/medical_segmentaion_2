@@ -143,69 +143,70 @@ def main(args):
                         smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
     device = accelerator.device
-    for step, batch in enumerate(train_dataloader):
+    for epoch in range(args.start_epoch, args.max_train_epochs):
 
-        memory_bank = []
-        image = batch['image'].to(dtype=weight_dtype, device = device)  # 1,3,512,512
-        #gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-        gt = batch['gt'].to(dtype=weight_dtype, device = device)
-        with torch.no_grad():
-            if args.image_processor == 'pvt':
-                output = condition_model(batch["image_condition"].to(dtype=weight_dtype, device = device))
-                encoder_hidden_states = vision_head(output)
-            elif args.image_processor == 'vit':
-                with torch.no_grad():
-                    output, pix_embedding = condition_model(**batch["image_condition"].to(dtype=weight_dtype, device = device))
-                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                    if args.not_use_cls_token:
-                        encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                    if args.only_use_cls_token:
-                        encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                    if args.reducing_redundancy:
-                        encoder_hidden_states = reduction_net(encoder_hidden_states)
-            latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-            unet(latents,
-                 0,
-                 encoder_hidden_states,
-                 trg_layer_list=args.trg_layer_list,
-                 noise_type=position_embedder).sample
-        query_dict, key_dict = controller.query_dict, controller.key_dict
-        controller.reset()
-        q_dict = {}
-        for layer in args.trg_layer_list:
-            query = query_dict[layer][0]  # head, pix_num, dim
-            res = int(query.shape[1] ** 0.5)
-            if args.text_before_query:
-                query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-            else:
-                query = query.reshape(1, res, res, -1)
-                query = query.permute(0, 3, 1, 2).contiguous()
-            q_dict[res] = query
-        x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-        # extracting class 1 samples
-        h, w = features.shape[2], features.shape[3]
-        for h_index in range(h):
-            for w_index in range(w):
-                feat = features[0, :, h_index, w_index].squeeze()
-                label = gt[0, 1, h_index, w_index].squeeze().item()
-                if label == 1:
-                    memory_bank.append(feat)
+        for step, batch in enumerate(train_dataloader):
 
-        memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
-        mean = memory_bank.mean(dim=0).unsqueeze(0)
-        std = memory_bank.std(dim=0).unsqueeze(0)
-        mean = mean.unsqueeze(-1).unsqueeze(-1)
-        std = std.unsqueeze(-1).unsqueeze(-1)
+            memory_bank = []
+            image = batch['image'].to(dtype=weight_dtype, device = device)  # 1,3,512,512
+            #gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
+            gt = batch['gt'].to(dtype=weight_dtype, device = device)
+            with torch.no_grad():
+                if args.image_processor == 'pvt':
+                    output = condition_model(batch["image_condition"].to(dtype=weight_dtype, device = device))
+                    encoder_hidden_states = vision_head(output)
+                elif args.image_processor == 'vit':
+                    with torch.no_grad():
+                        output, pix_embedding = condition_model(**batch["image_condition"].to(dtype=weight_dtype, device = device))
+                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                        if args.not_use_cls_token:
+                            encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                        if args.only_use_cls_token:
+                            encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                        if args.reducing_redundancy:
+                            encoder_hidden_states = reduction_net(encoder_hidden_states)
+                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                unet(latents,
+                     0,
+                     encoder_hidden_states,
+                     trg_layer_list=args.trg_layer_list,
+                     noise_type=position_embedder).sample
+            query_dict, key_dict = controller.query_dict, controller.key_dict
+            controller.reset()
+            q_dict = {}
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0]  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                if args.text_before_query:
+                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                else:
+                    query = query.reshape(1, res, res, -1)
+                    query = query.permute(0, 3, 1, 2).contiguous()
+                q_dict[res] = query
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+            # extracting class 1 samples
+            h, w = features.shape[2], features.shape[3]
+            for h_index in range(h):
+                for w_index in range(w):
+                    feat = features[0, :, h_index, w_index].squeeze()
+                    label = gt[0, 1, h_index, w_index].squeeze().item()
+                    if label == 1:
+                        memory_bank.append(feat)
 
-        # ----------------------------------------------------------------------------------------------------------- #
-        # Student Model Learning
-        for epoch in range(args.start_epoch, args.max_train_epochs):
+            memory_bank = torch.stack(memory_bank) # number, feat_dim = 160
+            mean = memory_bank.mean(dim=0).unsqueeze(0)
+            std = memory_bank.std(dim=0).unsqueeze(0)
+            mean = mean.unsqueeze(-1).unsqueeze(-1)
+            std = std.unsqueeze(-1).unsqueeze(-1)
+
+            # ----------------------------------------------------------------------------------------------------------- #
+            # Student Model Learning
             optimizer.zero_grad(set_to_none=True)
             sample = torch.randn(1,160,256,256).to(dtype=weight_dtype, device = accelerator.device)
             x = mean + std * sample
@@ -218,7 +219,6 @@ def main(args):
             accelerator.backward(loss)
             optimizer.step()
             lr_scheduler.step()
-
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
