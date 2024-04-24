@@ -157,14 +157,47 @@ def main(args):
                         smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
     device = accelerator.device
+    score_dict, confusion_matrix, _ = evaluation_check(student_segmentation_head,  #################################
+                                                       test_dataloader,
+                                                       accelerator.device,
+                                                       condition_model,
+                                                       unet, vae, controller, weight_dtype, 0,
+                                                       reduction_net, position_embedder, vision_head, args)
+
+    # saving
+    print(f' teacher original')
+    if is_main_process:
+        print(f'  - precision dictionary = {score_dict}')
+        print(f'  - confusion_matrix = {confusion_matrix}')
+        confusion_matrix = confusion_matrix.tolist()
+        confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
+        with open(confusion_save_dir, 'a') as f:
+            f.write(f' epoch = 0 \n')
+            for i in range(len(confusion_matrix)):
+                for j in range(len(confusion_matrix[i])):
+                    f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                f.write('\n')
+            f.write('\n')
+
+        score_save_dir = os.path.join(args.output_dir, 'score.txt')
+        with open(score_save_dir, 'a') as f:
+            dices = []
+            f.write(f' epoch = 0 | ')
+            for k in score_dict:
+                dice = float(score_dict[k])
+                f.write(f'class {k} = {dice} ')
+                dices.append(dice)
+            dice_coeff = sum(dices) / len(dices)
+            f.write(f'| dice_coeff = {dice_coeff}')
+            f.write(f'\n')
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         # ----------------------------------------------------------------------------------------------------------- #
         # Student Model Learning
         optimizer.zero_grad(set_to_none=True)
-        sample = torch.randn(1,160,256,256).to(dtype=weight_dtype, device = accelerator.device)
-        x = mean + std * sample
+        sample = torch.randn(1,160,256,256).to(dtype=weight_dtype)
+        x = (mean + std * sample).to(dtype=weight_dtype, device=device)
         masks_pred = student_segmentation_head.segment_feature(x) # 1,2,265,265
         pseudo_label = torch.ones_like(masks_pred)
         pseudo_label[:,0,:,:] = 0
