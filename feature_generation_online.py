@@ -53,6 +53,7 @@ def main(args):
     vision_head = None
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse)
+
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding

@@ -30,4 +30,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_processor 'pvt' \
- --image_model_training --reverse #--only_online_pseudo_loss
+ --image_model_training \
+ --use_position_embedder
+ #--only_online_pseudo_loss
