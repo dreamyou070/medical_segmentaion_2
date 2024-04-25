@@ -368,7 +368,8 @@ def main(args):
                                                            accelerator.device,
                                                            condition_model,
                                                            unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, position_embedder, vision_head, args)
+                                                           reduction_net,
+                                                           position_embedder, vision_head, args)
 
         # saving
         if is_main_process:
