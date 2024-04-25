@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="31_pvt_image_encoder_with_position_embedder_only_online_pseudo_loss" #
+file_name="gpu_test" #
 # --reverse --reducing_redundancy
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
@@ -30,4 +30,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_processor 'pvt' \
- --image_model_training --reverse --only_online_pseudo_loss
+ --image_model_training --reverse #--only_online_pseudo_loss
