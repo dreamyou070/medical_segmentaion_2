@@ -236,13 +236,15 @@ class SemanticModel(nn.Module):
         x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)  # [batch, 320, 64,64]
         x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)  # [batch, 320, 64,64]
         x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
-        return x
+        x_ = self.segmentation_head(x)  # [batch 960, res,res] -> [batch, 160, 256,256]
+        return x, x_
 
     def segment_feature(self, feature):
         # feature = [batch, 160, 256,256]
         # out = [batch, 2, 256,256]
-        x = self.segmentation_head(feature)  # [batch 960, res,res] -> [batch, 160, 256,256]
-        segment_out = self.outc(x)
+
+        segment_out = self.outc(feature)
+        # I may have to use softmax
         return segment_out
 
     def forward(self, x16_out, x32_out, x64_out):

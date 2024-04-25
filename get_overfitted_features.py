@@ -191,7 +191,7 @@ def main(args):
         image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
         gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
         gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-        print(f'gt = {gt}')
+        #print(f'gt = {gt}')
         #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
         #gt = gt.view(-1, gt.shape[-1]).contiguous()
 
@@ -226,13 +226,16 @@ def main(args):
         masks_pred = segmentation_head.segment_feature(features)                # [1,2,256,256]
         # gt = [1,2,256,256]
 
-        masks_pred = torch.randn((1, 2, 256, 256))
-        gt = torch.randn((1, 2, 256, 256))
+        #masks_pred = torch.randn((1, 2, 256, 256))
+        #gt = torch.randn((1, 2, 256, 256))
 
         h, w = masks_pred.size(2), masks_pred.size(3)
         for h_index in range(h):
             for w_index in range(w):
-                pred_label = masks_pred[0, 0, h_index, w_index].squeeze().item()
+
+                pred_label = masks_pred[0, :, h_index, w_index].squeeze() # [a,b]
+                pred_label = torch.argmax(torch.softmax(pred_label, dim=0)).item()
+
                 gt_label = gt[0, 0, h_index, w_index].squeeze().item() # what is gt ?
                 feat = features[0, :, h_index, w_index].squeeze()
 
