@@ -1,6 +1,6 @@
 # !/bin/bash
 
-port_number=51234
+port_number=50120
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
@@ -11,7 +11,7 @@ file_name="31_pvt_image_encoder_with_position_embedder_memorybank_student" #
 
 save_folder="31_pvt_image_encoder_with_position_embedder"
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --main_process_port $port_number memory_bank_student.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

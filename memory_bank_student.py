@@ -190,7 +190,8 @@ def main(args):
             dice_coeff = sum(dices) / len(dices)
             f.write(f'| dice_coeff = {dice_coeff}')
             f.write(f'\n')
-
+    # ----------------------------------------------------------------------------------------------------------- #
+    # additional training
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         # ----------------------------------------------------------------------------------------------------------- #
