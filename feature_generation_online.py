@@ -316,8 +316,10 @@ def main(args):
             pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
             # pseudo_sample = [256*256, 160] -> [160, 256*256]
             dim = pseudo_sample.shape[0]
-            pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0)
-            pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
+            pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
+            # 1, 160, 265, 265
+            real_label = batch['gt']
+            pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
 

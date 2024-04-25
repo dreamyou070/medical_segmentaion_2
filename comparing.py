@@ -4,11 +4,10 @@ import torch.nn.functional as F
 from torch import nn
 kl_loss = nn.KLDivLoss(log_target=True)
 
-features = torch.randn(10,160)
-gen_feature = torch.randn(10,160)
-output = kl_loss(features, gen_feature)
-
-print(output)
+batch = 1
+n_classes = 2
+mask_res = 256
+pseudo_label = torch.ones((batch, n_classes, mask_res, mask_res))
 """
 features = torch.randn(10,160)
 # generatoe gaussian distribution
