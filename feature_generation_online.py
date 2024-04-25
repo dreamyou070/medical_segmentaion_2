@@ -59,6 +59,19 @@ def main(args):
         from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
 
+    class AnomalFeatureGenerator(torch.nn.Module):
+        def __init__(self):
+            super(AnomalFeatureGenerator, self).__init__()
+            self.layer1 = torch.nn.Linear(160, 320)
+            self.layer2 = torch.nn.Linear(320, 160)
+
+        def forward(self, random_feature):
+            random_feature = self.layer1(random_feature)
+            random_feature = self.layer2(random_feature)
+            return random_feature
+
+    anomal_generator = AnomalFeatureGenerator()
+
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -77,6 +90,7 @@ def main(args):
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
+    trainable_params.append({"params": anomal_generator.parameters(), "lr": args.unet_lr})
 
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
@@ -279,13 +293,24 @@ def main(args):
             # [2] raw feature
             feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
             anomal_feat = feat[non_zero_index, :]  # [512,160]
+
+            """
             mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
             std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
 
             # [3] generate virtual feature
             batch, dim = features.shape[0], features.shape[1] # batch, 160
             sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
-            pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
+            """
+            random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,
+                                                              device = device) # pix_num, dim
+            pseudo_sample = anomal_generator(random_feature)
+            anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(),
+                                                       output.float(), reduction="none").mean([1, 2, 3])
+
+            #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
+
+            pseudo_sample = anomal_generator(torch.randn_like(features).to(dtype=weight_dtype, device = device))
             pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265

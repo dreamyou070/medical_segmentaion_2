@@ -87,8 +87,8 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
 
         # pass init params to Encoder
         self.encoder = Encoder(
-            in_channels=in_channels,
-            out_channels=latent_channels,
+            in_channels=in_channels, # 3
+            out_channels=latent_channels, # 4
             down_block_types=down_block_types,
             block_out_channels=block_out_channels,
             layers_per_block=layers_per_block,
@@ -259,14 +259,9 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
         else:
 
             # encoder make h
-            h = self.encoder(x)
-
-        print(f' h (1,4,64,64)= {h.shape}')
-
-
-        moments = self.quant_conv(h)
-        print(f'with quant conv, one convolution, moments (1,4,64,64) = {moments.shape}')
-
+            print(f'pure encoder')
+            h = self.encoder(x) # [1,4 + 4,64,64]
+        moments = self.quant_conv(h) # [1,8,64,64]
         posterior = DiagonalGaussianDistribution(moments)
 
         if not return_dict:

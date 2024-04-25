@@ -1,13 +1,23 @@
 import torch
 import numpy as np
 
-batch = 1
-dim = 160
-weight_dtype = torch.float32
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
+features = torch.randn(10,160)
+# generatoe gaussian distribution
+mean = torch.mean(features, dim=0).unsqueeze(1).unsqueeze(0)
+std = torch.std(features, dim=0).unsqueeze(1).unsqueeze(0)
+# maybe have to make class1 feature generator
 
-pseudo_label = torch.ones((batch, 2, 256,256))
+radom_feature = torch.rand_like(features)
+# generating class 1 feature from random features
+
+
+generator_net = AnomalFeatureGenerator()
+random_feature = torch.rand_like(features)
+output = generator_net(random_feature)
+loss = torch.nn.functional.mse_loss(features, output)
+
+
+
 """
 # [1] position
 gt = torch.randn(1,2,256,256)
