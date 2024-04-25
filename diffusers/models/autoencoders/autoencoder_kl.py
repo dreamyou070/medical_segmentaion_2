@@ -257,9 +257,16 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
             encoded_slices = [self.encoder(x_slice) for x_slice in x.split(1)]
             h = torch.cat(encoded_slices)
         else:
+
+            # encoder make h
             h = self.encoder(x)
 
+        print(f' h (1,4,64,64)= {h.shape}')
+
+
         moments = self.quant_conv(h)
+        print(f'with quant conv, one convolution, moments (1,4,64,64) = {moments.shape}')
+        
         posterior = DiagonalGaussianDistribution(moments)
 
         if not return_dict:
@@ -437,6 +444,8 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`DecoderOutput`] instead of a plain tuple.
         """
+
+        # x = [
         x = sample
         posterior = self.encode(x).latent_dist
         if sample_posterior:

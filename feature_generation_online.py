@@ -215,7 +215,13 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
 
             with torch.no_grad():
+
+                # image = [1,3,512,512]
+
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
+
+
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
                     if encoder_hidden_states.dim() != 3:
