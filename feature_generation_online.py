@@ -214,7 +214,7 @@ def main(args):
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-            gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
+            gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
             #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             #gt = gt.view(-1, gt.shape[-1]).contiguous()
 
@@ -228,14 +228,8 @@ def main(args):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-                noise_pred = unet(latents, 0, encoder_hidden_states,
-                                  trg_layer_list=args.trg_layer_list,
-                                  noise_type = position_embedder).sample
-
-            target = torch.randn_like(noise_pred)
-            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
-                [1, 2, 3])
-
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -248,11 +242,11 @@ def main(args):
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
-
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
-            masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
+            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+            masks_pred = segmentation_head.segment_feature(features)                # [1,2,  256,256]
+            # ----------------------------------------------------------------------------------------------------------- #
+            masks_pred = torch.softmax(masks_pred, dim=1)
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                            masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
@@ -273,26 +267,27 @@ def main(args):
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
             # ----------------------------------------------------------------------------------------------------------- #
-            # make gaussian virtual feature
-            # extracting class 1 samples
-            h, w = features.shape[2], features.shape[3]
-            memory_bank = []
-            for h_index in range(h):
-                for w_index in range(w):
-                    feat = features[0, :, h_index, w_index].squeeze()
-                    label = gt[0, 1, h_index, w_index].squeeze().item()
-                    if label == 1:
-                        memory_bank.append(feat)
-            memory_bank = torch.stack(memory_bank)  # number, feat_dim = 160
-            mean = memory_bank.mean(dim=0).unsqueeze(0)
-            std = memory_bank.std(dim=0).unsqueeze(0)
-            mean = mean.unsqueeze(-1).unsqueeze(-1)
-            std = std.unsqueeze(-1).unsqueeze(-1)
-            sample = torch.randn(1, 160, 256, 256).to(dtype=weight_dtype, device=accelerator.device)
+            # why does it takes so much time ... ?
+            # is there any other way to accelerate this process ?
 
-            pseudo_masks_pred = segmentation_head.segment_feature((mean + std * sample))  # 1,2,265,265
+            # [1] position
+            anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1)
+            anomal_map = anomal_map.flatten()  #
+            non_zero_index = torch.nonzero(anomal_map).flatten()
+
+            # [2] raw feature
+            feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim
+            anomal_feat = feat[non_zero_index, :]  # [512,160]
+            mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
+            std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
+
+            # [3] generate virtual feature
+            batch, dim = features.shape[0], features.shape[1]
+            sample = torch.randn(batch, dim, 256 * 256)
+            pseudo_sample = (mean + std * sample).view(batch, dim, 256, 256).contiguous().to(weight_dtype, device=device)
             pseudo_label = torch.ones_like(pseudo_masks_pred)
             pseudo_label[:, 0, :, :] = 0
+            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]

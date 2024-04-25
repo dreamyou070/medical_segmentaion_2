@@ -239,7 +239,6 @@ def main(args):
                 gt_label = gt[0, 0, h_index, w_index].squeeze().item() # what is gt ?
                 feat = features[0, :, h_index, w_index].squeeze()
 
-                print(f'gt_label : {gt_label} | pred_label : {pred_label}')
                 if gt_label == 0 :
                     if pred_label == 1:  # real class = 1, pred class 0
                         hard_features.append(feat)
