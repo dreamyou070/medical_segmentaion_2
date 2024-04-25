@@ -283,8 +283,8 @@ def main(args):
 
             # [3] generate virtual feature
             batch, dim = features.shape[0], features.shape[1]
-            sample = torch.randn(batch, dim, 256 * 256).to(weight_dtype, device=device)
-            pseudo_sample = (mean + std * sample).view(batch, dim, 256, 256).contiguous().to(weight_dtype, device=device)
+            sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
+            pseudo_sample = (mean + std * sample).view(batch, dim, 256, 256).contiguous().to(device=device, dtype=weight_dtype)
             pseudo_label = torch.ones_like(pseudo_masks_pred)
             pseudo_label[:, 0, :, :] = 0
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265

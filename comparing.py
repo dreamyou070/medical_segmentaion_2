@@ -1,6 +1,12 @@
 import torch
 import numpy as np
 
+batch = 1
+dim = 160
+weight_dtype = torch.float32
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
+"""
 # [1] position
 gt = torch.randn(1,2,256,256)
 gt[:,1,:,:] = 1
@@ -27,7 +33,7 @@ print(pseudo_sample.shape)
 
 
 
-
+"""
 #print(non_zero_index)
 """
 class DiagonalGaussianDistribution(object):
