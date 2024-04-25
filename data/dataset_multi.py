@@ -414,7 +414,8 @@ class TestDataset_Seg(Dataset):
 
         # 256,256,3
         gt[:, :, :class_num] = gt_arr_
-        gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
+        gt = torch.tensor(gt).permute(2, 0, 1)  # 2,256,256
+
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
 

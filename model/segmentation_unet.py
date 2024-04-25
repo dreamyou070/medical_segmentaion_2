@@ -188,13 +188,15 @@ class SemanticModel(nn.Module):
         if self.use_layer_norm:
             if mask_res == 128:
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
-                                                       nn.LayerNorm([160 , 128, 128]),)
+                                                       nn.LayerNorm([160 , 128, 128]),) # 64 -> 128
             if mask_res == 256:
+                # 64 -> 128 -> 256
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
                                                        nn.LayerNorm([160*3, 128, 128]),
                                                        Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
                                                        nn.LayerNorm([160, 256,256]))
             if mask_res == 512:
+                # 64 -> 128 -> 256 -> 512
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
                                                        nn.LayerNorm([160*3, 128, 128]),
                                                        Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
@@ -227,19 +229,20 @@ class SemanticModel(nn.Module):
         return x
 
     def gen_feature(self, x16_out, x32_out, x64_out):
-
-        x16_out = self.dim_and_res_up(self.mlp_layer_1, self.upsample_layer_1, x16_out)  # [batch, 320, 64,64]
+        # with simple linear and convolution layer # [batch, 320, 64,64]
+        x16_out = self.dim_and_res_up(self.mlp_layer_1,
+                                      self.upsample_layer_1,
+                                      x16_out)        # upscale 4 times
         x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)  # [batch, 320, 64,64]
         x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)  # [batch, 320, 64,64]
-        x_ = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
-        # non linear model ?
-        x = self.segmentation_head(x_)  # [batch, 160, 256,256]
-        return x_, x
+        x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
+        return x
 
     def segment_feature(self, feature):
         # feature = [batch, 160, 256,256]
         # out = [batch, 2, 256,256]
-        segment_out = self.outc(feature)
+        x = self.segmentation_head(feature)  # [batch 960, res,res] -> [batch, 160, 256,256]
+        segment_out = self.outc(x)
         return segment_out
 
     def forward(self, x16_out, x32_out, x64_out):
