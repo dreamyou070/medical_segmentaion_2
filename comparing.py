@@ -6,6 +6,8 @@ dim = 160
 weight_dtype = torch.float32
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
+
+pseudo_label = torch.ones((batch, 2, 256,256))
 """
 # [1] position
 gt = torch.randn(1,2,256,256)

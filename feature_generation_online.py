@@ -283,9 +283,9 @@ def main(args):
 
             # [3] generate virtual feature
             batch, dim = features.shape[0], features.shape[1]
-            sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
-            pseudo_sample = (mean + std * sample).view(batch, dim, 256, 256).contiguous().to(device=device, dtype=weight_dtype)
-            pseudo_label = torch.ones_like(batch['gt'])
+            sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
+            pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res,args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
+            pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
             pseudo_label[:, 0, :, :] = 0
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
