@@ -266,7 +266,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
 
         moments = self.quant_conv(h)
         print(f'with quant conv, one convolution, moments (1,4,64,64) = {moments.shape}')
-        
+
         posterior = DiagonalGaussianDistribution(moments)
 
         if not return_dict:
