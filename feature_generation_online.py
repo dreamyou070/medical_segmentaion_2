@@ -285,7 +285,7 @@ def main(args):
             batch, dim = features.shape[0], features.shape[1]
             sample = torch.randn(batch, dim, 256 * 256).to(device=device, dtype=weight_dtype)
             pseudo_sample = (mean + std * sample).view(batch, dim, 256, 256).contiguous().to(device=device, dtype=weight_dtype)
-            pseudo_label = torch.ones_like(pseudo_masks_pred)
+            pseudo_label = torch.ones_like(batch['gt'])
             pseudo_label[:, 0, :, :] = 0
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
