@@ -2,11 +2,26 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 from torch import nn
-
+"""
 features = torch.randn(10,160)
 mean = torch.mean(features, dim=0)
 cov = torch.cov(features)
 print(mean.shape, cov.shape)
+"""
+pseudo_sample = torch.randn(10,160)
+z_mu = pseudo_sample.mean(dim=0).unsqueeze(1).unsqueeze(0)
+z_sigma = pseudo_sample.std(dim=0).unsqueeze(1).unsqueeze(0)
+
+anomal_feat = torch.randn(10,160)
+a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
+a_sigma = anomal_feat.std(dim=0).unsqueeze(1).unsqueeze(0)
+
+# make kl divergence
+
+kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
+kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
+anomal_loss = torch.nn.functional.kl_div(pseudo_sample, anomal_feat, reduction="none").mean()
+print(anomal_loss)
 """
 kl_loss = nn.KLDivLoss(log_target=True)
 
