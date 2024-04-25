@@ -53,6 +53,7 @@ def main(args):
     vision_head = None
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse)
+
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
@@ -76,7 +77,6 @@ def main(args):
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
@@ -191,12 +191,10 @@ def main(args):
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
-
                                 # encoder hidden states is dictionary
                                 encoder_hidden_states = vision_head(output)
 
                             elif args.image_processor == 'vit':
-
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
                                 if args.not_use_cls_token:
@@ -227,14 +225,8 @@ def main(args):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-                noise_pred = unet(latents, 0, encoder_hidden_states,
-                                  trg_layer_list=args.trg_layer_list,
-                                  noise_type = position_embedder).sample
-
-            target = torch.randn_like(noise_pred)
-            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
-                [1, 2, 3])
-
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                     noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -249,8 +241,7 @@ def main(args):
                 q_dict[res] = query
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-            features   = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
             masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
@@ -270,11 +261,6 @@ def main(args):
                     loss += dice_loss
                     loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
-
-            if args.use_noise_pred_loss:
-                loss_dict['noise_loss'] = noise_loss.mean().item()
-                loss = loss + noise_loss.mean()
-
             loss = loss.mean()
             current_loss = loss.detach().item()
 

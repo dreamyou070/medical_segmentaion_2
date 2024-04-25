@@ -192,10 +192,8 @@ def main(args):
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
-
                                 # encoder hidden states is dictionary
                                 encoder_hidden_states = vision_head(output)
-
                             elif args.image_processor == 'vit':
 
                                 output, pix_embedding = condition_model(**batch["image_condition"])
@@ -218,15 +216,14 @@ def main(args):
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                unet(latents, 0, encoder_hidden_states,
+                     trg_layer_list=args.trg_layer_list,
                      noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
@@ -269,7 +266,7 @@ def main(args):
             # is there any other way to accelerate this process ?
 
             # [1] position
-            anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1)
+            anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1) # batch, 1, 256, 256
             anomal_map = anomal_map.flatten()  #
             non_zero_index = torch.nonzero(anomal_map).flatten() # class 1 index
 
@@ -296,7 +293,7 @@ def main(args):
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]
             if args.online_pseudo_loss :
-                loss = loss + pseudo_loss
+                loss = loss + pseudo_loss * args.pseudo_loss_weight
             if args.only_online_pseudo_loss :
                 loss = pseudo_loss
             # ----------------------------------------------------------------------------------------------------------- #
@@ -541,6 +538,7 @@ if __name__ == "__main__":
     parser.add_argument("--reverse", action='store_true')
     parser.add_argument("--online_pseudo_loss", action='store_true')
     parser.add_argument("--only_online_pseudo_loss", action='store_true')
+    parser.add_argument("--pseudo_loss_weight", type=float, default=1)
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
