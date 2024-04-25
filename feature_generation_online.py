@@ -185,7 +185,6 @@ def main(args):
             loss_dict = {}
 
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
@@ -231,21 +230,15 @@ def main(args):
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
 
             with torch.no_grad():
-
                 # image = [1,3,512,512]
-
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
-
-
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states,
-                     trg_layer_list=args.trg_layer_list,
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
                      noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
@@ -260,7 +253,10 @@ def main(args):
                     query = query.permute(0, 3, 1, 2).contiguous()
                 q_dict[res] = query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+            # [1] feature generation
             _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+            # [2] segmentation head
             masks_pred = segmentation_head.segment_feature(features)                # [1,2,  256,256]
             # ----------------------------------------------------------------------------------------------------------- #
             #masks_pred = torch.softmax(masks_pred, dim=1)
@@ -307,8 +303,12 @@ def main(args):
             random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
             pseudo_sample = anomal_generator(random_feature)
             # mae loss
-            anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
-                                                       pseudo_sample.float(), reduction="none").mean()
+
+            if args.anomal_mse_loss :
+                anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
+                                                           pseudo_sample.float(), reduction="none").mean()
+            elif args.anomal_kl_loss :
+                anomal_loss = torch.nn.functional.kl_div(pseudo_sample, anomal_feat, reduction="none").mean()
 
             #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
             # generate anomal from [pix_num, 160]
@@ -332,13 +332,7 @@ def main(args):
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]
             if args.online_pseudo_loss :
-                loss = loss + pseudo_loss * args.pseudo_loss_weight
-            if args.only_online_pseudo_loss :
-                loss = pseudo_loss
-            # ----------------------------------------------------------------------------------------------------------- #
-            #if args.use_noise_pred_loss:
-            #    loss_dict['noise_loss'] = noise_loss.mean().item()
-            #    loss = loss + noise_loss.mean()
+                loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
 
             loss = loss.mean()
             current_loss = loss.detach().item()
@@ -578,6 +572,10 @@ if __name__ == "__main__":
     parser.add_argument("--online_pseudo_loss", action='store_true')
     parser.add_argument("--only_online_pseudo_loss", action='store_true')
     parser.add_argument("--pseudo_loss_weight", type=float, default=1)
+    parser.add_argument("--anomal_loss_weight", type=float, default=1)
+    parser.add_argument("--anomal_mse_loss", action='store_true')
+    parser.add_argument("--anomal_kl_loss", action='store_true')
+
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

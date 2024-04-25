@@ -257,9 +257,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalVAEMixin):
             encoded_slices = [self.encoder(x_slice) for x_slice in x.split(1)]
             h = torch.cat(encoded_slices)
         else:
-
             # encoder make h
-            print(f'pure encoder')
             h = self.encoder(x) # [1,4 + 4,64,64]
         moments = self.quant_conv(h) # [1,8,64,64]
         posterior = DiagonalGaussianDistribution(moments)
