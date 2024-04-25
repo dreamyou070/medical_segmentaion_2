@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+"""
 features = torch.randn(10,160)
 # generatoe gaussian distribution
 mean = torch.mean(features, dim=0).unsqueeze(1).unsqueeze(0)
@@ -15,8 +15,12 @@ generator_net = AnomalFeatureGenerator()
 random_feature = torch.rand_like(features)
 output = generator_net(random_feature)
 loss = torch.nn.functional.mse_loss(features, output)
+"""
 
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
+generator_net = AutoencoderKL()
+# feature perturbation ... ?
 
 """
 # [1] position

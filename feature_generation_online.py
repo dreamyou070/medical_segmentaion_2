@@ -307,11 +307,11 @@ def main(args):
             random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,
                                                               device = device) # pix_num, dim
             pseudo_sample = anomal_generator(random_feature)
-            anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(),
-                                                       output.float(), reduction="none").mean([1, 2, 3])
+            # mae loss
+            anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
+                                                       pseudo_sample.float(), reduction="none").mean()
 
             #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
-
             pseudo_sample = anomal_generator(torch.randn_like(features).to(dtype=weight_dtype, device = device))
             pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
