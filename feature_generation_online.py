@@ -308,7 +308,18 @@ def main(args):
                 anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
                                                            pseudo_sample.float(), reduction="none").mean()
             elif args.anomal_kl_loss :
-                anomal_loss = torch.nn.functional.kl_div(pseudo_sample, anomal_feat, reduction="none").mean()
+                # https://engineer-mole.tistory.com/91
+
+                a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
+                a_var = anomal_feat.var(dim=0).unsqueeze(1).unsqueeze(0)
+                a_logvar = torch.log(a_var + 1e-8)
+
+                z_mu = pseudo_sample.mean(dim=0)
+                z_var = pseudo_sample.var(dim=0)
+                z_logvar = torch.log(z_var + 1e-8)
+
+                kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
+                anomal_loss = kl_loss.mean()
 
             #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
             # generate anomal from [pix_num, 160]
