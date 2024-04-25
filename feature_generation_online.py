@@ -215,8 +215,6 @@ def main(args):
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
-            #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-            #gt = gt.view(-1, gt.shape[-1]).contiguous()
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
@@ -246,7 +244,7 @@ def main(args):
             _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
             masks_pred = segmentation_head.segment_feature(features)                # [1,2,  256,256]
             # ----------------------------------------------------------------------------------------------------------- #
-            masks_pred = torch.softmax(masks_pred, dim=1)
+            #masks_pred = torch.softmax(masks_pred, dim=1)
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                            masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
@@ -273,22 +271,28 @@ def main(args):
             # [1] position
             anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1)
             anomal_map = anomal_map.flatten()  #
-            non_zero_index = torch.nonzero(anomal_map).flatten()
+            non_zero_index = torch.nonzero(anomal_map).flatten() # class 1 index
 
             # [2] raw feature
-            feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim
+            feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
             anomal_feat = feat[non_zero_index, :]  # [512,160]
             mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
             std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
 
             # [3] generate virtual feature
-            batch, dim = features.shape[0], features.shape[1]
+            batch, dim = features.shape[0], features.shape[1] # batch, 160
             sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
-            pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res,args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
+            pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
             pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
-            pseudo_label[:, 0, :, :] = 0
+            pseudo_label[:, 0, :, :] = 0 # all class 1 samples
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265
-            pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
+
+            # dice ce loss not with softmax (because it do manually)
+
+            #pseudo_loss = loss_dicece(input=torch.softmax(pseudo_masks_pred, dim=1),  # [class, 256,256]
+            #                          target=pseudo_label.to(dtype=weight_dtype,
+            #                                                 device=accelerator.device))  # [class, 256,256]
+            pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]
             if args.online_pseudo_loss :

@@ -106,7 +106,7 @@ def evaluation_check(segmentation_head,
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
             masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-            masks_pred = torch.softmax(masks_pred, dim=1)
+            #masks_pred = torch.softmax(masks_pred, dim=1)
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pred
             class_num = masks_pred.shape[1]  # 4
