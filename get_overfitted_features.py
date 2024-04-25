@@ -231,11 +231,13 @@ def main(args):
         h, w = masks_pred.size(2), masks_pred.size(3)
         for h_index in range(h):
             for w_index in range(w):
-                pred_label = masks_pred[0, 0, h_index, w_index]
-                gt_label = gt[0, 0, h_index, w_index]
+                pred_label = masks_pred[0, 0, h_index, w_index].squeeze().item()
+                gt_label = gt[0, 0, h_index, w_index].squeeze().item()
                 feat = features[0, :, h_index, w_index].squeeze()
-                if gt_label.item() == 0 :
-                    if pred_label.item() == 1:  # real class = 1, pred class 0
+
+                print(f'gt_label : {gt_label} | pred_label : {pred_label}')
+                if gt_label == 0 :
+                    if pred_label == 1:  # real class = 1, pred class 0
                         hard_features.append(feat)
                     else:
                         easy_features.append(feat)
