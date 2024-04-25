@@ -250,9 +250,10 @@ def main(args):
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-            features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
             masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                           masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
