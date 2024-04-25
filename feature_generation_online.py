@@ -275,6 +275,7 @@ def main(args):
             # make gaussian virtual feature
             # extracting class 1 samples
             h, w = features.shape[2], features.shape[3]
+            memory_bank = []
             for h_index in range(h):
                 for w_index in range(w):
                     feat = features[0, :, h_index, w_index].squeeze()
