@@ -137,6 +137,8 @@ def main(args):
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    anomal_generator = accelerator.prepare(anomal_generator)
+    anomal_generator = transform_models_if_DDP([anomal_generator])[0]
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
