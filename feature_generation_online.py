@@ -304,18 +304,22 @@ def main(args):
             batch, dim = features.shape[0], features.shape[1] # batch, 160
             sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
             """
-            random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,
-                                                              device = device) # pix_num, dim
+            random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
             pseudo_sample = anomal_generator(random_feature)
             # mae loss
             anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
                                                        pseudo_sample.float(), reduction="none").mean()
 
             #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
-            pseudo_sample = anomal_generator(torch.randn_like(features).to(dtype=weight_dtype, device = device))
+            # generate anomal from [pix_num, 160]
+
+            pseudo_sample = anomal_generator((args.mask_res*args.mask_res, 160).to(dtype=weight_dtype, device = device)).permute(1,0).contiguous()
+            # pseudo_sample = [256*256, 160] -> [160, 256*256]
+            dim = pseudo_sample.shape[0]
+            pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0)
             pseudo_label = torch.ones((batch, args.n_classes, args.mask_res,args.mask_res))
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
-            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_sample)  # 1,2,265,265
+            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
 
             # dice ce loss not with softmax (because it do manually)
 
