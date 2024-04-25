@@ -297,10 +297,12 @@ def main(args):
                                                              device=accelerator.device))  # [class, 256,256]
             if args.online_pseudo_loss :
                 loss = loss + pseudo_loss
+            if args.only_online_pseudo_loss :
+                loss = pseudo_loss
             # ----------------------------------------------------------------------------------------------------------- #
-            if args.use_noise_pred_loss:
-                loss_dict['noise_loss'] = noise_loss.mean().item()
-                loss = loss + noise_loss.mean()
+            #if args.use_noise_pred_loss:
+            #    loss_dict['noise_loss'] = noise_loss.mean().item()
+            #    loss = loss + noise_loss.mean()
 
             loss = loss.mean()
             current_loss = loss.detach().item()
@@ -537,6 +539,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_layer_norm", action='store_true')
     parser.add_argument("--reverse", action='store_true')
     parser.add_argument("--online_pseudo_loss", action='store_true')
+    parser.add_argument("--only_online_pseudo_loss", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
