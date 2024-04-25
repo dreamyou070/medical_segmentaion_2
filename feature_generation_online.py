@@ -312,8 +312,8 @@ def main(args):
 
             #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
             # generate anomal from [pix_num, 160]
-
-            pseudo_sample = anomal_generator((args.mask_res*args.mask_res, 160).to(dtype=weight_dtype, device = device)).permute(1,0).contiguous()
+            random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
+            pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
             # pseudo_sample = [256*256, 160] -> [160, 256*256]
             dim = pseudo_sample.shape[0]
             pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0)

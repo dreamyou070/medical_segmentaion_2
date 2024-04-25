@@ -1,5 +1,14 @@
 import torch
 import numpy as np
+import torch.nn.functional as F
+from torch import nn
+kl_loss = nn.KLDivLoss(log_target=True)
+
+features = torch.randn(10,160)
+gen_feature = torch.randn(10,160)
+output = kl_loss(features, gen_feature)
+
+print(output)
 """
 features = torch.randn(10,160)
 # generatoe gaussian distribution
