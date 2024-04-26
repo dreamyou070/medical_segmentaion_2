@@ -70,7 +70,7 @@ def main(args):
             random_feature = self.layer2(random_feature)
             return random_feature
 
-    anomal_generator = AnomalFeatureGenerator()
+    #anomal_generator = AnomalFeatureGenerator()
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -90,7 +90,7 @@ def main(args):
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": anomal_generator.parameters(), "lr": args.unet_lr})
+    #trainable_params.append({"params": anomal_generator.parameters(), "lr": args.unet_lr})
 
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
@@ -137,8 +137,8 @@ def main(args):
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    anomal_generator = accelerator.prepare(anomal_generator)
-    anomal_generator = transform_models_if_DDP([anomal_generator])[0]
+    #anomal_generator = accelerator.prepare(anomal_generator)
+    #anomal_generator = transform_models_if_DDP([anomal_generator])[0]
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
@@ -331,12 +331,12 @@ def main(args):
                     kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
                     anomal_loss = kl_loss.mean()
             """
-            random_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype)
+            pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype)
             # [2] anomal big feature
             #random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
-            pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
-            dim = pseudo_sample.shape[0]
-            pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
+            #pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
+            #dim = pseudo_sample.shape[0]
+            #pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
             real_label = batch['gt']
             pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
@@ -347,10 +347,10 @@ def main(args):
 
             # [3]
             if args.online_pseudo_loss :
-                if args.anomal_small_loss:
-                    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
-                else :
-                    loss = loss + pseudo_loss * args.pseudo_loss_weight
+                #if args.anomal_small_loss:
+                #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
+                #else :
+                loss = loss + pseudo_loss * args.pseudo_loss_weight
 
             loss = loss.mean()
             current_loss = loss.detach().item()
