@@ -162,8 +162,7 @@ class PFNet(nn.Module):
 
 
 
-    def forward(self, x16_out, x32_out, x64_out, high_semantic_map):
-
+    def gen_feature(self, x16_out, x32_out, x64_out, high_semantic_map):
         # x16_out = [batch, 1280, 16, 16]
         # x32_out = [batch, 640, 32, 32]
         # x64_out = [batch, 320, 64, 64]
@@ -172,8 +171,12 @@ class PFNet(nn.Module):
                                        y=x16_out,
                                        in_map=high_semantic_map)
         focus2, predict2 = self.focus2(x=x64_out, y=focus3, in_map=predict3)
-        focus = focus2 * predict2 # focus = [1, 320, 64, 64]
+        focus = focus2 * predict2  # focus = [1, 320, 64, 64]
         x = self.segmentation_head(focus)
+        return x
+
+    def segment_feature(self, x):
+
         x = self.outc(x)
         return x
 
