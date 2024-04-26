@@ -90,7 +90,7 @@ class Positioning(nn.Module):
         sab = self.sab(x)
         self.map = self.map.to(x.device)
         global_sab = self.map(sab)
-        return sab + global_sab
+        return sab+global_sab, global_sab
 
 class AllPositioning(nn.Module):
 
@@ -108,7 +108,8 @@ class AllPositioning(nn.Module):
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
-        return net(x)
+        x, global_feat = net(x)
+        return x, global_feat
 
 
 #x16_out = torch.randn(1, 1280, 16, 16)

@@ -19,7 +19,7 @@ from utils.evaluate import evaluation_check
 from monai.utils import DiceCEReduction, LossReduction
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from model.reduction_model import ReductionNet
+from model.focus_net import PFNet
 from model.vision_condition_head import vision_condition_head
 from utils.anomal_sample_sampler import DiagonalGaussianDistribution
 from model.positioning import AllPositioning
@@ -47,13 +47,16 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
-    segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                      mask_res=args.mask_res,
-                                      use_layer_norm = args.use_layer_norm)
-    reduction_net = None
-    if args.reducing_redundancy :
-        reduction_net = ReductionNet(768, args.n_classes,
-                                     use_weighted_reduct=args.use_weighted_reduct)
+    if args.use_simple_segmodel :
+        segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                          mask_res=args.mask_res,
+                                          use_layer_norm = args.use_layer_norm)
+    else :
+        segmentation_head = PFNet(n_classes=args.n_classes,
+                                          mask_res=args.mask_res,
+                                          use_layer_norm = args.use_layer_norm)
+
+
     vision_head = None
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse)
@@ -90,26 +93,6 @@ def main(args):
     print(f'\n step 7. loss function')
     loss_CE = nn.CrossEntropyLoss()
     loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
-    loss_Dice = DiceLoss(include_background=False,
-                         to_onehot_y=False,
-                         sigmoid=False,
-                         softmax=True,
-                         other_act=None,
-                         squared_pred=False,
-                         jaccard=False,
-                         reduction=LossReduction.MEAN,
-                         smooth_nr=1e-5,
-                         smooth_dr=1e-5,
-                         batch=False,
-                         weight=None)
-
     loss_dicece = DiceCELoss(include_background=False,
                              to_onehot_y=False,
                              sigmoid=False,
@@ -127,21 +110,12 @@ def main(args):
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
-        positioning_modules = transform_models_if_DDP([positioning_module])
-
-
-    if args.reducing_redundancy :
-        reduction_net = accelerator.prepare(reduction_net)
-        reduction_net = transform_models_if_DDP([reduction_net])[0]
-
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
-
     if args.image_processor == 'pvt' :
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
-
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
@@ -167,7 +141,6 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    kl_weight = 1e-6
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -194,8 +167,6 @@ def main(args):
                                     encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                                 if args.only_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else:
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
@@ -210,8 +181,6 @@ def main(args):
                                     encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                                 if args.only_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
@@ -239,19 +208,20 @@ def main(args):
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 if args.use_positioning_module:
-                    query = positioning_module(query, layer_name=layer)
+                    query, global_feat = positioning_module(query, layer_name=layer)
+                    if res == 16 :
+                        global_attn = global_feat
                 q_dict[res] = query
+
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
+            if args.use_simple_segmodel :
+                masks_pred = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
+            else :
+                _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                # [2] segmentation head
+                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
 
-
-
-            # [1] feature generation
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-            # [2] segmentation head
-            masks_pred = segmentation_head.segment_feature(features)                # [1,2,  256,256]
-            # ----------------------------------------------------------------------------------------------------------- #
-            #masks_pred = torch.softmax(masks_pred, dim=1)
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                            masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
@@ -265,11 +235,6 @@ def main(args):
                 if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
                 loss += focal_loss
                 loss_dict['focal_loss'] = focal_loss.item()
-                # [5.3] Dice Loss
-                if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
-                    loss += dice_loss
-                    loss_dict['dice_loss'] = dice_loss.item()
                 loss = loss.mean()
             # ----------------------------------------------------------------------------------------------------------- #
             # why does it takes so much time ... ?
@@ -386,12 +351,7 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.reducing_redundancy :
-                save_model(args,
-                           saving_folder='reduction_net',
-                           saving_name=f'reduction-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(reduction_net),
-                           save_dtype=save_dtype)
+
             if args.use_position_embedder :
                 save_model(args,
                            saving_folder='position_embedder',
@@ -424,7 +384,7 @@ def main(args):
                                                            accelerator.device,
                                                            condition_model,
                                                            unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net,
+                                                           None,
                                                            position_embedder, vision_head,
                                                            positioning_module,
                                                            args)
@@ -601,6 +561,7 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_kl_loss", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
+    parser.add_argument("--use_simple_segmodel", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

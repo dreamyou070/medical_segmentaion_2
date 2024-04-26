@@ -57,20 +57,11 @@ def evaluation_check(segmentation_head,
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
                                 if args.reducing_redundancy:
                                     encoder_hidden_states = reduction_net(encoder_hidden_states)
-                if args.use_text_condition:
-                    with torch.set_grad_enabled(True):
-                        encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                            "last_hidden_state"]  # [batch, 77, 768]
-
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
             gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
             gt = gt.view(-1, gt.shape[-1]).contiguous()
-
-            # key_word_index = batch['key_word_index'][0] # torch([10,14])
-            # target key word should intense
-            # how can i increase the alignment between image and text ?
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
@@ -85,11 +76,6 @@ def evaluation_check(segmentation_head,
                 noise_pred = unet(latents, 0, encoder_hidden_states,
                                   trg_layer_list=args.trg_layer_list,
                                   noise_type=position_embedder).sample
-
-            target = torch.randn_like(noise_pred)
-            noise_loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none").mean(
-                [1, 2, 3])
-
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
@@ -101,14 +87,19 @@ def evaluation_check(segmentation_head,
                 else:
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
-                if args.use_positioning_module :
-                    query = positioning_module(query, layer)
+                if args.use_positioning_module:
+                    query, global_feat = positioning_module(query, layer_name=layer)
+                    if res == 16:
+                        global_attn = global_feat
                 q_dict[res] = query
             #######################################################################################################################
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-            masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-            #masks_pred = torch.softmax(masks_pred, dim=1)
+            if args.use_simple_segmodel :
+                masks_pred = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
+            else :
+                _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                # [2] segmentation head
+                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pred
             class_num = masks_pred.shape[1]  # 4
