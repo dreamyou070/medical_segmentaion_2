@@ -17,13 +17,15 @@ class DiagonalGaussianDistribution(object):
     def update (self, parameters):
         """ update with previous one and new parameters """
         # parameters = [num_samples, dim]
+        self.parameters = self.parameters.detach()
         self.parameters = torch.cat([self.parameters, parameters], dim=0)
+
+        # why this problem .. ?
         self.mean = self.parameters.mean(dim=0).unsqueeze(0)
         self.var = self.parameters.var(dim=0).unsqueeze(0)
         self.std = torch.sqrt(self.var)
         self.logvar = torch.log(self.var)
         self.memory_iter += 1
-
         if self.memory_iter % 20 == 0 :
             N = parameters.shape[0]
             self.parameters = self.parameters[N:,:]
