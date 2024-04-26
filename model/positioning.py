@@ -88,6 +88,7 @@ class Positioning(nn.Module):
             x = self.cab(x) # is like self attntion
         self.sab = self.sab.to(x.device)
         sab = self.sab(x)
+        self.map = self.map.to(x.device)
         global_sab = self.map(sab)
         return sab + global_sab
 
