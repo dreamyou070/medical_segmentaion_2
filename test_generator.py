@@ -58,8 +58,11 @@ def main(args):
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
+        if args.position_embedder_weights is not None:
+            position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
 
     class AnomalFeatureGenerator(torch.nn.Module):
+        """ anomal feature mapping class """
         def __init__(self):
             super(AnomalFeatureGenerator, self).__init__()
             self.layer1 = torch.nn.Linear(160, 320)
@@ -400,11 +403,7 @@ def main(args):
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
-            save_model(args,
-                       saving_folder='anomal_generator',
-                       saving_name=f'anomal-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(anomal_generator),
-                       save_dtype=save_dtype)
+
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
