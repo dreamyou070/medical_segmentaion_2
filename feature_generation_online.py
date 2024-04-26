@@ -293,10 +293,10 @@ def main(args):
             anomal_feat = feat[non_zero_index, :]  # [512,160]
 
 
-            if step == 0:
-                generator = DiagonalGaussianDistribution(parameters=anomal_feat)
-            else:
-                generator.update(parameters=anomal_feat)
+            #if step == 0:
+            generator = DiagonalGaussianDistribution(parameters=anomal_feat)
+            #else:
+            #    generator.update(parameters=anomal_feat)
 
             """
             mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
@@ -332,7 +332,7 @@ def main(args):
                     anomal_loss = kl_loss.mean()
             """
             pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype) # 256,256
-            print(f'pseudo_feature = {pseudo_feature.shape}')
+            
             #
 
 
