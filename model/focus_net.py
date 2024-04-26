@@ -128,6 +128,8 @@ class PFNet(nn.Module):
         self.focus1 = Focus(640, 1280)
         self.focus2 = Focus(320, 640)
 
+        self.use_layer_norm = use_layer_norm
+
         # Segmentation Head
         if self.use_layer_norm:
             if mask_res == 128:
