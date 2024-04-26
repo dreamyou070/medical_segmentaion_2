@@ -332,7 +332,7 @@ def main(args):
                     anomal_loss = kl_loss.mean()
             """
             pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype) # 256,256
-            
+
             #
 
 
@@ -413,11 +413,13 @@ def main(args):
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
+            """
             save_model(args,
                        saving_folder='anomal_generator',
                        saving_name=f'anomal-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(anomal_generator),
                        save_dtype=save_dtype)
+            """
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
