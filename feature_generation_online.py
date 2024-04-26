@@ -66,7 +66,7 @@ def main(args):
         position_embedder = AllPositionalEmbedding()
     positioning_module = None
     if args.use_positioning_module :
-        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn)
+        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -256,59 +256,14 @@ def main(args):
                 generator = DiagonalGaussianDistribution(parameters=anomal_feat)
             else:
                 generator.update(parameters=anomal_feat)
-
-            """
-            mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
-            std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
-
-            # [3] generate virtual feature
-            batch, dim = features.shape[0], features.shape[1] # batch, 160
-            sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
-            
-
-
-            random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
-            pseudo_sample = anomal_generator(random_feature) # ****************************************************** #
-            
-
-            # mae loss
-            if args.anomal_small_loss :
-                if args.anomal_mse_loss :
-                    anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
-                                                               pseudo_sample.float(), reduction="none").mean()
-                elif args.anomal_kl_loss :
-                    # https://engineer-mole.tistory.com/91
-
-                    a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
-                    a_var = anomal_feat.var(dim=0).unsqueeze(1).unsqueeze(0)
-                    a_logvar = torch.log(a_var + 1e-8)
-
-                    z_mu = pseudo_sample.mean(dim=0)
-                    z_var = pseudo_sample.var(dim=0)
-                    z_logvar = torch.log(z_var + 1e-8)
-
-                    kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
-                    anomal_loss = kl_loss.mean()
-            """
             pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype) # 256,256
-
-            #
-
-
-            # [2] anomal big feature
-            #random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
-            #pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
-            #dim = pseudo_sample.shape[0]
-            #pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
             real_label = batch['gt']
             pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
-
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]
-
             # [3]
             if args.online_pseudo_loss :
                 #if args.anomal_small_loss:

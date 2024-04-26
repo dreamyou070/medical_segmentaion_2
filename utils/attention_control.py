@@ -43,6 +43,8 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 key = key.float()
             """ Second Trial """
             if trg_layer_list is not None and layer_name in trg_layer_list and argument.text_before_query :
+                # save query
+                # save before attn query
                 controller.save_query((query * self.scale), layer_name) # query = batch, seq_len, dim
 
 
@@ -51,6 +53,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
             if trg_layer_list is not None and layer_name in trg_layer_list :
+                # pix_num, pix_num
                 controller.save_attention(attention_probs, layer_name) # attention_probs = batch, seq_len, sen_len
 
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
