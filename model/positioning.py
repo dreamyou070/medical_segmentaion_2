@@ -1,13 +1,3 @@
-"""
- @Time    : 2021/7/6 14:23
- @Author  : Haiyang Mei
- @E-mail  : mhy666@mail.dlut.edu.cn
-
- @Project : CVPR2021_PFNet
- @File    : PFNet.py
- @Function: Focus and Exploration Network
-
-"""
 import torch
 import torch.nn as nn
 
@@ -50,9 +40,9 @@ class SA_Block(nn.Module):
     def __init__(self, in_dim):
         super(SA_Block, self).__init__()
         self.chanel_in = in_dim
-        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
+        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1) # dimension shrinking
+        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)   #
+        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)      # dim reconstruction
         self.gamma = nn.Parameter(torch.ones(1))
         self.softmax = nn.Softmax(dim=-1)
 
@@ -68,6 +58,8 @@ class SA_Block(nn.Module):
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)
         energy = torch.bmm(proj_query, proj_key)
         attention = self.softmax(energy)
+
+        # [2]
         proj_value = self.value_conv(x).view(m_batchsize, -1, width * height)
 
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
@@ -93,7 +85,6 @@ class Positioning(nn.Module):
     def forward(self, x):
         if self.use_channel_attn:
             x = self.cab(x) # is like self attntion
-        print(f'channel attn output = {x.shape}')
         sab = self.sab(x)
         return sab
 

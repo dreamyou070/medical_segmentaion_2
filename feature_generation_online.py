@@ -22,6 +22,10 @@ from monai.losses import DiceLoss, DiceCELoss
 from model.reduction_model import ReductionNet
 from model.vision_condition_head import vision_condition_head
 from utils.anomal_sample_sampler import DiagonalGaussianDistribution
+from model.positioning import AllPositioning
+from model.pe import AllPositionalEmbedding
+
+
 # image conditioned segmentation mask generating
 
 def main(args):
@@ -56,11 +60,7 @@ def main(args):
 
     position_embedder = None
     if args.use_position_embedder :
-        from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
-
-
-    from model.positioning import AllPositioning
     positioning_module = None
     if args.use_positioning_module :
         positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn)
@@ -73,21 +73,15 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
-                                                        args.unet_lr,
-                                                        args.learning_rate,
-                                                        condition_modality=condition_modality,)
-    if args.reducing_redundancy :
-        trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
+                                                        args.learning_rate, condition_modality=condition_modality,)
     if args.use_position_embedder :
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
     if args.use_positioning_module:
         trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
-
-    trainable_params.append({"params": segmentation_head.parameters(),
-                             "lr": args.learning_rate})
+    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -133,13 +127,17 @@ def main(args):
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
-        positioning_module = transform_models_if_DDP([positioning_module])[0]
+        positioning_modules = transform_models_if_DDP([positioning_module])
+
+
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
+
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
+
     if args.image_processor == 'pvt' :
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
@@ -215,17 +213,11 @@ def main(args):
                                 if args.reducing_redundancy:
                                     encoder_hidden_states = reduction_net(encoder_hidden_states)
 
-                if args.use_text_condition:
-                    with torch.set_grad_enabled(True):
-                        encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                            "last_hidden_state"]  # [batch, 77, 768]
-
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
 
             with torch.no_grad():
-                # image = [1,3,512,512]
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
