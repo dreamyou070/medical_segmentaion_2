@@ -28,6 +28,8 @@ from ignite.handlers import *
 from ignite.metrics import *
 import torch.nn.functional as F
 # image conditioned segmentation mask generating
+def eval_step(engine, batch):
+    return batch
 
 def main(args):
 
