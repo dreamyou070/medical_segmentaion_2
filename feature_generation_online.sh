@@ -1,12 +1,12 @@
 # !/bin/bash
-port_number=53737
+port_number=53838
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="37_pvt_image_encoder_with_position_embedder_mse_generator_loss_with_diagonalgaussiandistribution_update_code_use_positioning_module" #
+file_name="38_pvt_image_encoder_with_position_embedder_mse_generator_loss_use_positioning_module" #
 # --reverse --reducing_redundancy
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
@@ -31,5 +31,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --image_model_training \
  --use_position_embedder \
  --use_positioning_module \
- --online_pseudo_loss \
  --anomal_mse_loss
