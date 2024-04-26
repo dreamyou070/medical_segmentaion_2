@@ -98,16 +98,17 @@ class Positioning(nn.Module):
 
 class AllPositioning(nn.Module):
 
-    layer_names = [('up_blocks_1_attentions_2_transformer_blocks_0_attn2',1280)
-                   ('up_blocks_2_attentions_2_transformer_blocks_0_attn2',640)
-                   ('up_blocks_3_attentions_2_transformer_blocks_0_attn2',320)]
+
+    layer_names = {'up_blocks_1_attentions_2_transformer_blocks_0_attn2':1280,
+                           'up_blocks_2_attentions_2_transformer_blocks_0_attn2': 640,
+                           'up_blocks_3_attentions_2_transformer_blocks_0_attn2': 320,}
+
     def __init__(self):
         super(AllPositioning, self).__init__()
 
         self.position_net = {}
-        for layer_name in self.layer_names:
-            name, channel = layer_name
-            self.position_net[layer_name] = Positioning(channel)
+        for layer_name in self.layer_names.keys():
+            self.position_net[layer_name] = Positioning(int(self.layer_names[layer_name]))
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
