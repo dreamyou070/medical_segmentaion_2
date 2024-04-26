@@ -331,7 +331,11 @@ def main(args):
                     kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
                     anomal_loss = kl_loss.mean()
             """
-            pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype)
+            pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype) # 256,256
+            print(f'pseudo_feature = {pseudo_feature.shape}')
+            #
+
+
             # [2] anomal big feature
             #random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
             #pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
@@ -340,6 +344,8 @@ def main(args):
             real_label = batch['gt']
             pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
+
+
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,

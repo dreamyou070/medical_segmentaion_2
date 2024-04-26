@@ -8,8 +8,8 @@ class DiagonalGaussianDistribution(object):
     def __init__(self, parameters: torch.Tensor):
 
         self.parameters = parameters # num
-        self.mean = parameters.mean(dim=0)
-        self.var = parameters.var(dim=0)
+        self.mean = parameters.mean(dim=0).unsqueeze(0)
+        self.var = parameters.var(dim=0).unsqueeze(0)
         self.std = torch.sqrt(self.var)
         self.logvar = torch.log(self.var)
         self.memory_iter = 0
@@ -18,8 +18,8 @@ class DiagonalGaussianDistribution(object):
         """ update with previous one and new parameters """
         # parameters = [num_samples, dim]
         self.parameters = torch.cat([self.parameters, parameters], dim=0)
-        self.mean = self.parameters.mean(dim=0)
-        self.var = self.parameters.var(dim=0)
+        self.mean = self.parameters.mean(dim=0).unsqueeze(0)
+        self.var = self.parameters.var(dim=0).unsqueeze(0)
         self.std = torch.sqrt(self.var)
         self.logvar = torch.log(self.var)
         self.memory_iter += 1
@@ -30,8 +30,10 @@ class DiagonalGaussianDistribution(object):
 
     def sample(self, mask_res, device, weight_dtype):
 
-        sample = torch.randn((mask_res * mask_res, 160)).to(dtype=weight_dtype, device=device)
-        x = self.mean + self.std * sample
+        sample = torch.randn((mask_res * mask_res, 160)).to(dtype=weight_dtype, device=device) # N, 160
+        x = (self.mean + self.std * sample).permute(1, 0).contiguous()
+        # [256*256, 160] -> [160,256*256] -> [160, 256, 256]
+        x = x.view(160, mask_res, mask_res).unsqueeze(0)
         return x
 
     def kl(self, other: "DiagonalGaussianDistribution" = None) -> torch.Tensor:
