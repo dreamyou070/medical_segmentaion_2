@@ -18,9 +18,9 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/medical/${obj_name}/${benchmark}/test" \
  --network_dim 144 --network_alpha 4 \
- --network_weights "../result/${category}/${obj_name}/${benchmark}/${save_folder}/${file_name}/model/lora-000022.safetensors" \
- --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${save_folder}/${file_name}/position_embedder/position-000022.pt" \
- --anomal_generator_weights "../result/${category}/${obj_name}/${benchmark}/${save_folder}/${file_name}/anomal_generator/anomal-000022.pt" \
+ --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/${file_name}/model/lora-000022.safetensors" \
+ --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/${file_name}/position_embedder/position-000022.pt" \
+ --anomal_generator_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/${file_name}/anomal_generator/anomal-000022.pt" \
  --resize_shape 512 \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
