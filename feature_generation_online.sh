@@ -20,9 +20,9 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
  --obj_name "${obj_name}" \
- --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn1',
-                    'up_blocks_2_attentions_2_transformer_blocks_0_attn1',
-                    'up_blocks_3_attentions_2_transformer_blocks_0_attn1',]" \
+ --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 2 --mask_res 256 --batch_size 1 \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
