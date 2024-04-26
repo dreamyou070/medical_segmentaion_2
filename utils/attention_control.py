@@ -60,7 +60,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 controller.save_query(hidden_states, layer_name)
 
             hidden_states = self.to_out[0](hidden_states)
-
+            # it does not add original query again
             return hidden_states
         return forward
 

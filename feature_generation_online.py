@@ -57,12 +57,13 @@ def main(args):
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
-        position_embedder = AllPositioning(use_channel_attn=args.use_channel_attn)
+        position_embedder = AllPositionalEmbedding()
+
 
     from model.positioning import AllPositioning
     positioning_module = None
     if args.use_positioning_module :
-        positioning_module = AllPositioning()
+        position_embedder = AllPositioning(use_channel_attn=args.use_channel_attn)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
