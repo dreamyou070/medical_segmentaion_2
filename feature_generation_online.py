@@ -59,18 +59,10 @@ def main(args):
         from model.pe import AllPositionalEmbedding
         position_embedder = AllPositionalEmbedding()
 
-    class AnomalFeatureGenerator(torch.nn.Module):
-        def __init__(self):
-            super(AnomalFeatureGenerator, self).__init__()
-            self.layer1 = torch.nn.Linear(160, 320)
-            self.layer2 = torch.nn.Linear(320, 160)
-
-        def forward(self, random_feature):
-            random_feature = self.layer1(random_feature)
-            random_feature = self.layer2(random_feature)
-            return random_feature
-
-    #anomal_generator = AnomalFeatureGenerator()
+    from model.positioning import AllPositioning
+    positioning_module = None
+    if args.use_positioning_module :
+        positioning_module = AllPositioning()
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -90,7 +82,8 @@ def main(args):
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-    #trainable_params.append({"params": anomal_generator.parameters(), "lr": args.unet_lr})
+    if args.use_positioning_module:
+        trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
 
     trainable_params.append({"params": segmentation_head.parameters(),
                              "lr": args.learning_rate})
@@ -137,8 +130,9 @@ def main(args):
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    #anomal_generator = accelerator.prepare(anomal_generator)
-    #anomal_generator = transform_models_if_DDP([anomal_generator])[0]
+    if args.use_positioning_module:
+        positioning_module = accelerator.prepare(positioning_module)
+        positioning_module = transform_models_if_DDP([positioning_module])[0]
     if args.reducing_redundancy :
         reduction_net = accelerator.prepare(reduction_net)
         reduction_net = transform_models_if_DDP([reduction_net])[0]
@@ -251,8 +245,13 @@ def main(args):
                 else:
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
+                if args.use_positioning_module:
+                    query = positioning_module(query, layer_name=layer)
                 q_dict[res] = query
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+
+
 
             # [1] feature generation
             _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
@@ -345,7 +344,6 @@ def main(args):
             pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
 
-
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,
@@ -434,7 +432,9 @@ def main(args):
                                                            condition_model,
                                                            unet, vae, controller, weight_dtype, epoch,
                                                            reduction_net,
-                                                           position_embedder, vision_head, args)
+                                                           position_embedder, vision_head,
+                                                           positioning_module,
+                                                           args)
 
         # saving
         if is_main_process:
@@ -606,7 +606,8 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_loss_weight", type=float, default=1)
     parser.add_argument("--anomal_mse_loss", action='store_true')
     parser.add_argument("--anomal_kl_loss", action='store_true')
-    parser.add_argument("--anomal_small_loss", action='store_true')
+    parser.add_argument("--use_positioning_module", action='store_true')
+
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

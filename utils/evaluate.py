@@ -12,7 +12,7 @@ def evaluation_check(segmentation_head,
                      dataloader,
                      device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
-                     reduction_net, position_embedder, vision_head, args):
+                     reduction_net, position_embedder, vision_head, positioning_module, args):
 
     segmentation_head.eval()
 
@@ -101,6 +101,8 @@ def evaluation_check(segmentation_head,
                 else:
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
+                if args.use_positioning_module :
+                    query = positioning_module(query, layer)
                 q_dict[res] = query
             #######################################################################################################################
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
