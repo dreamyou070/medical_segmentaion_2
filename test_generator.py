@@ -21,7 +21,12 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from model.reduction_model import ReductionNet
 from model.vision_condition_head import vision_condition_head
-
+from ignite.metrics.confusion_matrix import ConfusionMatrix
+import torch
+from ignite.engine import *
+from ignite.handlers import *
+from ignite.metrics import *
+import torch.nn.functional as F
 # image conditioned segmentation mask generating
 
 def main(args):
@@ -74,66 +79,8 @@ def main(args):
             return random_feature
 
     anomal_generator = AnomalFeatureGenerator()
-
-    print(f'\n step 4. dataset and dataloader')
-    if args.seed is None:
-        args.seed = random.randint(0, 2 ** 32)
-    set_seed(args.seed)
-    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
-
-    print(f'\n step 5. optimizer')
-    args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
-                                                        args.unet_lr,
-                                                        args.learning_rate,
-                                                        condition_modality=condition_modality,)
-    if args.reducing_redundancy :
-        trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
-    if args.use_position_embedder :
-        trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    if args.image_processor == 'pvt' :
-        trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": anomal_generator.parameters(), "lr": args.unet_lr})
-
-    trainable_params.append({"params": segmentation_head.parameters(),
-                             "lr": args.learning_rate})
-    optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
-
-    print(f'\n step 6. lr')
-    lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
-
-    print(f'\n step 7. loss function')
-    loss_CE = nn.CrossEntropyLoss()
-    loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
-    loss_Dice = DiceLoss(include_background=False,
-                         to_onehot_y=False,
-                         sigmoid=False,
-                         softmax=True,
-                         other_act=None,
-                         squared_pred=False,
-                         jaccard=False,
-                         reduction=LossReduction.MEAN,
-                         smooth_nr=1e-5,
-                         smooth_dr=1e-5,
-                         batch=False,
-                         weight=None)
-
-    loss_dicece = DiceCELoss(include_background=False,
-                             to_onehot_y=False,
-                             sigmoid=False,
-                             softmax=True,
-                             squared_pred=True,
-                             lambda_dice=args.dice_weight,
-                             smooth_nr=1e-5,
-                             smooth_dr=1e-5,
-                             weight=None, )
+    if args.anomal_generator_weights is not None:
+        anomal_generator.load_state_dict(torch.load(args.anomal_generator_weights))
 
     print(f'\n step 8. model to device')
     condition_model = accelerator.prepare(condition_model)
@@ -154,23 +101,17 @@ def main(args):
 
     unet, network = transform_models_if_DDP([unet, network])
     segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-    if args.gradient_checkpointing:
-        unet.train()
-        segmentation_head.train()
-        for t_enc in condition_models:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-    else:
-        unet.eval()
-        for t_enc in condition_models:
-            t_enc.eval()
-        del t_enc
-        network.prepare_grad_etc()
 
-    print(f'\n step 9. registering saving tensor')
-    controller = AttentionStore()
-    register_attention_control(unet, controller)
+    print(f'\n step 9. loss function')
+    loss_dicece = DiceCELoss(include_background=False,
+                             to_onehot_y=False,
+                             sigmoid=False,
+                             softmax=True,
+                             squared_pred=True,
+                             lambda_dice=args.dice_weight,
+                             smooth_nr=1e-5,
+                             smooth_dr=1e-5,
+                             weight=None, )
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
@@ -178,274 +119,55 @@ def main(args):
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
+    device = accelerator.device
+
+    y_true_list, y_pred_list = [], []
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
-        epoch_loss_total = 0
-        accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+        # [1] generator pseudo sample
+        random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
+        pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
+        dim = pseudo_sample.shape[0]
+        pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
 
-        for step, batch in enumerate(train_dataloader):
-            device = accelerator.device
-            loss_dict = {}
+        # [2] pseudo answer
+        pseudo_label = torch.ones((1, args.n_classes, args.mask_res, args.mask_res)).to(dtype=weight_dtype, device=device)
+        pseudo_label[:, 0, :, :] = 0 # all class 1 samples
+        gt_flat = torch.ones(args.mask_res*args.mask_res).to(dtype=weight_dtype, device=device)
+        pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
+        pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
+                                  target=pseudo_label.to(dtype=weight_dtype,
+                                                         device=accelerator.device))  # [class, 256,256]
+        # pseudo loss make
+        class_num = args.n_classes
+        mask_pred_argmax = torch.argmax(pseudo_masks_pred, dim=1).flatten()  # 256*256
+        y_pred_list.append(mask_pred_argmax)
+        y_true = gt_flat.squeeze()
+        y_true_list.append(y_true)
 
-            encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-            if not args.without_condition:
-                if args.use_image_condition:
-                    if not args.image_model_training:
+    # [1] pred
+    y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
+    y_pred = F.one_hot(y_pred, num_classes=class_num)  # [pixel_num, C]
+    y_true = torch.cat(y_true_list).detach().cpu().long()  # [pixel_num]
+    # [2] make confusion engine
+    default_evaluator = Engine(eval_step)
+    cm = ConfusionMatrix(num_classes=class_num)
+    cm.attach(default_evaluator, 'confusion_matrix')
+    state = default_evaluator.run([[y_pred, y_true]])
+    confusion_matrix = state.metrics['confusion_matrix']
+    actual_axis, pred_axis = confusion_matrix.shape
+    IOU_dict = {}
+    eps = 1e-15
+    for actual_idx in range(actual_axis):
+        total_actual_num = sum(confusion_matrix[actual_idx])
+        total_predict_num = sum(confusion_matrix[:, actual_idx])
+        dice_coeff = 2 * confusion_matrix[actual_idx, actual_idx] / (total_actual_num + total_predict_num + eps)
+        IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
+    # showing
+    print(f'\n confusion matrix : {confusion_matrix}')
+    print(f'\n IOU : {IOU_dict}')
 
-                        if args.image_processor == 'pvt':
-                            output = condition_model(batch["image_condition"])
-                            encoder_hidden_states = vision_head(output)
-
-                        elif args.image_processor == 'vit':
-                            with torch.no_grad():
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
-                    else:
-                        with torch.set_grad_enabled(True):
-                            if args.image_processor == 'pvt':
-                                output = condition_model(batch["image_condition"])
-                                # encoder hidden states is dictionary
-                                encoder_hidden_states = vision_head(output)
-                            elif args.image_processor == 'vit':
-
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
-
-                if args.use_text_condition:
-                    with torch.set_grad_enabled(True):
-                        encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                            "last_hidden_state"]  # [batch, 77, 768]
-
-            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-            gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
-
-            with torch.no_grad():
-                # image = [1,3,512,512]
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            with torch.set_grad_enabled(True):
-                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
-                    if encoder_hidden_states.dim() != 3:
-                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                    if encoder_hidden_states.dim() != 3:
-                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type = position_embedder).sample
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0]  # head, pix_num, dim
-                res = int(query.shape[1] ** 0.5)
-                if args.text_before_query:
-                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                else:
-                    query = query.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()
-                q_dict[res] = query
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-            # [1] feature generation
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-            # [2] segmentation head
-            masks_pred = segmentation_head.segment_feature(features)                # [1,2,  256,256]
-            # ----------------------------------------------------------------------------------------------------------- #
-            #masks_pred = torch.softmax(masks_pred, dim=1)
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
-                                                                           masks_pred.shape[-1]).contiguous()
-            if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
-                                   target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
-            else:
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                # [5.3] Dice Loss
-                if args.use_dice_loss:
-                    dice_loss = loss_Dice(masks_pred, gt)
-                    loss += dice_loss
-                    loss_dict['dice_loss'] = dice_loss.item()
-                loss = loss.mean()
-            # ----------------------------------------------------------------------------------------------------------- #
-            # why does it takes so much time ... ?
-            # is there any other way to accelerate this process ?
-
-            # [1] position
-            anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1) # batch, 1, 256, 256
-            anomal_map = anomal_map.flatten()  #
-            non_zero_index = torch.nonzero(anomal_map).flatten() # class 1 index
-
-            # [2] raw feature
-            feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
-            anomal_feat = feat[non_zero_index, :]  # [512,160]
-
-            """
-            mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
-            std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
-
-            # [3] generate virtual feature
-            batch, dim = features.shape[0], features.shape[1] # batch, 160
-            sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
-            """
-            random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
-            pseudo_sample = anomal_generator(random_feature)
-            # mae loss
-
-            if args.anomal_mse_loss :
-                anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
-                                                           pseudo_sample.float(), reduction="none").mean()
-            elif args.anomal_kl_loss :
-                # https://engineer-mole.tistory.com/91
-
-                a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
-                a_var = anomal_feat.var(dim=0).unsqueeze(1).unsqueeze(0)
-                a_logvar = torch.log(a_var + 1e-8)
-
-                z_mu = pseudo_sample.mean(dim=0)
-                z_var = pseudo_sample.var(dim=0)
-                z_logvar = torch.log(z_var + 1e-8)
-
-                kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
-                anomal_loss = kl_loss.mean()
-
-            #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
-            # generate anomal from [pix_num, 160]
-            random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
-            pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
-            # pseudo_sample = [256*256, 160] -> [160, 256*256]
-            dim = pseudo_sample.shape[0]
-            pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
-            # 1, 160, 265, 265
-            real_label = batch['gt']
-            pseudo_label = torch.ones_like(real_label)
-            pseudo_label[:, 0, :, :] = 0 # all class 1 samples
-            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
-
-            # dice ce loss not with softmax (because it do manually)
-
-            #pseudo_loss = loss_dicece(input=torch.softmax(pseudo_masks_pred, dim=1),  # [class, 256,256]
-            #                          target=pseudo_label.to(dtype=weight_dtype,
-            #                                                 device=accelerator.device))  # [class, 256,256]
-            pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
-                                      target=pseudo_label.to(dtype=weight_dtype,
-                                                             device=accelerator.device))  # [class, 256,256]
-            if args.online_pseudo_loss :
-                loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
-
-            loss = loss.mean()
-            current_loss = loss.detach().item()
-
-            if epoch == args.start_epoch:
-                loss_list.append(current_loss)
-            else:
-                epoch_loss_total -= loss_list[step]
-                loss_list[step] = current_loss
-            epoch_loss_total += current_loss
-            avr_loss = epoch_loss_total / len(loss_list)
-            loss_dict['avr_loss'] = avr_loss
-            accelerator.backward(loss)
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad(set_to_none=True)
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
-            if is_main_process:
-                progress_bar.set_postfix(**loss_dict)
-            if global_step >= args.max_train_steps:
-                break
-
-        # ----------------------------------------------------------------------------------------------------------- #
-        accelerator.wait_for_everyone()
-        if is_main_process:
-            saving_epoch = str(epoch + 1).zfill(6)
-            save_model(args,
-                       saving_folder='model',
-                       saving_name=f'lora-{saving_epoch}.safetensors',
-                       unwrapped_nw=accelerator.unwrap_model(network),
-                       save_dtype=save_dtype)
-            save_model(args,
-                       saving_folder='segmentation',
-                       saving_name=f'segmentation-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(segmentation_head),
-                       save_dtype=save_dtype)
-            if args.reducing_redundancy :
-                save_model(args,
-                           saving_folder='reduction_net',
-                           saving_name=f'reduction-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(reduction_net),
-                           save_dtype=save_dtype)
-            if args.use_position_embedder :
-                save_model(args,
-                           saving_folder='position_embedder',
-                           saving_name=f'position-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
-                           save_dtype=save_dtype)
-            if args.image_processor == 'pvt' :
-                save_model(args,
-                           saving_folder='vision_head',
-                           saving_name=f'vision-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(vision_head),
-                           save_dtype=save_dtype)
-
-
-        # ----------------------------------------------------------------------------------------------------------- #
-        # [7] evaluate
-        loader = test_dataloader
-        if args.check_training:
-            print(f'test with training data')
-            loader = train_dataloader
-
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head,
-                                                           loader,
-                                                           accelerator.device,
-                                                           condition_model,
-                                                           unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net,
-                                                           position_embedder, vision_head, args)
-
-        # saving
-        if is_main_process:
-            print(f'  - precision dictionary = {score_dict}')
-            print(f'  - confusion_matrix = {confusion_matrix}')
-            confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
-            with open(confusion_save_dir, 'a') as f:
-                f.write(f' epoch = {epoch + 1} \n')
-                for i in range(len(confusion_matrix)):
-                    for j in range(len(confusion_matrix[i])):
-                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                    f.write('\n')
-                f.write('\n')
-
-            score_save_dir = os.path.join(args.output_dir, 'score.txt')
-            with open(score_save_dir, 'a') as f:
-                dices = []
-                f.write(f' epoch = {epoch + 1} | ')
-                for k in score_dict:
-                    dice = float(score_dict[k])
-                    f.write(f'class {k} = {dice} ')
-                    dices.append(dice)
-                dice_coeff = sum(dices) / len(dices)
-                f.write(f'| dice_coeff = {dice_coeff}')
-                f.write(f'\n')
-    accelerator.end_training()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -590,6 +312,7 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_loss_weight", type=float, default=1)
     parser.add_argument("--anomal_mse_loss", action='store_true')
     parser.add_argument("--anomal_kl_loss", action='store_true')
+    parser.add_argument("--anomal_generator_weights", type=str)
 
     args = parser.parse_args()
     passing_argument(args)
