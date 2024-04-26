@@ -20,7 +20,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --network_dim 144 --network_alpha 4 \
  --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/model/lora-000022.safetensors" \
  --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/position_embedder/position-000022.pt" \
- --anomal_generator_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/anomal_generator/anomal-000022.pt" \
+ --anomal_generator_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${save_folder}/anomal_generator/anomal-000001.pt" \
  --resize_shape 512 \
  --latent_res 64 \
  --trigger_word "${trigger_word}" \
