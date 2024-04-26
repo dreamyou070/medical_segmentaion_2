@@ -28,9 +28,9 @@ class DiagonalGaussianDistribution(object):
             N = parameters.shape[0]
             self.parameters = self.parameters[N:,:]
 
-    def sample(self, mask_res):
+    def sample(self, mask_res, weight_dtype, device):
 
-        sample = torch.randn((mask_res * mask_res, 160))
+        sample = torch.randn((mask_res * mask_res, 160)).to(weight_dtype=weight_dtype, device=device)
         x = self.mean + self.std * sample
         return x
 
