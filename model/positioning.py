@@ -10,9 +10,6 @@
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-import backbone.resnet.resnet as resnet
 
 
 ###################################################################
@@ -84,32 +81,45 @@ class SA_Block(nn.Module):
 # ##################### Positioning Module ########################
 ###################################################################
 class Positioning(nn.Module):
-    def __init__(self, channel):
+    def __init__(self, channel, use_channel_attn):
         super(Positioning, self).__init__()
         self.channel = channel
-        self.cab = CA_Block(self.channel)
+        self.use_channel_attn = use_channel_attn
+        if self.use_channel_attn:
+            self.cab = CA_Block(self.channel)
         self.sab = SA_Block(self.channel)
         self.map = nn.Conv2d(self.channel, 1, 7, 1, 3) # as if average pooling
 
     def forward(self, x):
-        cab = self.cab(x)
-        sab = self.sab(cab)
+        if self.use_channel_attn:
+            x = self.cab(x) # is like self attntion
+        print(f'channel attn output = {x.shape}')
+        sab = self.sab(x)
         return sab
 
 class AllPositioning(nn.Module):
 
 
     layer_names = {'up_blocks_1_attentions_2_transformer_blocks_0_attn2':1280,
-                           'up_blocks_2_attentions_2_transformer_blocks_0_attn2': 640,
-                           'up_blocks_3_attentions_2_transformer_blocks_0_attn2': 320,}
+                   'up_blocks_2_attentions_2_transformer_blocks_0_attn2': 640,
+                   'up_blocks_3_attentions_2_transformer_blocks_0_attn2': 320,}
 
-    def __init__(self):
+    def __init__(self, use_channel_attn):
         super(AllPositioning, self).__init__()
 
         self.position_net = {}
         for layer_name in self.layer_names.keys():
-            self.position_net[layer_name] = Positioning(int(self.layer_names[layer_name]))
+            self.position_net[layer_name] = Positioning(int(self.layer_names[layer_name]), use_channel_attn)
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
         return net(x)
+
+
+#x16_out = torch.randn(1, 1280, 16, 16)
+#x32_out = torch.randn(1, 640, 32, 32)
+#x64_out = torch.randn(1, 320, 64, 64)
+
+#y16_out = net(x16_out, 'up_blocks_1_attentions_2_transformer_blocks_0_attn2')
+#y32_out = net(x32_out, 'up_blocks_2_attentions_2_transformer_blocks_0_attn2')
+#y64_out = net(x64_out, 'up_blocks_3_attentions_2_transformer_blocks_0_attn2')

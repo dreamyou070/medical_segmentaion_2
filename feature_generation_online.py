@@ -57,7 +57,7 @@ def main(args):
     position_embedder = None
     if args.use_position_embedder :
         from model.pe import AllPositionalEmbedding
-        position_embedder = AllPositionalEmbedding()
+        position_embedder = AllPositioning(use_channel_attn=args.use_channel_attn)
 
     from model.positioning import AllPositioning
     positioning_module = None
@@ -607,7 +607,7 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_mse_loss", action='store_true')
     parser.add_argument("--anomal_kl_loss", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
-
+    parser.add_argument("--use_channel_attn", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
