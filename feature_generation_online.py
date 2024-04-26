@@ -21,7 +21,7 @@ from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from model.reduction_model import ReductionNet
 from model.vision_condition_head import vision_condition_head
-
+from utils.anomal_sample_sampler import DiagonalGaussianDistribution
 # image conditioned segmentation mask generating
 
 def main(args):
@@ -292,6 +292,12 @@ def main(args):
             feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
             anomal_feat = feat[non_zero_index, :]  # [512,160]
 
+
+            if step == 0:
+                generator = DiagonalGaussianDistribution(parameters=anomal_feat)
+            else:
+                generator.update(parameters=anomal_feat)
+
             """
             mean = torch.mean(anomal_feat, dim=0).unsqueeze(1) # [160,1=pixel]
             std = torch.std(anomal_feat, dim=0).unsqueeze(1)   # [160,1=pixel]
@@ -299,11 +305,12 @@ def main(args):
             # [3] generate virtual feature
             batch, dim = features.shape[0], features.shape[1] # batch, 160
             sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
-            """
+            
 
 
             random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
             pseudo_sample = anomal_generator(random_feature) # ****************************************************** #
+            
 
             # mae loss
             if args.anomal_small_loss :
@@ -323,9 +330,10 @@ def main(args):
 
                     kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
                     anomal_loss = kl_loss.mean()
-
+            """
+            random_feature = generator.sample(mask_res=args.mask_res)
             # [2] anomal big feature
-            random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
+            #random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
             pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
             dim = pseudo_sample.shape[0]
             pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
