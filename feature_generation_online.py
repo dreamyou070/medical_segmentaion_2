@@ -331,7 +331,7 @@ def main(args):
                     kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
                     anomal_loss = kl_loss.mean()
             """
-            random_feature = generator.sample(mask_res=args.mask_res)
+            random_feature = generator.sample(mask_res=args.mask_res).to(dtype=weight_dtype, device=device)
             # [2] anomal big feature
             #random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
             pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
