@@ -95,7 +95,6 @@ class Focus(nn.Module):
 
         # [1] upscaling
         up = self.up(y)
-        print(up.shape)
 
         # [2] in_map controlling
         input_map = self.input_map(in_map) # upscaling (from low resolution to high resolution)
