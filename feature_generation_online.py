@@ -300,50 +300,49 @@ def main(args):
             batch, dim = features.shape[0], features.shape[1] # batch, 160
             sample = torch.randn(batch, dim, args.mask_res * args.mask_res).to(device=device, dtype=weight_dtype)
             """
+
+
             random_feature = torch.randn_like(anomal_feat).to(dtype=weight_dtype,device = device) # pix_num, dim
-            pseudo_sample = anomal_generator(random_feature)
+            pseudo_sample = anomal_generator(random_feature) # ****************************************************** #
+
             # mae loss
+            if args.anomal_small_loss :
+                if args.anomal_mse_loss :
+                    anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
+                                                               pseudo_sample.float(), reduction="none").mean()
+                elif args.anomal_kl_loss :
+                    # https://engineer-mole.tistory.com/91
 
-            if args.anomal_mse_loss :
-                anomal_loss = torch.nn.functional.mse_loss(anomal_feat.float(), # [num, 160]
-                                                           pseudo_sample.float(), reduction="none").mean()
-            elif args.anomal_kl_loss :
-                # https://engineer-mole.tistory.com/91
+                    a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
+                    a_var = anomal_feat.var(dim=0).unsqueeze(1).unsqueeze(0)
+                    a_logvar = torch.log(a_var + 1e-8)
 
-                a_mu = anomal_feat.mean(dim=0).unsqueeze(1).unsqueeze(0)
-                a_var = anomal_feat.var(dim=0).unsqueeze(1).unsqueeze(0)
-                a_logvar = torch.log(a_var + 1e-8)
+                    z_mu = pseudo_sample.mean(dim=0)
+                    z_var = pseudo_sample.var(dim=0)
+                    z_logvar = torch.log(z_var + 1e-8)
 
-                z_mu = pseudo_sample.mean(dim=0)
-                z_var = pseudo_sample.var(dim=0)
-                z_logvar = torch.log(z_var + 1e-8)
+                    kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
+                    anomal_loss = kl_loss.mean()
 
-                kl_loss = (z_logvar - a_logvar - 0.5) + (a_var + (a_mu - z_mu).pow(2)) / (2 * z_var)
-                anomal_loss = kl_loss.mean()
-
-            #pseudo_sample = (mean + std * sample).view(batch, dim, args.mask_res, args.mask_res).contiguous().to(device=device, dtype=weight_dtype)
-            # generate anomal from [pix_num, 160]
+            # [2] anomal big feature
             random_feature = torch.randn((args.mask_res*args.mask_res, 160)).to(dtype=weight_dtype, device = device)
             pseudo_sample = anomal_generator(random_feature).permute(1,0).contiguous()
-            # pseudo_sample = [256*256, 160] -> [160, 256*256]
             dim = pseudo_sample.shape[0]
             pseudo_feature = pseudo_sample.view(dim, args.mask_res, args.mask_res).contiguous().unsqueeze(0) # 1, 160, 265,265
-            # 1, 160, 265, 265
             real_label = batch['gt']
             pseudo_label = torch.ones_like(real_label)
             pseudo_label[:, 0, :, :] = 0 # all class 1 samples
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
-
-            # dice ce loss not with softmax (because it do manually)
-
-            #pseudo_loss = loss_dicece(input=torch.softmax(pseudo_masks_pred, dim=1),  # [class, 256,256]
-            #                          target=pseudo_label.to(dtype=weight_dtype,
-            #                                                 device=accelerator.device))  # [class, 256,256]
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype,
                                                              device=accelerator.device))  # [class, 256,256]
+
+            # [3]
             if args.online_pseudo_loss :
-                loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
+                if args.anomal_small_loss:
+                    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
+                else :
+                    loss = loss + pseudo_loss * args.pseudo_loss_weight
 
             loss = loss.mean()
             current_loss = loss.detach().item()
@@ -591,7 +590,7 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_loss_weight", type=float, default=1)
     parser.add_argument("--anomal_mse_loss", action='store_true')
     parser.add_argument("--anomal_kl_loss", action='store_true')
-
+    parser.add_argument("--anomal_small_loss", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

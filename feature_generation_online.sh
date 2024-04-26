@@ -1,14 +1,14 @@
 # !/bin/bash
 # language 가 분명 작용하는듯 하다.
 
-port_number=53334
+port_number=53335
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="35_pvt_image_encoder_with_position_embedder_mse_generator_loss" #
+file_name="35_pvt_image_encoder_with_position_embedder_mse_generator_loss_without_anomal_small_loss" #
 # --reverse --reducing_redundancy
 accelerate launch --config_file ../../gpu_config/gpu_0_1_2_3_4_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
