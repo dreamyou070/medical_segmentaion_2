@@ -80,13 +80,16 @@ class Positioning(nn.Module):
         if self.use_channel_attn:
             self.cab = CA_Block(self.channel)
         self.sab = SA_Block(self.channel)
-        self.map = nn.Conv2d(self.channel, 1, 7, 1, 3) # as if average pooling
+        self.map =  nn.Conv2d(self.channel, 1, 11, 1, 5)  # as if average pooling
 
     def forward(self, x):
         if self.use_channel_attn:
+            self.cab = self.cab.to(x.device)
             x = self.cab(x) # is like self attntion
+        self.sab = self.sab.to(x.device)
         sab = self.sab(x)
-        return sab
+        global_sab = self.map(sab)
+        return sab + global_sab
 
 class AllPositioning(nn.Module):
 
