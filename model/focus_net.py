@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from segmentation_unet import Up_conv, OutConv
+from model.segmentation_unet import Up_conv, OutConv
 
 
 class Context_Exploration_Block(nn.Module):
