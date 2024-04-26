@@ -26,7 +26,7 @@ class DiagonalGaussianDistribution(object):
         self.std = torch.sqrt(self.var)
         self.logvar = torch.log(self.var)
         self.memory_iter += 1
-        if self.memory_iter % 20 == 0 :
+        if self.memory_iter> 20 :
             N = parameters.shape[0]
             self.parameters = self.parameters[N:,:]
 
