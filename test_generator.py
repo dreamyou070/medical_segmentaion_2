@@ -113,8 +113,6 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 10. Training !')
-    progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
-                        disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
     kl_weight = 1e-6
