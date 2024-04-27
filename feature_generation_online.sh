@@ -1,12 +1,12 @@
 # !/bin/bash
 port_number=53999
-category="medical"
-obj_name="leader_polyp"
-trigger_word="leader_polyp"
-benchmark="Pranet"
+category="camouflaged"
+obj_name="CAMO-V.1.0-CVIU2019_sy"
+trigger_word="CAMO-V.1.0-CVIU2019_sy"
+benchmark="CAMO-V.1.0-CVIU2019_sy"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="41_feature_generation_change_to_latents" # best 0.852
+file_name="1_basis_vit" # best 0.852
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
@@ -26,7 +26,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
- --image_processor 'pvt' \
+ --image_processor 'vit' \
  --image_model_training \
  --use_position_embedder \
  --anomal_mse_loss --online_pseudo_loss \

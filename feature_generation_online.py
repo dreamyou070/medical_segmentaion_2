@@ -190,6 +190,8 @@ def main(args):
 
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pseudo feature
+            # almost impossible
+            """
             gt_64_array = batch['gt_64_array'].squeeze() # [1,64,64]
             non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
             feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
@@ -198,15 +200,21 @@ def main(args):
                 generator = DiagonalGaussianDistribution(parameters=anomal_feat, latent_dim=anomal_feat.shape[-1])
             else:
                 generator.update(parameters=anomal_feat)
-            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,160,256,256]
-            # [2] pseudo label
+            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,4,256,256]
+            # unet feature generating
+            # how to condition ??
+            
+
+
+            # should unet again ?
+            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
+
             pseudo_label = torch.ones_like(batch['gt'])
             pseudo_label[:, 0, :, :] = 0  # all class 1 samples
-            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
                                       target=pseudo_label.to(dtype=weight_dtype, device=accelerator.device))  # [class, 256,256]
+            """
             # ----------------------------------------------------------------------------------------------------------- #
-
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
                     if encoder_hidden_states.dim() != 3:
@@ -262,11 +270,11 @@ def main(args):
             # is there any other way to accelerate this process ?
 
                         # [3]
-            if args.online_pseudo_loss :
+            #if args.online_pseudo_loss :
                 #if args.anomal_small_loss:
                 #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
                 #else :
-                loss = loss + pseudo_loss * args.pseudo_loss_weight
+                #loss = loss + pseudo_loss * args.pseudo_loss_weight
 
             loss = loss.mean()
             current_loss = loss.detach().item()
