@@ -2,8 +2,8 @@
 port_number=53902
 category="camouflaged"
 obj_name="COD10K"
-trigger_word="COD"
-benchmark="COD10K-v3"
+trigger_word="COD10K"
+benchmark="COD10K"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="1_basis_vit" # best 0.852
