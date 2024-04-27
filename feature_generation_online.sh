@@ -1,9 +1,9 @@
 # !/bin/bash
-port_number=53902
+port_number=53912
 category="camouflaged"
-obj_name="COD10k"
-trigger_word="COD10k"
-benchmark="COD10k"
+obj_name="CAMO"
+trigger_word="CAMO"
+benchmark="CAMO"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
 file_name="1_basis_vit" # best 0.852
