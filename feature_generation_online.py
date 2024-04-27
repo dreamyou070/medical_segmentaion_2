@@ -185,34 +185,27 @@ def main(args):
             image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
-
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
-            # [1] get anomal latents only
-            gt_64_array = batch['gt_64_array'].squeeze() # [1,256,256]
+            # ----------------------------------------------------------------------------------------------------------- #
+            # [1] pseudo feature
+            gt_64_array = batch['gt_64_array'].squeeze() # [1,64,64]
             non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
-
-            # [2] raw feature
-            # 1,4,pixel_num -> [4,pixel_num] -> [pixel_num,4]
             feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
             anomal_feat = feat[non_zero_index, :]  # [10,4]
-
-            # generator
             if step == 0:
-                generator = DiagonalGaussianDistribution(parameters=anomal_feat)
-                # no parameter
+                generator = DiagonalGaussianDistribution(parameters=anomal_feat, latent_dim=anomal_feat.shape[-1])
             else:
                 generator.update(parameters=anomal_feat)
-            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device,
-                                              weight_dtype=weight_dtype)  # 256,256
-            real_label = batch['gt']
-            pseudo_label = torch.ones_like(real_label)
+            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,160,256,256]
+            # [2] pseudo label
+            pseudo_label = torch.ones_like(batch['gt'])
             pseudo_label[:, 0, :, :] = 0  # all class 1 samples
             pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
             pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
-                                      target=pseudo_label.to(dtype=weight_dtype,
-                                                             device=accelerator.device))  # [class, 256,256]
+                                      target=pseudo_label.to(dtype=weight_dtype, device=accelerator.device))  # [class, 256,256]
+            # ----------------------------------------------------------------------------------------------------------- #
 
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :

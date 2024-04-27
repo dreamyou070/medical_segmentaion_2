@@ -5,7 +5,7 @@ from typing import Tuple
 
 class DiagonalGaussianDistribution(object):
 
-    def __init__(self, parameters: torch.Tensor):
+    def __init__(self, parameters: torch.Tensor, latent_dim):
 
         self.parameters = parameters # num
         self.mean = parameters.mean(dim=0).unsqueeze(0)
@@ -13,6 +13,7 @@ class DiagonalGaussianDistribution(object):
         self.std = torch.sqrt(self.var)
         self.logvar = torch.log(self.var)
         self.memory_iter = 0
+        self.latent_dim = latent_dim
 
     def update (self, parameters):
         """ update with previous one and new parameters """
@@ -32,10 +33,12 @@ class DiagonalGaussianDistribution(object):
 
     def sample(self, mask_res, device, weight_dtype):
 
-        sample = torch.randn((mask_res * mask_res, 160)).to(dtype=weight_dtype, device=device) # N, 160
+
+
+        sample = torch.randn((mask_res * mask_res, self.latent_dim)).to(dtype=weight_dtype, device=device) # N, 160
         x = (self.mean + self.std * sample).permute(1, 0).contiguous()
         # [256*256, 160] -> [160,256*256] -> [160, 256, 256]
-        x = x.view(160, mask_res, mask_res).unsqueeze(0)
+        x = x.view(self.latent_dim, mask_res, mask_res).unsqueeze(0)
         return x
 
     def kl(self, other: "DiagonalGaussianDistribution" = None) -> torch.Tensor:
