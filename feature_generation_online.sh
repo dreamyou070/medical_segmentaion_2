@@ -1,12 +1,12 @@
 # !/bin/bash
-port_number=53912
+port_number=53922
 category="camouflaged"
 obj_name="CAMO"
 trigger_word="CAMO"
 benchmark="CAMO-V.1.0-CVIU2019_sy"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
-file_name="1_basis_vit" # best 0.852
+file_name="2_basis_pvt" # best 0.852
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
@@ -23,7 +23,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
- --image_model_training --image_processor 'vit' \
+ --image_model_training --image_processor 'pvt' \
  --use_position_embedder \
  --anomal_mse_loss --online_pseudo_loss \
  --use_positioning_module --use_channel_attn \
