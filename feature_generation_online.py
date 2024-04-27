@@ -182,12 +182,38 @@ def main(args):
                                 if args.only_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
 
-            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-            gt = batch['gt'].to(dtype=weight_dtype)            # 1,3,256,256
+            image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
+            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
+            gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
+            # [1] get anomal latents only
+            gt_64_array = batch['gt_64_array'].squeeze() # [1,256,256]
+            non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
+
+            # [2] raw feature
+            # 1,4,pixel_num -> [4,pixel_num] -> [pixel_num,4]
+            feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
+            anomal_feat = feat[non_zero_index, :]  # [10,4]
+
+            # generator
+            if step == 0:
+                generator = DiagonalGaussianDistribution(parameters=anomal_feat)
+                # no parameter
+            else:
+                generator.update(parameters=anomal_feat)
+            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device,
+                                              weight_dtype=weight_dtype)  # 256,256
+            real_label = batch['gt']
+            pseudo_label = torch.ones_like(real_label)
+            pseudo_label[:, 0, :, :] = 0  # all class 1 samples
+            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
+            pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
+                                      target=pseudo_label.to(dtype=weight_dtype,
+                                                             device=accelerator.device))  # [class, 256,256]
+
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
                     if encoder_hidden_states.dim() != 3:
@@ -242,29 +268,7 @@ def main(args):
             # why does it takes so much time ... ?
             # is there any other way to accelerate this process ?
 
-            # [1] position
-            anomal_map = gt[:, 1, :, :].contiguous().unsqueeze(1) # batch, 1, 256, 256
-            anomal_map = anomal_map.flatten()  #
-            non_zero_index = torch.nonzero(anomal_map).flatten() # class 1 index
-
-            # [2] raw feature
-            feat = torch.flatten((features), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
-            anomal_feat = feat[non_zero_index, :]  # [512,160]
-
-
-            if step == 0:
-                generator = DiagonalGaussianDistribution(parameters=anomal_feat)
-            else:
-                generator.update(parameters=anomal_feat)
-            pseudo_feature = generator.sample(mask_res=args.mask_res, device = device, weight_dtype=weight_dtype) # 256,256
-            real_label = batch['gt']
-            pseudo_label = torch.ones_like(real_label)
-            pseudo_label[:, 0, :, :] = 0 # all class 1 samples
-            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
-            pseudo_loss = loss_dicece(input=pseudo_masks_pred,   # [class, 256,256]
-                                      target=pseudo_label.to(dtype=weight_dtype,
-                                                             device=accelerator.device))  # [class, 256,256]
-            # [3]
+                        # [3]
             if args.online_pseudo_loss :
                 #if args.anomal_small_loss:
                 #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight

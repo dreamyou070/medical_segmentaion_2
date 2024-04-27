@@ -149,6 +149,7 @@ class TrainDataset_Seg(Dataset):
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
+
         if argument.gt_ext_npy :
             gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
             if self.use_data_aug:
@@ -175,7 +176,12 @@ class TrainDataset_Seg(Dataset):
             gt_arr = np.array(gt_img) # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
-        # [3] make semantic pseudo mal
+        # [3] generate res 64 gt image
+        gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
+        gt_64_array = np.array(gt_64_pil) # [64,64]
+        gt_64_array = np.where(gt_64_array > 100, 1, 0)
+
+
 
         # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
@@ -277,7 +283,8 @@ class TrainDataset_Seg(Dataset):
                 "gt_flat" : gt_flat,            # [128*128]
                 "input_ids": input_ids,
                 'caption' : caption,
-                "image_condition" : image_condition} # [197,1]
+                "image_condition" : image_condition,
+                'gt_64_array' : gt_64_array} # [197,1]
 
 
 class TestDataset_Seg(Dataset):
