@@ -171,6 +171,62 @@ class SpatialAttention(nn.Module):
         return prediction1_8, prediction2_8
 
 
+class PolypPVT(nn.Module):
+
+    def __init__(self, channel=32):
+        super(PolypPVT, self).__init__()
+
+        self.backbone = pvt_v2_b2()  # [64, 128, 320, 512]
+        path = r'/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/pretrained_pth/pvt_v2_b2.pth'
+
+        save_model = torch.load(path)
+        model_dict = self.backbone.state_dict()
+        state_dict = {k: v for k, v in save_model.items() if k in model_dict.keys()}
+        model_dict.update(state_dict)
+        self.backbone.load_state_dict(model_dict)
+
+        self.Translayer2_0 = BasicConv2d(64, channel, 1)
+        self.Translayer2_1 = BasicConv2d(128, channel, 1)
+        self.Translayer3_1 = BasicConv2d(320, channel, 1)
+        self.Translayer4_1 = BasicConv2d(512, channel, 1)
+
+        self.CFM = CFM(channel)
+        self.ca = ChannelAttention(64)
+        self.sa = SpatialAttention()
+        self.SAM = SAM()
+
+        self.down05 = nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)
+        self.out_SAM = nn.Conv2d(channel, 1, 1)
+        self.out_CFM = nn.Conv2d(channel, 1, 1)
+
+    def forward(self, x):
+        # backbone
+        pvt = self.backbone(x)
+        x1 = pvt[0]
+        x2 = pvt[1]
+        x3 = pvt[2]
+        x4 = pvt[3]
+
+        # CIM
+        x1 = self.ca(x1) * x1  # channel attention
+        cim_feature = self.sa(x1) * x1  # spatial attention
+
+        # [1] CFM feature
+        x2_t = self.Translayer2_1(x2)
+        x3_t = self.Translayer3_1(x3)
+        x4_t = self.Translayer4_1(x4)
+        cfm_feature = self.CFM(x4_t, x3_t, x2_t)
+        prediction1 = self.out_CFM(cfm_feature)
+        prediction1_8 = F.interpolate(prediction1, scale_factor=8, mode='bilinear')
+
+        # [2] SAM
+        T2 = self.Translayer2_0(cim_feature)
+        T2 = self.down05(T2)
+        sam_feature = self.SAM(cfm_feature, T2)
+        prediction2 = self.out_SAM(sam_feature)
+        prediction2_8 = F.interpolate(prediction2, scale_factor=8, mode='bilinear')
+
+        return prediction1_8, prediction2_8
 """
 if __name__ == '__main__':
     model = PolypPVT().cuda() # image should have [352,352]
