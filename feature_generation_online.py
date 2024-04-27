@@ -326,6 +326,13 @@ def main(args):
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
+            if args.use_position_embedder :
+                save_model(args,
+                            saving_folder='positioning_module',
+                            saving_name=f'positioning-{saving_epoch}.pt',
+                            unwrapped_nw=accelerator.unwrap_model(positioning_module),
+                            save_dtype=save_dtype)
+
             """
             save_model(args,
                        saving_folder='anomal_generator',

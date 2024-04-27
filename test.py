@@ -55,23 +55,10 @@ def main(args):
     pure_path = os.path.split(args.segmentation_head_weights)[-1]
     pure_path = os.path.splitext(pure_path)[0]
     num = pure_path.split('-')[-1]
-    print(f' (4) reduction_net')
-    reduction_net = None
-    if args.reducing_redundancy:
-        reduction_net = ReductionNet(cross_dim=768,
-                                     class_num=args.n_classes,
-                                     use_weighted_reduct = args.use_weighted_reduct,)
-        # loading
-        reduction_folder = os.path.join(args.output_dir, 'reduction_net')
-        reduction_file = os.path.join(reduction_folder, f'reduction-{num}.pt')
-        reduction_net.load_state_dict(torch.load(reduction_file))
-        reduction_net.to(dtype=weight_dtype, device=accelerator.device)
-
     print(f' (5) position_embedder')
     position_embedder = None
     if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding()
-        # loading
         position_embedder_folder = os.path.join(args.output_dir, 'position_embedder')
         position_embedder_file = os.path.join(position_embedder_folder, f'position-{num}.pt')
         position_embedder.load_state_dict(torch.load(position_embedder_file))
@@ -98,14 +85,24 @@ def main(args):
         vision_head_file = os.path.join(vision_head_folder, f'vision-{num}.pt')
         vision_head.load_state_dict(torch.load(vision_head_file))
         vision_head.to(dtype=weight_dtype, device=accelerator.device)
-
+    positioning_module = None
+    if args.use_positioning_module:
+        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn, )
+        positioning_module_folder = os.path.join(args.output_dir, 'position_embedder')
+        positioning_module_file = os.path.join(positioning_module_folder, f'position-{num}.pt')
+        positioning_module.load_state_dict(torch.load(positioning_module_file))
+        positioning_module.to(dtype=weight_dtype, device=accelerator.device)
 
 
     print(f' step 2. check data path')
     if not args.inference_with_training_data :
         save_base = os.path.join(args.output_dir, 'thesis_output')
         os.makedirs(save_base, exist_ok=True)
-        for _data_name in ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']:
+        if args.obj_name == 'leader_polyp':
+            folders= ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']
+        else :
+            folders = ['test']
+        for _data_name in folders :
 
             # [1] data_path here
             data_path = os.path.join(args.base_path, _data_name)
@@ -147,16 +144,6 @@ def main(args):
                                         output, pix_embedding = condition_model(**batch["image_condition"])
                                         encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
 
-
-
-
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
-
                     if args.use_text_condition:
                         with torch.set_grad_enabled(True):
                             encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
@@ -167,6 +154,47 @@ def main(args):
                     # [2] gt image
                     gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
                     gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
+
+                    with torch.no_grad():
+                        latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                        if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
+                            if encoder_hidden_states.dim() != 3:
+                                encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                            if encoder_hidden_states.dim() != 3:
+                                encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                        unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                             noise_type=position_embedder).sample
+                    query_dict, key_dict = controller.query_dict, controller.key_dict
+                    controller.reset()
+                    q_dict = {}
+                    for layer in args.trg_layer_list:
+                        query = query_dict[layer][0]  # head, pix_num, dim
+                        res = int(query.shape[1] ** 0.5)
+                        if args.text_before_query:
+                            query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                        else:
+                            query = query.reshape(1, res, res, -1)
+                            query = query.permute(0, 3, 1, 2).contiguous()
+                        if args.use_positioning_module:
+                            query, global_feat = positioning_module(query, layer_name=layer)
+                            if res == 16:
+                                global_attn = global_feat
+                        q_dict[res] = query
+
+                    x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+                    if args.use_simple_segmodel:
+                        _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                        # [2] segmentation head
+                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+                    else:
+                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out,
+                                                                 global_attn)  # [1,160,256,256]
+                        # [2] segmentation head
+                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+
+
+
                     #gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
                     #gt = gt.view(-1, gt.shape[-1]).contiguous()
                     with torch.no_grad():
@@ -558,6 +586,7 @@ if __name__ == '__main__' :
     parser.add_argument("--inference_with_training_data", action='store_true')
     parser.add_argument("--use_position_embedding", action='store_true')
     parser.add_argument("--reverse", action='store_true')
+    parser.add_argument("--use_positioning_module", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataloader import passing_mvtec_argument
