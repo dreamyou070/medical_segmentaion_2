@@ -108,12 +108,15 @@ class AllPositioning(nn.Module):
 
         self.position_net = {}
         for layer_name in self.layer_names.keys():
-            if use_self_attn:
-                self.position_net[layer_name] = Positioning(channel = int(self.self_layer_names[layer_name]),
-                                                            use_channel_attn = use_channel_attn)
-            else:
-                self.position_net[layer_name] = Positioning(channel = int(self.layer_names[layer_name]),
-                                                            use_channel_attn=use_channel_attn)
+
+            print(f'self.self_layer_names[layer_name] = {self.self_layer_names[layer_name]}')
+
+            #if use_self_attn:
+            #    self.position_net[layer_name] = Positioning(channel = int(self.self_layer_names[layer_name]),
+            #                                                use_channel_attn = use_channel_attn)
+            #else:
+            #    self.position_net[layer_name] = Positioning(channel = int(self.layer_names[layer_name]),
+            #                                                use_channel_attn=use_channel_attn)
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
