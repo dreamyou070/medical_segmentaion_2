@@ -54,7 +54,8 @@ def evaluation_check(segmentation_head,
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_64_flat'].to(dtype=weight_dtype)  # 1,64*64
+            #gt_flat = batch['gt_64_flat'].to(dtype=weight_dtype)  # 1,64*64
+            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,64*64
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
