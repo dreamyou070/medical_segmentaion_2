@@ -243,13 +243,13 @@ class AllPositioning(nn.Module):
                                                n_classes = n_classes)
 
     def forward(self, x, layer_name):
-        net = self.position_net[layer_name]
+        net = self.position_net[layer_name].to(x.device)
         # generate spatial attention result and global_feature
         x, global_feat = net(x)
         return x, global_feat
 
     def predict_seg(self,channel_attn_query, spatial_attn_query, layer_name, in_map) :
-        focus_net = self.focus_net[layer_name]
+        focus_net = self.focus_net[layer_name].to(channel_attn_query.device)
         mask_pred, focus_map = focus_net(channel_attn_query, spatial_attn_query, in_map)
         return mask_pred, focus_map
 
