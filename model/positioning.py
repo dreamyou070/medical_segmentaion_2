@@ -236,6 +236,7 @@ class AllPositioning(nn.Module):
                                                         use_channel_attn = use_channel_attn)
         # ------------------------------------------------------------------------------------------
         # [2] focus network
+        self.focus_net = {}
         for layer_name in layer_names.keys():
             self.focus_net[layer_name] = Focus(channel1 = int(layer_names[layer_name]),
                                                channel2 = int(layer_names[layer_name]),
