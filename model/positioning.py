@@ -107,17 +107,14 @@ class AllPositioning(nn.Module):
         super(AllPositioning, self).__init__()
 
         self.position_net = {}
-        for layer_name in self.layer_names.keys():
-
-            print(f'self.self_layer_names[layer_name] = {self.self_layer_names[layer_name]}')
-
-            #if use_self_attn:
-            #    self.position_net[layer_name] = Positioning(channel = int(self.self_layer_names[layer_name]),
-            #                                                use_channel_attn = use_channel_attn)
-            #else:
-            #    self.position_net[layer_name] = Positioning(channel = int(self.layer_names[layer_name]),
-            #                                                use_channel_attn=use_channel_attn)
-
+        if use_self_attn:
+            layer_names = self.self_layer_names
+        else:
+            layer_names = self.layer_names
+        for layer_name in layer_names.keys():
+            self.position_net[layer_name] = Positioning(channel = int(layer_names[layer_name]),
+                                                        use_channel_attn = use_channel_attn)
+            
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
         # generate spatial attention result and global_feature
