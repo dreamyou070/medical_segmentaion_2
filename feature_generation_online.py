@@ -126,10 +126,12 @@ def main(args):
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
     unet, network = transform_models_if_DDP([unet, network])
-    segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    if args.use_segmentation_model:
+        segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
-        segmentation_head.train()
+        if args.use_segmentation_model:
+            segmentation_head.train()
         for t_enc in condition_models:
             t_enc.train()
             if args.train_text_encoder:

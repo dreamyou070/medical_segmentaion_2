@@ -13,8 +13,8 @@ def evaluation_check(segmentation_head,
                      device,
                      condition_model, unet, vae, controller, weight_dtype, epoch,
                      reduction_net, position_embedder, vision_head, positioning_module, args):
-
-    segmentation_head.eval()
+    if args.use_segmentation_model :
+        segmentation_head.eval()
 
     with torch.no_grad():
         y_true_list, y_pred_list = [], []
@@ -155,5 +155,6 @@ def evaluation_check(segmentation_head,
             dice_coeff = 2 * confusion_matrix[actual_idx, actual_idx] / (total_actual_num + total_predict_num + eps)
             IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
         # [1] WC Score
-    segmentation_head.train()
+    if args.use_segmentation_model :
+        segmentation_head.train()
     return IOU_dict, confusion_matrix, dice_coeff
