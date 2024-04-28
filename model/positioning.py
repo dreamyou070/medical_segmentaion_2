@@ -98,9 +98,10 @@ class AllPositioning(nn.Module):
     layer_names = {'up_blocks_1_attentions_2_transformer_blocks_0_attn2':1280,
                    'up_blocks_2_attentions_2_transformer_blocks_0_attn2': 640,
                    'up_blocks_3_attentions_2_transformer_blocks_0_attn2': 320,}
-    self_layer_names = {'up_blocks_1_attentions_2_transformer_blocks_0_attn1':1280,
-                        'up_blocks_2_attentions_2_transformer_blocks_0_attn1': 640,
-                        'up_blocks_3_attentions_2_transformer_blocks_0_attn1': 320,}
+
+    self_layer_names = {'up_blocks_1_attentions_2_transformer_blocks_0_attn1' : 1280,
+                        'up_blocks_2_attentions_2_transformer_blocks_0_attn1' : 640,
+                        'up_blocks_3_attentions_2_transformer_blocks_0_attn1' : 320,}
 
     def __init__(self, use_channel_attn, use_self_attn=False):
         super(AllPositioning, self).__init__()
@@ -108,9 +109,11 @@ class AllPositioning(nn.Module):
         self.position_net = {}
         for layer_name in self.layer_names.keys():
             if use_self_attn:
-                self.position_net[layer_name] = Positioning(int(self.self_layer_names[layer_name]), use_channel_attn)
+                self.position_net[layer_name] = Positioning(channel = int(self.self_layer_names[layer_name]),
+                                                            use_channel_attn = use_channel_attn)
             else:
-                self.position_net[layer_name] = Positioning(int(self.layer_names[layer_name]), use_channel_attn)
+                self.position_net[layer_name] = Positioning(channel = int(self.layer_names[layer_name]),
+                                                            use_channel_attn=use_channel_attn)
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]

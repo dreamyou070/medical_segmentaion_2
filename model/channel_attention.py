@@ -27,7 +27,7 @@ import torch
 # max_pool = spatial dimension max num
 input = torch.randn(1,4,64,64)
 avg_pool = nn.AdaptiveAvgPool2d(1)
-print(avg_pool.weight)
+#print(avg_pool.weight)
 #output = avg_pool(input)
 #print(output.shape)
 
