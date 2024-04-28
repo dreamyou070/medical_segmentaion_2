@@ -18,6 +18,7 @@ from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
 from torchvision import transforms
 from model.vision_condition_head import vision_condition_head
+from model.positioning import AllPositioning
 def eval_step(engine, batch):
     return batch
 def torch_to_pil(torch_img):
