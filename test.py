@@ -588,6 +588,7 @@ if __name__ == '__main__' :
     parser.add_argument("--reverse", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
+    parser.add_argument("--use_simple_segmodel", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataloader import passing_mvtec_argument

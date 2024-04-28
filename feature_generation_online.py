@@ -530,7 +530,6 @@ if __name__ == "__main__":
     parser.add_argument("--anomal_kl_loss", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
-    parser.add_argument("--use_simple_segmodel", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
