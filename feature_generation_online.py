@@ -233,7 +233,9 @@ def main(args):
             q_dict = {}
             for layer in args.trg_layer_list:
                 # self attention is too week ?
+                # didnot use spatial attention ...
                 query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
+                print(f'query = {query.shape}, channel_attn_query = {channel_attn_query.shape}')
                 res = int(query.shape[1] ** 0.5)
                 if args.test_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim

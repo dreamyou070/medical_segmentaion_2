@@ -26,9 +26,9 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 hidden_states = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
-            if trg_layer_list is not None and layer_name in trg_layer_list:
+            #if trg_layer_list is not None and layer_name in trg_layer_list:
                 # [1] before channel attn, [Batch, pix_num, dim]
-                controller.save_query(query, layer_name)
+             #   controller.save_query(query, layer_name)
 
             context = context if context is not None else hidden_states
             if type(context) == dict :
@@ -46,12 +46,13 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 key = key.float()
 
             """ Second Trial """
-            #if trg_layer_list is not None and layer_name in trg_layer_list and argument.test_before_query :
-                # saving query before attn
-            #    controller.save_query((query * self.scale),layer_name) # query = batch, seq_len, dim
-            attention_scores = torch.baddbmm(
-                torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
-                query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
+            if trg_layer_list is not None and layer_name in trg_layer_list :
+                # batch=8, seq_len, dim
+                controller.save_query((query * self.scale),layer_name) # query = batch, seq_len, dim
+
+            attention_scores = torch.baddbmm(torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
+                                             query,
+                                             key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
             #if trg_layer_list is not None and layer_name in trg_layer_list :
                 # pix_num, pix_num
@@ -63,7 +64,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             if trg_layer_list is not None and layer_name in trg_layer_list:
                 # [2] after channel attn [Batch, pix_num, dim]
                 controller.save_query(hidden_states, layer_name)
-
             hidden_states = self.to_out[0](hidden_states)
             # it does not add original query again
             return hidden_states
