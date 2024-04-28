@@ -2,7 +2,7 @@
 
 port_number=50052
 category="camouflaged"
-obj_name="CAMO-V.1.0-CVIU2019_sy"
+obj_name="CAMO"
 benchmark="CAMO-V.1.0-CVIU2019_sy"
 layer_name='layer_3'
 sub_folder="up_16_32_64"
