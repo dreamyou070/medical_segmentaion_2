@@ -108,7 +108,6 @@ def evaluation_check(segmentation_head,
                     query, global_feat = positioning_module(query, layer_name=layer)
                     spatial_attn_query = query
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
-                # I do not think it can make good prediction
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
                 if focus_map is None:
@@ -120,11 +119,27 @@ def evaluation_check(segmentation_head,
                                                                  spatial_attn_query=spatial_attn_query,
                                                                  layer_name=layer,
                                                                  in_map=focus_map)
+                q_dict[res] = pred
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
                 # mask prediction
-            masks_pred = pred
+                # loss = loss_dicece(input = pred,  # [class, 256,256]
+                #                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype))  # [class, 256,256]
+                # total_loss += loss.mean()
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+
+            if args.use_simple_segmodel:
+                _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                # [2] segmentation head
+                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+            # else :
+            #    features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
+            # [2] segmentation head
+            #    masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                           masks_pred.shape[-1]).contiguous()
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pred
             class_num = masks_pred.shape[1]  # 4
