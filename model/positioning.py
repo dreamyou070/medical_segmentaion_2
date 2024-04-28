@@ -86,10 +86,10 @@ class Focus(nn.Module):
         self.relu1 = nn.ReLU()
         self.bn2 = nn.BatchNorm2d(self.channel1)
         self.relu2 = nn.ReLU()
-        #self.n_classes = n_classes
-        #self.segment_head = nn.Conv2d(self.channel2,
-        #                              self.n_classes,
-        #                              kernel_size=1)
+        self.n_classes = n_classes
+        self.segment_head = nn.Conv2d(self.channel2,
+                                      self.n_classes,
+                                      kernel_size=1)
 
 
     def forward(self, x, y, in_map):
