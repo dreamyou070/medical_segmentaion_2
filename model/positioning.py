@@ -110,23 +110,16 @@ class Focus(nn.Module):
             b_feature = (1-x)
             fn = self.fn(b_feature)
 
-        self.alpha = self.alpha.to(x.device)
-        self.bn1 = self.bn1.to(x.device)
-        self.beta = self.beta.to(x.device)
-        self.bn2 = self.bn2.to(x.device)
-        self.output_map = self.output_map.to(x.device)
-        self.segment_head = self.segment_head.to(x.device)
-        
         # [4] refine
-        refine1 = y - (self.alpha * fp)
-        refine1 = self.bn1(refine1)
+        refine1 = y - (self.alpha.to(x.device) * fp)
+        refine1 = self.bn1.to(x.device)(refine1)
         refine1 = self.relu1(refine1)
 
-        refine2 = refine1 + (self.beta * fn)
-        refine2 = self.bn2(refine2)
+        refine2 = refine1 + (self.beta.to(x.device) * fn)
+        refine2 = self.bn2.to(x.device)(refine2)
         refine2 = self.relu2(refine2) # [1,320, 64, 64]
-        output_map = self.output_map(refine2)    # [1, 1, 64, 64]
-        segment_out = self.segment_head(refine2) # [1, 2, 64, 64]
+        output_map = self.output_map.to(x.device)(refine2)    # [1, 1, 64, 64]
+        segment_out = self.segment_head.to(x.device)(refine2) # [1, 2, 64, 64]
 
         return segment_out, output_map
 
