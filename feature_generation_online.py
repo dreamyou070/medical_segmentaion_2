@@ -54,13 +54,15 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
-    if args.use_simple_segmodel :
-        segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                          mask_res=args.mask_res,
-                                          use_layer_norm = args.use_layer_norm)
-    else :
-        segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
-                                  use_layer_norm = args.use_layer_norm)
+    segmentation_head = None
+    if args.use_segmentation_model :
+        if args.use_simple_segmodel :
+            segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                              mask_res=args.mask_res,
+                                              use_layer_norm = args.use_layer_norm)
+        else :
+            segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
+                                      use_layer_norm = args.use_layer_norm)
 
     vision_head = None
     if args.image_processor == 'pvt' :
@@ -258,8 +260,9 @@ def main(args):
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
                 # mask prediction
+                res_array_gt = batch['res_array_gt'][0]
                 loss = loss_dicece(input = pred,  # [class, 256,256]
-                                   target= batch['res_array_gt'][res].to(dtype=weight_dtype))  # [class, 256,256]
+                                   target= res_array_gt[res].to(dtype=weight_dtype))  # [class, 256,256]
                 total_loss += loss.mean()
 
             """
@@ -332,11 +335,12 @@ def main(args):
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
-            save_model(args,
-                       saving_folder='segmentation',
-                       saving_name=f'segmentation-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(segmentation_head),
-                       save_dtype=save_dtype)
+            if args.use_segmentation_model :
+                save_model(args,
+                           saving_folder='segmentation',
+                           saving_name=f'segmentation-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                           save_dtype=save_dtype)
 
             if args.use_position_embedder :
                 save_model(args,
@@ -494,7 +498,7 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained_segmentation_model", type=str)
     parser.add_argument("--use_batchnorm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
-    parser.add_argument("--aggregation_model_a", action='store_true')
+
     parser.add_argument("--aggregation_model_b", action='store_true')
     parser.add_argument("--aggregation_model_c", action='store_true')
     parser.add_argument("--aggregation_model_d", action='store_true')
@@ -555,6 +559,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
     parser.add_argument("--use_simple_segmodel", action='store_true')
+    parser.add_argument("--use_segmentation_model", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
