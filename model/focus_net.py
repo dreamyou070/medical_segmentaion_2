@@ -73,7 +73,9 @@ class Focus(nn.Module):
         self.channel2 = channel2
 
         self.up = nn.Sequential(nn.Conv2d(self.channel2, self.channel1, 7, 1, 3),
-                                nn.BatchNorm2d(self.channel1), nn.ReLU(), nn.UpsamplingBilinear2d(scale_factor=2))
+                                nn.BatchNorm2d(self.channel1),
+                                nn.ReLU(),
+                                nn.UpsamplingBilinear2d(scale_factor=2))
 
         self.input_map = nn.Sequential(nn.UpsamplingBilinear2d(scale_factor=2),
                                        nn.Sigmoid())

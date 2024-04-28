@@ -160,16 +160,14 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
-
                         if args.image_processor == 'pvt':
                             output = condition_model(batch["image_condition"])
                             encoder_hidden_states = vision_head(output)
-
                         elif args.image_processor == 'vit':
                             with torch.no_grad():
                                 output, pix_embedding = condition_model(**batch["image_condition"])
@@ -182,23 +180,19 @@ def main(args):
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
-                                # encoder hidden states is dictionary
                                 encoder_hidden_states = vision_head(output)
                             elif args.image_processor == 'vit':
-
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
                                 if args.not_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 1:, :]
                                 if args.only_use_cls_token:
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
-
             image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pseudo feature
             # almost impossible
@@ -232,32 +226,34 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type = position_embedder).sample
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
-            q_dict = {}
+            #q_dict = {}
             for layer in args.trg_layer_list:
                 query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 if args.test_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 else:
-                    # test after attn (already 1, pix_num, dim)
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 if args.use_positioning_module :
                     query, global_feat = positioning_module(query, layer_name=layer)
                     spatial_attn_query = query
-                    if res == 16 :
-                        global_attn = global_feat
-                # channel_attn = [batch, res*res, dim] -> [batch, res, res, dim] ->  [batch, dim, res, res]
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
-                # spatial_attn = [batch, dim, res, res]
-                #print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
-                q_dict[res] = query
+                # channel_attn_query = [1, 320, 64, 64]
+                # spatial_attn_query = [1, 320, 64, 64]
+                if focus_map is None :
+                    # when res = 16
+                    print(f'no initial focus map, res = {res}')
+                    if args.use_max_for_focus_map :
+                        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                    else :
+                        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
                 pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                 spatial_attn_query=spatial_attn_query, layer_name=layer,
+                                                                 spatial_attn_query=spatial_attn_query,
+                                                                 layer_name=layer,
                                                                  in_map=focus_map)
                 print(f'pred = {pred.shape}')
                 # focus_map = [batch, 1, res,res]
@@ -563,6 +559,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_channel_attn", action='store_true')
     parser.add_argument("--use_simple_segmodel", action='store_true')
     parser.add_argument("--use_segmentation_model", action='store_true')
+    parser.add_argument("--use_max_for_focus_map", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

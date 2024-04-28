@@ -63,13 +63,19 @@ class Context_Exploration_Block(nn.Module):
 
         return ce
 class Focus(nn.Module):
-    def __init__(self, channel1, channel2, n_classes):
+
+    def __init__(self, channel1, channel2, n_classes, do_up):
         super(Focus, self).__init__()
         self.channel1 = channel1
         self.channel2 = channel2
 
-        self.input_map = nn.Sequential(nn.UpsamplingBilinear2d(scale_factor=2),
-                                       nn.Sigmoid())
+        self.do_up = do_up
+        if self.do_up:
+            self.input_map = nn.Sequential(nn.UpsamplingBilinear2d(scale_factor=2),
+                                           nn.Sigmoid())
+        else :
+            self.input_map = nn.Sequential(nn.Sigmoid())
+
         self.output_map = nn.Conv2d(self.channel1, 1, 7, 1, 3)
 
         self.fp = Context_Exploration_Block(self.channel1)
@@ -87,30 +93,24 @@ class Focus(nn.Module):
 
 
     def forward(self, x, y, in_map):
+        # ------------------------------------------------------------------------------------------
+        # [1] distraction discovering
+        # if foreground and background is similar, distraction occurs
+        # step 1.1 foreground and background division with nn.sigmoid
+        foreground_map = self.input_map.to(x.device)(in_map)
+        foreground_feature = x * foreground_map
+        # 1.1 context exploration block
+        fp = self.fp.to(x.device)(foreground_feature)
 
-        # x: channel attn
-        # y: spatial attn
-        self.fp = self.fp.to(x.device)
-        self.fn = self.fn.to(x.device)
+        # step 1.2 background feature
+        background_map = 1 - foreground_map
+        background_feature = x * background_map
+        # 1.2 context exploration block
+        fn = self.fn.to(x.device)(background_feature)
 
-        if in_map is not None:
-            self.input_map = self.input_map.to(x.device)
-            input_map = self.input_map(in_map) # upscaling (from low resolution to high resolution)
-            # [3.1] foreground focus attn
-            f_feature = x * input_map
-
-            fp = self.fp(f_feature)
-            # [3.2] background focus attn
-            b_feature = x * (1 - input_map)
-            fn = self.fn(b_feature)
-        else :
-            f_feature = x
-            fp = self.fp(f_feature)
-            # [3.2] background focus attn
-            b_feature = (1-x)
-            fn = self.fn(b_feature)
-
-        # [4] refine
+        # ------------------------------------------------------------------------------------------
+        # [2] distrction removal
+        # erase or remove what is bad
         refine1 = y - (self.alpha.to(x.device) * fp)
         refine1 = self.bn1.to(x.device)(refine1)
         refine1 = self.relu1(refine1)
@@ -244,9 +244,14 @@ class AllPositioning(nn.Module):
         # [2] focus network
         self.focus_net = {}
         for layer_name in layer_names.keys():
+            if 'up_blocks_1' in layer_name:
+                do_up = False
+            else :
+                do_up = True
             self.focus_net[layer_name] = Focus(channel1 = int(layer_names[layer_name]),
                                                channel2 = int(layer_names[layer_name]),
-                                               n_classes = n_classes)
+                                               n_classes = n_classes,
+                                               do_up = do_up)
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
