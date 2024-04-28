@@ -259,7 +259,7 @@ def main(args):
                 # ------------------------------------------------------------------------------------------------- #
                 # mask prediction
                 loss = loss_dicece(input = pred,  # [class, 256,256]
-                                   target= batch[res].to(dtype=weight_dtype))  # [class, 256,256]
+                                   target= batch['res_array_gt'][res].to(dtype=weight_dtype))  # [class, 256,256]
                 total_loss += loss.mean()
 
             """
