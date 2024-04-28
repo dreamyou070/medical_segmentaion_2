@@ -152,7 +152,12 @@ class TestDataset(Dataset):
 
 
         else:
-            gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            try :
+                gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+            except :
+                name, ext = os.path.splitext(gt_path)
+                gt_path = f'{name}.png'
+                gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
             gt_arr = np.array(gt_img)  # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
