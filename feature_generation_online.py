@@ -1,3 +1,7 @@
+""" Context-aware Network """
+# 일부러 전략을 세워가면서 하자.
+# 1.1. extracting edge feature
+# 1.2. deep features are extracted according to edge feature
 import argparse, math, random, json
 from tqdm import tqdm
 from accelerate.utils import set_seed
@@ -16,12 +20,9 @@ from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
 from utils.evaluate import evaluation_check
-from monai.utils import DiceCEReduction, LossReduction
-from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
 from model.focus_net import PFNet
 from model.vision_condition_head import vision_condition_head
-from utils.anomal_sample_sampler import DiagonalGaussianDistribution
 from model.positioning import AllPositioning
 from model.pe import AllPositionalEmbedding
 
@@ -52,21 +53,19 @@ def main(args):
                                           mask_res=args.mask_res,
                                           use_layer_norm = args.use_layer_norm)
     else :
-        segmentation_head = PFNet(n_classes=args.n_classes,
-                                          mask_res=args.mask_res,
-                                          use_layer_norm = args.use_layer_norm)
-
+        segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
+                                  use_layer_norm = args.use_layer_norm)
 
     vision_head = None
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse)
-
     position_embedder = None
     if args.use_position_embedder :
         position_embedder = AllPositionalEmbedding()
     positioning_module = None
     if args.use_positioning_module :
-        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,)
+        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
+                                            use_self_attn=args.use_self_attn,)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -527,7 +526,7 @@ if __name__ == "__main__":
     parser.add_argument("--pseudo_loss_weight", type=float, default=1)
     parser.add_argument("--anomal_loss_weight", type=float, default=1)
     parser.add_argument("--anomal_mse_loss", action='store_true')
-    parser.add_argument("--anomal_kl_loss", action='store_true')
+    parser.add_argument("--use_self_attn", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
     args = parser.parse_args()

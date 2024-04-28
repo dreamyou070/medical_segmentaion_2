@@ -1,13 +1,17 @@
 # !/bin/bash
 port_number=52222
-category="camouflaged"
-obj_name="COD10k"
-trigger_word="COD10k"
-benchmark="COD10k"
+category="medical"
+obj_name="leader_polyp"
+trigger_word="leader_polyp"
+benchmark="Pranet"
 layer_name='layer_3'
-sub_folder="up_16_32_64"
+sub_folder="up_16_32_64_selfattn"
 file_name="2_basis_pvt" # best 0.852
-
+# [1] lora
+# [2] positioning_module (almost for self attn)
+# [3] condition model (almost for cross attn)
+# [4] position embedding
+# [5] seg model
 accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
@@ -16,9 +20,9 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
- --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
-                    'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
-                    'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
+ --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn1',
+                    'up_blocks_2_attentions_2_transformer_blocks_0_attn1',
+                    'up_blocks_3_attentions_2_transformer_blocks_0_attn1',]" \
  --n_classes 2 --mask_res 256 --batch_size 1 \
  --use_dice_ce_loss \
  --optimizer_args weight_decay=0.00005 \
@@ -27,4 +31,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_position_embedder \
  --anomal_mse_loss --online_pseudo_loss \
  --use_positioning_module --use_channel_attn \
- --use_simple_segmodel
+ --use_simple_segmodel \
+ --use_self_attn

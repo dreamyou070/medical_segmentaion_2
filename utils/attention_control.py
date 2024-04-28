@@ -22,6 +22,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 is_cross_attention = True
 
             if noise_type is not None and argument.use_position_embedder :
+                """ cross attention position embedding """
                 hidden_states = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
@@ -43,11 +44,9 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 key = key.float()
             """ Second Trial """
             if trg_layer_list is not None and layer_name in trg_layer_list and argument.text_before_query :
-                # save query
-                # save before attn query
-                controller.save_query((query * self.scale), layer_name) # query = batch, seq_len, dim
-
-
+                # save query = [Batch, Seq_len, Dim]
+                controller.save_query((query * self.scale),
+                                      layer_name) # query = batch, seq_len, dim
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
