@@ -98,6 +98,7 @@ class Focus(nn.Module):
         # if foreground and background is similar, distraction occurs
         # step 1.1 foreground and background division with nn.sigmoid
         foreground_map = self.input_map.to(x.device)(in_map)
+        print(f'foreground_map = {foreground_map.shape}')
         foreground_feature = x * foreground_map
         # 1.1 context exploration block
         fp = self.fp.to(x.device)(foreground_feature)

@@ -156,8 +156,9 @@ def main(args):
 
         epoch_loss_total, total_loss = 0, 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        focus_map = None
+
         for step, batch in enumerate(train_dataloader):
+            focus_map = None
             device = accelerator.device
             loss_dict = {}
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
@@ -245,8 +246,6 @@ def main(args):
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
                 if focus_map is None :
-                    # when res = 16
-                    print(f'no initial focus map, res = {res}')
                     if args.use_max_for_focus_map :
                         focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
                     else :
@@ -255,7 +254,6 @@ def main(args):
                                                                  spatial_attn_query=spatial_attn_query,
                                                                  layer_name=layer,
                                                                  in_map=focus_map)
-                print(f'pred = {pred.shape}')
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
