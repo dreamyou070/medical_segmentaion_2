@@ -257,8 +257,8 @@ class AllPositioning(nn.Module):
 
     def predict_seg(self,channel_attn_query, spatial_attn_query, layer_name, in_map) :
         focus_net = self.focus_net[layer_name]
-        mask_pred, focus_map = focus_net(channel_attn_query, spatial_attn_query, in_map)
-        return mask_pred, focus_map
+        segment_out, refine2, output_map = focus_net(channel_attn_query, spatial_attn_query, in_map)
+        return segment_out, refine2, output_map
 
 
 
