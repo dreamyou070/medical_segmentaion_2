@@ -104,22 +104,26 @@ def evaluation_check(segmentation_head,
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 else:
                     query = query.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()
-                if args.use_positioning_module:
-                    query, global_feat = positioning_module(query, layer_name=layer)
-                    spatial_attn_query = query
+                    query = query.permute(0, 3, 1, 2).contiguous()   # 1, dim, res, res
+                spatial_attn_query = query
+                if args.use_positioning_module :
+                    # spatial
+                    spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
-                if focus_map is None:
-                    if args.use_max_for_focus_map:
+                """
+                if focus_map is None :
+                    if args.use_max_for_focus_map :
                         focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                    else:
+                    else :
                         focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
                 pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
                                                                  spatial_attn_query=spatial_attn_query,
                                                                  layer_name=layer,
                                                                  in_map=focus_map)
+                """
+                pred = channel_attn_query
                 q_dict[res] = pred
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]

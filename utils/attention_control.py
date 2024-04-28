@@ -27,7 +27,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             query = self.to_q(hidden_states)
             if trg_layer_list is not None and layer_name in trg_layer_list:
-                # [1] before channel attn
+                # [1] before channel attn, [Batch, pix_num, dim]
                 controller.save_query(query, layer_name)
 
             context = context if context is not None else hidden_states
@@ -61,7 +61,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
-                # [2] after channel attn
+                # [2] after channel attn [Batch, pix_num, dim]
                 controller.save_query(hidden_states, layer_name)
 
             hidden_states = self.to_out[0](hidden_states)
