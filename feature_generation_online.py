@@ -232,6 +232,7 @@ def main(args):
             controller.reset()
             q_dict = {}
             for layer in args.trg_layer_list:
+                # self attention is too week ?
                 query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 if args.test_before_query:
