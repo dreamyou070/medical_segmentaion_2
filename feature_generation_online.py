@@ -247,16 +247,15 @@ def main(args):
                 q_dict[res] = query
                 if focus_map is not None :
                     pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                           spatial_attn_query=spatial_attn_query,
-                                                           layer_name=layer,
-                                                           in_map=focus_map)
+                                                                     spatial_attn_query=spatial_attn_query, layer_name=layer, in_map=focus_map)
                     # focus_map = [batch, 1, res,res]
                     # pred      = [batch, 2, res, res]
                     # ------------------------------------------------------------------------------------------------- #
                     # mask prediction
+                    loss = loss_dicece(input = pred,  # [class, 256,256]
+                                       target= batch[res].to(dtype=weight_dtype))  # [class, 256,256]
 
-                    print(f'layer = {layer} | focus_map = {focus_map.shape}')
-
+            """
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
             if args.use_simple_segmodel :
@@ -270,6 +269,7 @@ def main(args):
 
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                            masks_pred.shape[-1]).contiguous()
+            
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
@@ -292,7 +292,7 @@ def main(args):
                 #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
                 #else :
                 #loss = loss + pseudo_loss * args.pseudo_loss_weight
-
+            """
             loss = loss.mean()
             current_loss = loss.detach().item()
 

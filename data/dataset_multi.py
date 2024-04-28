@@ -184,7 +184,25 @@ class TrainDataset_Seg(Dataset):
         # [3] generate res 64 gt image
         gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
         gt_64_array = np.array(gt_64_pil) # [64,64]
-        gt_64_array = np.where(gt_64_array > 100, 1, 0)
+        gt_64_array = np.where(gt_64_array > 100, 1, 0) # [64,64]
+        gt_64_array = to_categorical(gt_64_array, num_classes=self.n_classes)
+
+
+        #
+        gt_32_pil = Image.open(gt_path).convert('L').resize((32, 32), Image.BICUBIC)
+        gt_32_array = np.array(gt_32_pil) # [32,32]
+        gt_32_array = np.where(gt_32_array > 100, 1, 0)
+        gt_32_array = to_categorical(gt_32_array, num_classes=self.n_classes)
+
+        gt_16_pil = Image.open(gt_path).convert('L').resize((16, 16), Image.BICUBIC)
+        gt_16_array = np.array(gt_16_pil) # [16,16]
+        gt_16_array = np.where(gt_16_array > 100, 1, 0)
+        gt_16_array = to_categorical(gt_16_array, num_classes=self.n_classes)
+
+        res_array_gt = {}
+        res_array_gt['64'] = gt_64_array
+        res_array_gt['32'] = gt_32_array
+        res_array_gt['16'] = gt_16_array
 
 
 
@@ -289,7 +307,7 @@ class TrainDataset_Seg(Dataset):
                 "input_ids": input_ids,
                 'caption' : caption,
                 "image_condition" : image_condition,
-                'gt_64_array' : gt_64_array} # [197,1]
+                'res_array_gt' : res_array_gt} # [197,1]
 
 
 class TestDataset_Seg(Dataset):
