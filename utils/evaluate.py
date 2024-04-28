@@ -54,8 +54,7 @@ def evaluation_check(segmentation_head,
                                     encoder_hidden_states = encoder_hidden_states[:, 0, :]
 
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
-            gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
+            gt_flat = batch['gt_64_flat'].to(dtype=weight_dtype)  # 1,64*64
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
@@ -109,6 +108,7 @@ def evaluation_check(segmentation_head,
                     query, global_feat = positioning_module(query, layer_name=layer)
                     spatial_attn_query = query
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
+                # I do not think it can make good prediction
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
                 if focus_map is None:
@@ -130,6 +130,7 @@ def evaluation_check(segmentation_head,
             class_num = masks_pred.shape[1]  # 4
             mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
             y_pred_list.append(mask_pred_argmax)
+            #
             y_true = gt_flat.squeeze()
             y_true_list.append(y_true)
 

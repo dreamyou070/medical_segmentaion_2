@@ -185,6 +185,7 @@ class TrainDataset_Seg(Dataset):
         gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
         gt_64_array = np.array(gt_64_pil) # [64,64]
         gt_64_array = np.where(gt_64_array > 100, 1, 0) # [64,64]
+        gt_64_flat = gt_64_array.flatten()  # 64*64
         gt_64_array = torch.tensor(to_categorical(gt_64_array, num_classes=self.n_classes)).permute(2,0,1).contiguous() # [3,64,64]
 
 
@@ -309,7 +310,8 @@ class TrainDataset_Seg(Dataset):
                 "input_ids": input_ids,
                 'caption' : caption,
                 "image_condition" : image_condition,
-                'res_array_gt' : res_array_gt} # [197,1]
+                'res_array_gt' : res_array_gt,
+                'gt_64_flat' : gt_64_flat} # [197,1]
 
 
 class TestDataset_Seg(Dataset):
@@ -388,7 +390,7 @@ class TestDataset_Seg(Dataset):
         img_path = self.image_paths[idx]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
-        if self.use_data_aug :
+        if self.use_data_aug:
             # rotating
             random_p = np.random.rand()
             if random_p < 0.25:
@@ -399,19 +401,19 @@ class TestDataset_Seg(Dataset):
                 number = 3
             elif 0.75 <= random_p:
                 number = 4
-            img = np.rot90(img, k=number) # ok, because it is 3 channel image
+            img = np.rot90(img, k=number)  # ok, because it is 3 channel image
 
         img = self.transform(img.copy())
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
 
-        if argument.gt_ext_npy :
-            gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
+        if argument.gt_ext_npy:
+            gt_arr = np.load(gt_path)  # 256,256 (brain tumor case)
             if self.use_data_aug:
                 gt_arr = np.rot90(gt_arr, k=number)
             if argument.obj_name == 'brain':
-                gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
+                gt_arr = np.where(gt_arr == 4, 3, gt_arr)  # 4 -> 3
             # make image from numpy
 
             # [1] get final image
@@ -421,45 +423,64 @@ class TestDataset_Seg(Dataset):
                 for w_index in range(W):
                     mask_rgb[h_index, w_index] = class_matching_map[gt_arr[h_index, w_index]]
             mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
-            mask_pil = mask_pil.resize((384,384), Image.BICUBIC)
+            mask_pil = mask_pil.resize((384, 384), Image.BICUBIC)
             mask_img = self.transform(np.array(mask_pil))
 
 
-        else :
-            try :
+        else:
+            try:
                 gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            except :
+            except:
                 name, ext = os.path.splitext(gt_path)
                 gt_path = f'{name}.png'
                 gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            if self.use_data_aug :
+            if self.use_data_aug:
                 gt_img = np.rot90(gt_img, k=number)
-            gt_arr = np.array(gt_img) # 128,128
+            gt_arr = np.array(gt_img)  # 128,128
             gt_arr = np.where(gt_arr > 100, 1, 0)
 
         # [3] generate res 64 gt image
         gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
-        gt_64_array = np.array(gt_64_pil) # [64,64]
-        gt_64_array = np.where(gt_64_array > 100, 1, 0)
+        gt_64_array = np.array(gt_64_pil)  # [64,64]
+        gt_64_array = np.where(gt_64_array > 100, 1, 0)  # [64,64]
+        gt_64_flat = gt_64_array.flatten()  # 64*64
+        gt_64_array = torch.tensor(to_categorical(gt_64_array, num_classes=self.n_classes)).permute(2, 0,
+                                                                                                    1).contiguous()  # [3,64,64]
 
+        #
+        gt_32_pil = Image.open(gt_path).convert('L').resize((32, 32), Image.BICUBIC)
+        gt_32_array = np.array(gt_32_pil)  # [32,32]
+        gt_32_array = np.where(gt_32_array > 100, 1, 0)
+        gt_32_array = to_categorical(gt_32_array, num_classes=self.n_classes)
+        gt_32_array = torch.tensor(gt_32_array).permute(2, 0, 1).contiguous()  # [3,32,32]
 
+        gt_16_pil = Image.open(gt_path).convert('L').resize((16, 16), Image.BICUBIC)
+        gt_16_array = np.array(gt_16_pil)  # [16,16]
+        gt_16_array = np.where(gt_16_array > 100, 1, 0)
+        gt_16_array = to_categorical(gt_16_array, num_classes=self.n_classes)
+        gt_16_array = torch.tensor(gt_16_array).permute(2, 0, 1).contiguous()
+
+        res_array_gt = {}
+        res_array_gt['64'] = gt_64_array
+        res_array_gt['32'] = gt_32_array
+        res_array_gt['16'] = gt_16_array
 
         # ex) 0, 1, 2
         class_es = np.unique(gt_arr)
 
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
-        gt = np.zeros((self.mask_res,   # 256
-                       self.mask_res,   # 256
-                       self.n_classes)) # 3
+        gt = np.zeros((self.mask_res,  # 256
+                       self.mask_res,  # 256
+                       self.n_classes))  # 3
 
         # 256,256,3
-        gt[:,:,:class_num] = gt_arr_
-        gt = torch.tensor(gt).permute(2,0,1)        # 3,256,256
+        gt[:, :, :class_num] = gt_arr_
+        gt = torch.tensor(gt).permute(2, 0, 1)  # 3,256,256
         # [3] gt flatten
-        gt_flat = gt_arr.flatten() # 128*128
+        gt_flat = gt_arr.flatten()  # 128*128
 
-        if argument.use_image_by_caption :
+        if argument.use_image_by_caption:
 
             # [3] caption
             if argument.obj_name == 'brain':
@@ -471,26 +492,26 @@ class TestDataset_Seg(Dataset):
             elif argument.obj_name == 'leader_polyp':
                 class_map = leader_polyp_class_map
 
-            if argument.use_base_prompt :
+            if argument.use_base_prompt:
                 caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
+            else:
                 caption = ''
             caption = base_prompts[np.random.randint(0, len(base_prompts))]
             for i, class_idx in enumerate(class_es):
-                if argument.use_key_word :
+                if argument.use_key_word:
                     caption += class_map[class_idx][0]
-                else :
+                else:
                     caption += class_map[class_idx][1]
 
                 if i == class_es.shape[0] - 1:
                     caption += ''
                 else:
-                    #caption += ', '
+                    # caption += ', '
                     caption += ' '
-        else :
-            if argument.use_base_prompt :
+        else:
+            if argument.use_base_prompt:
                 base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
+            else:
                 base_prompt = ''
             caption = f'{base_prompt}{argument.obj_name}'
 
@@ -503,35 +524,34 @@ class TestDataset_Seg(Dataset):
 
         # condition image = [384,384]
         # gt =[3,256,256]
-        gt_pil = gt.permute(1,2,0).cpu().numpy() * 255
+        gt_pil = gt.permute(1, 2, 0).cpu().numpy() * 255
         gt_pil = gt_pil.astype(np.uint8)
         # remove r channel to zero
-        gt_pil[:,:,0] = gt_pil[:,:,0] * 0
+        gt_pil[:, :, 0] = gt_pil[:, :, 0] * 0
         gt_pil = Image.fromarray(gt_pil)  # [256,256,3], RGB mask
 
-
-        if argument.image_processor == 'blip' :
+        if argument.image_processor == 'blip':
             pil = Image.open(img_path).convert('RGB')
-            if self.use_data_aug :
+            if self.use_data_aug:
                 np_pil = np.rot90(np.array(pil), k=number)
                 pil = Image.fromarray(np_pil)
             image_condition = self.image_processor(pil)  # [3,224,224]
 
-        elif argument.image_processor == 'pvt' :
+        elif argument.image_processor == 'pvt':
             pil = Image.open(img_path).convert('RGB')
-            if self.use_data_aug :
+            if self.use_data_aug:
                 np_pil = np.rot90(np.array(pil), k=number)
                 pil = Image.fromarray(np_pil)
             image_condition = self.image_processor(pil)
 
-        else :
-            if self.use_data_aug :
+        else:
+            if self.use_data_aug:
                 pil = Image.open(img_path).convert('RGB')
                 np_pil = np.rot90(np.array(pil), k=number)
                 image_condition = self.image_processor(images=Image.fromarray(np_pil),
                                                        return_tensors="pt",
                                                        padding=True)  # .data['pixel_values'] # [1,3,224,224]
-            else :
+            else:
                 image_condition = self.image_processor(images=Image.open(img_path).convert('RGB'),
                                                        return_tensors="pt",
                                                        padding=True)  # .data['pixel_values'] # [1,3,224,224]
@@ -540,9 +560,10 @@ class TestDataset_Seg(Dataset):
 
         # can i use visual attention mask in ViT ?
         return {'image': img,  # [3,512,512]
-                "gt": gt,                       # [3,256,256]
-                "gt_flat" : gt_flat,            # [128*128]
+                "gt": gt,  # [3,256,256]
+                "gt_flat": gt_flat,  # [128*128]
                 "input_ids": input_ids,
-                'caption' : caption,
-                "image_condition" : image_condition,
-                'gt_64_array' : gt_64_array} # [197,1]
+                'caption': caption,
+                "image_condition": image_condition,
+                'res_array_gt': res_array_gt,
+                'gt_64_flat': gt_64_flat}  # [197,1]
