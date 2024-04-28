@@ -92,7 +92,8 @@ def main(args):
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
     if args.use_positioning_module:
         trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    if args.use_segmentation_model :
+        trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
