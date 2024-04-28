@@ -26,7 +26,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 hidden_states = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
-
             context = context if context is not None else hidden_states
             if type(context) == dict :
                 p = query.shape[1]
@@ -35,30 +34,31 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             key_ = self.to_k(context)
             value = self.to_v(context)
 
-            # print(f'layer_name {layer_name} | after to_q {query.shape} | after to_k {key_.shape} | after to_v {value.shape}')
             query = self.reshape_heads_to_batch_dim(query)
             key = self.reshape_heads_to_batch_dim(key_)
             value = self.reshape_heads_to_batch_dim(value)
             if self.upcast_attention:
                 query = query.float()
                 key = key.float()
+
             """ Second Trial """
-            if trg_layer_list is not None and layer_name in trg_layer_list and argument.text_before_query :
-                # save query = [Batch, Seq_len, Dim]
-                controller.save_query((query * self.scale),
-                                      layer_name) # query = batch, seq_len, dim
+            if trg_layer_list is not None and layer_name in trg_layer_list and argument.test_before_query :
+                # saving query before attn
+                controller.save_query((query * self.scale),layer_name) # query = batch, seq_len, dim
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
             attention_probs = attention_scores.softmax(dim=-1).to(value.dtype)
-            if trg_layer_list is not None and layer_name in trg_layer_list :
+            #if trg_layer_list is not None and layer_name in trg_layer_list :
                 # pix_num, pix_num
-                controller.save_attention(attention_probs, layer_name) # attention_probs = batch, seq_len, sen_len
+            #    controller.save_attention(attention_probs, layer_name) # attention_probs = batch, seq_len, sen_len
 
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
-            if not argument.text_before_query and trg_layer_list is not None and layer_name in trg_layer_list:
+            if not argument.test_before_query and trg_layer_list is not None and layer_name in trg_layer_list:
+                print(f'getting here')
+                # it always do here !
                 controller.save_query(hidden_states, layer_name)
 
             hidden_states = self.to_out[0](hidden_states)

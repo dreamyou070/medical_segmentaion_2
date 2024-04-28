@@ -228,12 +228,13 @@ def main(args):
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
-                if args.text_before_query:
+                if args.test_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 else:
+                    # test after attn (already 1, pix_num, dim)
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
-                if args.use_positioning_module:
+                if args.use_positioning_module :
                     query, global_feat = positioning_module(query, layer_name=layer)
                     if res == 16 :
                         global_attn = global_feat
@@ -503,7 +504,7 @@ if __name__ == "__main__":
     parser.add_argument("--gt_ext_npy", action='store_true')
     parser.add_argument("--generation", action='store_true')
     parser.add_argument("--test_like_train", action='store_true')
-    parser.add_argument("--text_before_query", action='store_true')
+    parser.add_argument("--test_before_query", action='store_true')
     parser.add_argument("--do_text_attn", action='store_true')
     parser.add_argument("--use_image_condition", action='store_true')
     parser.add_argument("--use_text_condition", action='store_true')
