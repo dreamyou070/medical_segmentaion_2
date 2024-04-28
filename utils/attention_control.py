@@ -26,6 +26,10 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 hidden_states = noise_type(hidden_states, layer_name)
 
             query = self.to_q(hidden_states)
+            if trg_layer_list is not None and layer_name in trg_layer_list:
+                # [1] before channel attn
+                controller.save_query(query, layer_name)
+
             context = context if context is not None else hidden_states
             if type(context) == dict :
                 p = query.shape[1]
@@ -42,9 +46,9 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 key = key.float()
 
             """ Second Trial """
-            if trg_layer_list is not None and layer_name in trg_layer_list and argument.test_before_query :
+            #if trg_layer_list is not None and layer_name in trg_layer_list and argument.test_before_query :
                 # saving query before attn
-                controller.save_query((query * self.scale),layer_name) # query = batch, seq_len, dim
+            #    controller.save_query((query * self.scale),layer_name) # query = batch, seq_len, dim
             attention_scores = torch.baddbmm(
                 torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
                 query, key.transpose(-1, -2), beta=0, alpha=self.scale,) # [8, pix_num, sen_len]
@@ -56,9 +60,8 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
-            if not argument.test_before_query and trg_layer_list is not None and layer_name in trg_layer_list:
-                print(f'getting here')
-                # it always do here !
+            if trg_layer_list is not None and layer_name in trg_layer_list:
+                # [2] after channel attn
                 controller.save_query(hidden_states, layer_name)
 
             hidden_states = self.to_out[0](hidden_states)

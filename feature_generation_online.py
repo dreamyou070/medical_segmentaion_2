@@ -226,7 +226,7 @@ def main(args):
             controller.reset()
             q_dict = {}
             for layer in args.trg_layer_list:
-                query = query_dict[layer][0]  # head, pix_num, dim
+                query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
                 if args.test_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
@@ -236,8 +236,11 @@ def main(args):
                     query = query.permute(0, 3, 1, 2).contiguous()
                 if args.use_positioning_module :
                     query, global_feat = positioning_module(query, layer_name=layer)
+                    spatial_attn_query = query
                     if res == 16 :
                         global_attn = global_feat
+                print(f'layer_name = {layer}')
+                print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
                 q_dict[res] = query
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
@@ -530,6 +533,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_self_attn", action='store_true')
     parser.add_argument("--use_positioning_module", action='store_true')
     parser.add_argument("--use_channel_attn", action='store_true')
+    parser.add_argument("--use_simple_segmodel", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

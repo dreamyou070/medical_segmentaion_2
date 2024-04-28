@@ -60,7 +60,7 @@ class SA_Block(nn.Module):
         attention = self.softmax(energy)
 
         # [2]
-        proj_value = self.value_conv(x).view(m_batchsize, -1, width * height)
+        proj_value = self.value_conv(x).view(m_batchsize, -1, width * height) # [B,C,(HxW)] -> [B,(HxW),C]
 
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
         out = out.view(m_batchsize, C, height, width)
@@ -114,6 +114,7 @@ class AllPositioning(nn.Module):
 
     def forward(self, x, layer_name):
         net = self.position_net[layer_name]
+        # generate spatial attention result and global_feature
         x, global_feat = net(x)
         return x, global_feat
 
