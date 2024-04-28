@@ -12,11 +12,11 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number test.py \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --network_dim 144 --network_alpha 4 \
- --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000022.safetensors" \
+ --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000065.safetensors" \
  --use_position_embedder \
  --use_image_condition --image_processor 'vit' \
  --use_positioning_module \
- --segmentation_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000022.pt" \
+ --segmentation_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000065.pt" \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --base_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
  --obj_name "${obj_name}" \
