@@ -245,15 +245,15 @@ def main(args):
                 # spatial_attn = [batch, dim, res, res]
                 #print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
                 q_dict[res] = query
-                if focus_map is not None :
-                    pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                     spatial_attn_query=spatial_attn_query, layer_name=layer, in_map=focus_map)
-                    # focus_map = [batch, 1, res,res]
-                    # pred      = [batch, 2, res, res]
-                    # ------------------------------------------------------------------------------------------------- #
-                    # mask prediction
-                    loss = loss_dicece(input = pred,  # [class, 256,256]
-                                       target= batch[res].to(dtype=weight_dtype))  # [class, 256,256]
+                pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
+                                                                 spatial_attn_query=spatial_attn_query, layer_name=layer,
+                                                                 in_map=focus_map)
+                # focus_map = [batch, 1, res,res]
+                # pred      = [batch, 2, res, res]
+                # ------------------------------------------------------------------------------------------------- #
+                # mask prediction
+                loss = loss_dicece(input = pred,  # [class, 256,256]
+                                   target= batch[res].to(dtype=weight_dtype))  # [class, 256,256]
 
             """
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
