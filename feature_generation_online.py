@@ -156,6 +156,7 @@ def main(args):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
+
         for step, batch in enumerate(train_dataloader):
             total_loss = 0
             focus_map = None
@@ -234,14 +235,14 @@ def main(args):
             for layer in args.trg_layer_list:
                 # self attention is too week ?
                 # didnot use spatial attention ...
+                # spatial query
                 query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
-                print(f'query = {query.shape}, channel_attn_query = {channel_attn_query.shape}')
                 res = int(query.shape[1] ** 0.5)
-                if args.test_before_query:
-                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                else:
-                    query = query.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()   # 1, dim, res, res
+                #if args.test_before_query:
+                #    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                #else:
+                query = query.reshape(1, res, res, -1)
+                query = query.permute(0, 3, 1, 2).contiguous()   # 1, dim, res, res
                 spatial_attn_query = query
                 if args.use_positioning_module :
                     # spatial
@@ -249,40 +250,33 @@ def main(args):
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
-                """
                 if focus_map is None :
                     if args.use_max_for_focus_map :
                         focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
                     else :
                         focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
-                pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                 spatial_attn_query=spatial_attn_query,
-                                                                 layer_name=layer,
-                                                                 in_map=focus_map)
-                """
-                pred = channel_attn_query
-                q_dict[res] = pred
+                pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
+                                                                          spatial_attn_query=spatial_attn_query,
+                                                                          layer_name=layer,
+                                                                          in_map=focus_map)
+                #pred = channel_attn_query
+                q_dict[res] = feature
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
                 # mask prediction
-                #loss = loss_dicece(input = pred,  # [class, 256,256]
-                #                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype))  # [class, 256,256]
-                #total_loss += loss.mean()
+                total_loss += loss_dicece(input = pred,  # [class, 256,256]
+                                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
             if args.use_simple_segmodel :
                 _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
                 # [2] segmentation head
                 masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-            #else :
-            #    features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
+            else :
+                features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_feat)  # [1,160,256,256]
                 # [2] segmentation head
-            #    masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
-                                                                           masks_pred.shape[-1]).contiguous()
-            
+                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
@@ -305,8 +299,7 @@ def main(args):
                 #else :
                 #loss = loss + pseudo_loss * args.pseudo_loss_weight
 
-            #total_loss += loss.mean()
-            total_loss = loss.mean()
+            total_loss += loss.mean()
             current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
@@ -328,7 +321,6 @@ def main(args):
                 progress_bar.set_postfix(**loss_dict)
             if global_step >= args.max_train_steps:
                 break
-            break
         # ----------------------------------------------------------------------------------------------------------- #
         accelerator.wait_for_everyone()
         if is_main_process:

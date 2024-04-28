@@ -115,10 +115,9 @@ class Focus(nn.Module):
         refine2 = self.relu2(self.bn2.to(x.device)(refine1 + (self.beta.to(x.device) * fn))) # [1,320, 64, 64]
 
         output_map = self.output_map.to(x.device)(refine2)    # [1, 1, 64, 64]
-        #segment_out = self.segment_head.to(x.device)(refine2) # [1, 2, 64, 64]
+        segment_out = self.segment_head.to(x.device)(refine2) # [1, 2, 64, 64]
 
-        #return segment_out, output_map
-        return refine2, output_map
+        return segment_out, refine2, output_map
 
 
 
