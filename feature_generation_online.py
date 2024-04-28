@@ -27,6 +27,12 @@ from model.positioning import AllPositioning
 from model.pe import AllPositionalEmbedding
 
 
+def bce_iou_loss(pred, target):
+    bce_out = bce_loss(pred, target)
+    iou_out = iou_loss(pred, target)
+    loss = bce_out + iou_out
+    return loss
+
 # image conditioned segmentation mask generating
 
 def main(args):
@@ -143,7 +149,7 @@ def main(args):
     loss_list = []
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
-        epoch_loss_total = 0
+        epoch_loss_total, total_loss = 0, 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         focus_map = None
         for step, batch in enumerate(train_dataloader):
@@ -254,6 +260,7 @@ def main(args):
                 # mask prediction
                 loss = loss_dicece(input = pred,  # [class, 256,256]
                                    target= batch[res].to(dtype=weight_dtype))  # [class, 256,256]
+                total_loss += loss.mean()
 
             """
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
@@ -293,7 +300,7 @@ def main(args):
                 #else :
                 #loss = loss + pseudo_loss * args.pseudo_loss_weight
             """
-            loss = loss.mean()
+            loss = total_loss.mean()
             current_loss = loss.detach().item()
 
             if epoch == args.start_epoch:

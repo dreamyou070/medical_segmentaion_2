@@ -81,7 +81,9 @@ class Focus(nn.Module):
         self.bn2 = nn.BatchNorm2d(self.channel1)
         self.relu2 = nn.ReLU()
         self.n_classes = n_classes
-        self.segment_head = nn.Conv2d(self.channel1, self.n_classes, kernel_size=1)
+        self.segment_head = nn.Conv2d(self.channel2,
+                                      self.n_classes,
+                                      kernel_size=1)
 
 
     def forward(self, x, y, in_map):
@@ -112,13 +114,14 @@ class Focus(nn.Module):
 
         refine2 = refine1 + (self.beta * fn)
         refine2 = self.bn2(refine2)
-        refine2 = self.relu2(refine2)
+        refine2 = self.relu2(refine2) # [1,320, 64, 64]
+        output_map = self.output_map(refine2)    # [1, 1, 64, 64]
+        segment_out = self.segment_head(refine2) # [1, 2, 64, 64]
 
-        refine2 = self.segment_head(refine2)
+        return segment_out, output_map
 
-        output_map = self.output_map(refine2)
 
-        return refine2, output_map
+
 
 ###################################################################
 # ################## Channel Attention Block ######################
@@ -243,13 +246,13 @@ class AllPositioning(nn.Module):
                                                n_classes = n_classes)
 
     def forward(self, x, layer_name):
-        net = self.position_net[layer_name].to(x.device)
+        net = self.position_net[layer_name]
         # generate spatial attention result and global_feature
         x, global_feat = net(x)
         return x, global_feat
 
     def predict_seg(self,channel_attn_query, spatial_attn_query, layer_name, in_map) :
-        focus_net = self.focus_net[layer_name].to(channel_attn_query.device)
+        focus_net = self.focus_net[layer_name]
         mask_pred, focus_map = focus_net(channel_attn_query, spatial_attn_query, in_map)
         return mask_pred, focus_map
 
