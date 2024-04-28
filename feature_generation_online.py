@@ -154,7 +154,6 @@ def main(args):
     loss_list = []
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
-
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
         for step, batch in enumerate(train_dataloader):
@@ -231,7 +230,7 @@ def main(args):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type = position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
-            #q_dict = {}
+            q_dict = {}
             for layer in args.trg_layer_list:
                 query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
                 res = int(query.shape[1] ** 0.5)
@@ -255,6 +254,7 @@ def main(args):
                                                                  spatial_attn_query=spatial_attn_query,
                                                                  layer_name=layer,
                                                                  in_map=focus_map)
+                q_dict[res] = pred
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
@@ -263,17 +263,17 @@ def main(args):
                                    target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype))  # [class, 256,256]
                 total_loss += loss.mean()
 
-            """
+
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
             if args.use_simple_segmodel :
                 _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
                 # [2] segmentation head
                 masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-            else :
-                features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
+            #else :
+            #    features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_attn)  # [1,160,256,256]
                 # [2] segmentation head
-                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+            #    masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
 
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                            masks_pred.shape[-1]).contiguous()
@@ -293,16 +293,15 @@ def main(args):
             # ----------------------------------------------------------------------------------------------------------- #
             # why does it takes so much time ... ?
             # is there any other way to accelerate this process ?
-
-                        # [3]
+            # [3]
             #if args.online_pseudo_loss :
                 #if args.anomal_small_loss:
                 #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
                 #else :
                 #loss = loss + pseudo_loss * args.pseudo_loss_weight
-            """
-            loss = total_loss.mean()
-            current_loss = loss.detach().item()
+
+            total_loss += loss.mean()
+            current_loss = total_loss.detach().item()
 
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)

@@ -6,7 +6,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_selfattn"
-file_name="2_basis_pvt" # best 0.852
+file_name="3_camouflage_segmentation_model" # best 0.852
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)
@@ -32,4 +32,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --anomal_mse_loss --online_pseudo_loss \
  --use_positioning_module \
  --use_simple_segmodel \
- --use_self_attn
+ --use_self_attn \
+ --use_segmentation_model
