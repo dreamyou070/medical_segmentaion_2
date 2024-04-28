@@ -265,7 +265,7 @@ class AllPositioning(nn.Module):
 
 
 
-
+"""
 x = torch.randn(1,320,64,64)
 y = torch.randn(1,320,64,64)
 in_map = torch.randn(1,1,64,64)
@@ -273,3 +273,4 @@ model = Focus(320, 320)
 refine2, output_map = model(x=x, y=y, in_map=None)
 print(refine2.shape)
 print(output_map.shape)
+"""
