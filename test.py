@@ -6,7 +6,6 @@ from model import call_model_package
 from model.pe import AllPositionalEmbedding
 from utils.accelerator_utils import prepare_accelerator
 from model.segmentation_unet import SemanticModel
-from model.reduction_model import ReductionNet
 from data.dataloader import TestDataset
 from torch import nn
 from attention_store import AttentionStore
