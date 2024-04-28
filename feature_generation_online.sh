@@ -1,18 +1,18 @@
 # !/bin/bash
-port_number=52654
+port_number=52655
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_selfattn"
-file_name="3_crossattn_module"
+file_name="3_crossattn_module_reverse"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)
 # [4] position embedding
 # [5] seg model
-accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
@@ -29,7 +29,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_image_condition \
  --image_model_training --image_processor 'pvt' \
  --use_position_embedder \
- --anomal_mse_loss --online_pseudo_loss \
  --use_positioning_module \
  --use_simple_segmodel \
  --use_segmentation_model

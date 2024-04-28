@@ -66,6 +66,7 @@ def main(args):
 
     vision_head = None
     if args.image_processor == 'pvt' :
+        # generate more high semantic with reverse
         vision_head = vision_condition_head(reverse = args.reverse)
     position_embedder = None
     if args.use_position_embedder :
@@ -330,6 +331,7 @@ def main(args):
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
+
             if args.use_segmentation_model :
                 save_model(args,
                            saving_folder='segmentation',
@@ -343,12 +345,14 @@ def main(args):
                            saving_name=f'position-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(position_embedder),
                            save_dtype=save_dtype)
+
             if args.image_processor == 'pvt' :
                 save_model(args,
                            saving_folder='vision_head',
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
+
             if args.use_position_embedder :
                 save_model(args,
                             saving_folder='positioning_module',
