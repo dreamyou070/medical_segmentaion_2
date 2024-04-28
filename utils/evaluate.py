@@ -20,9 +20,7 @@ def evaluation_check(segmentation_head,
         y_true_list, y_pred_list = [], []
 
         for global_num, batch in enumerate(dataloader):
-
-            encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-
+            focus_map = None
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
             if not args.without_condition:
                 if args.use_image_condition:
@@ -105,19 +103,19 @@ def evaluation_check(segmentation_head,
                 if args.test_before_query:
                     query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
                 else:
-                    # test after attn (already 1, pix_num, dim)
                     query = query.reshape(1, res, res, -1)
                     query = query.permute(0, 3, 1, 2).contiguous()
                 if args.use_positioning_module:
                     query, global_feat = positioning_module(query, layer_name=layer)
                     spatial_attn_query = query
-                    if res == 16:
-                        global_attn = global_feat
-                # channel_attn = [batch, res*res, dim] -> [batch, res, res, dim] ->  [batch, dim, res, res]
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
-                # spatial_attn = [batch, dim, res, res]
-                # print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
-                q_dict[res] = query
+                # channel_attn_query = [1, 320, 64, 64]
+                # spatial_attn_query = [1, 320, 64, 64]
+                if focus_map is None:
+                    if args.use_max_for_focus_map:
+                        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                    else:
+                        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
                 pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
                                                                  spatial_attn_query=spatial_attn_query,
                                                                  layer_name=layer,

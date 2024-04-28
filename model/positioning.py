@@ -110,14 +110,10 @@ class Focus(nn.Module):
 
         # ------------------------------------------------------------------------------------------
         # [2] distrction removal
-        # erase or remove what is bad
-        refine1 = y - (self.alpha.to(x.device) * fp)
-        refine1 = self.bn1.to(x.device)(refine1)
-        refine1 = self.relu1(refine1)
+        # y = spatial attention result
+        refine1 = self.relu1(self.bn1.to(x.device)(y - (self.alpha.to(x.device) * fp)))
+        refine2 = self.relu2(self.bn2.to(x.device)(refine1 + (self.beta.to(x.device) * fn))) # [1,320, 64, 64]
 
-        refine2 = refine1 + (self.beta.to(x.device) * fn)
-        refine2 = self.bn2.to(x.device)(refine2)
-        refine2 = self.relu2(refine2) # [1,320, 64, 64]
         output_map = self.output_map.to(x.device)(refine2)    # [1, 1, 64, 64]
         segment_out = self.segment_head.to(x.device)(refine2) # [1, 2, 64, 64]
 
