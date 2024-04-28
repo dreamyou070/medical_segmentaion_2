@@ -90,11 +90,15 @@ class Focus(nn.Module):
 
         # x: channel attn
         # y: spatial attn
+        self.fp = self.fp.to(x.device)
+        self.fn = self.fn.to(x.device)
 
         if in_map is not None:
+            self.input_map = self.input_map.to(x.device)
             input_map = self.input_map(in_map) # upscaling (from low resolution to high resolution)
             # [3.1] foreground focus attn
             f_feature = x * input_map
+
             fp = self.fp(f_feature)
             # [3.2] background focus attn
             b_feature = x * (1 - input_map)
@@ -106,7 +110,13 @@ class Focus(nn.Module):
             b_feature = (1-x)
             fn = self.fn(b_feature)
 
-
+        self.alpha = self.alpha.to(x.device)
+        self.bn1 = self.bn1.to(x.device)
+        self.beta = self.beta.to(x.device)
+        self.bn2 = self.bn2.to(x.device)
+        self.output_map = self.output_map.to(x.device)
+        self.segment_head = self.segment_head.to(x.device)
+        
         # [4] refine
         refine1 = y - (self.alpha * fp)
         refine1 = self.bn1(refine1)
