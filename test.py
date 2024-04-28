@@ -223,8 +223,18 @@ def main(args):
 
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
-                    masks_pred = segmentation_head(x16_out, x32_out, x64_out)  # [1,4,256,256]
-                    #######################################################################################################################
+                    if args.use_simple_segmodel:
+                        _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                        # [2] segmentation head
+                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+                    else:
+                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out,
+                                                                 global_attn)  # [1,160,256,256]
+                        # [2] segmentation head
+                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+
+                    masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                                   masks_pred.shape[-1]).contiguous()
                     # [1] pred
                     class_num = masks_pred.shape[1]  # 4
                     mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
