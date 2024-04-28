@@ -65,7 +65,8 @@ def main(args):
     positioning_module = None
     if args.use_positioning_module :
         positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
-                                            use_self_attn=args.use_self_attn,)
+                                            use_self_attn=args.use_self_attn,
+                                            n_classes = args.n_classes,)
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -239,9 +240,22 @@ def main(args):
                     spatial_attn_query = query
                     if res == 16 :
                         global_attn = global_feat
-                print(f'layer_name = {layer}')
-                print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
+                # channel_attn = [batch, res*res, dim] -> [batch, res, res, dim] ->  [batch, dim, res, res]
+                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
+                # spatial_attn = [batch, dim, res, res]
+                #print(f'channel_attn_query = {channel_attn_query.shape} | spatial_attn_query = {spatial_attn_query.shape}')
                 q_dict[res] = query
+                if focus_map is not None :
+                    pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
+                                                           spatial_attn_query=spatial_attn_query,
+                                                           layer_name=layer,
+                                                           in_map=focus_map)
+                    # focus_map = [batch, 1, res,res]
+                    # pred      = [batch, 2, res, res]
+                    # ------------------------------------------------------------------------------------------------- #
+                    # mask prediction
+
+                    print(f'layer = {layer} | focus_map = {focus_map.shape}')
 
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
 
