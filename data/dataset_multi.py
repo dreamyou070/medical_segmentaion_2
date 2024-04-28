@@ -185,7 +185,7 @@ class TrainDataset_Seg(Dataset):
         gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
         gt_64_array = np.array(gt_64_pil) # [64,64]
         gt_64_array = np.where(gt_64_array > 100, 1, 0) # [64,64]
-        gt_64_array = to_categorical(gt_64_array, num_classes=self.n_classes)
+        gt_64_array = torch.tensor(to_categorical(gt_64_array, num_classes=self.n_classes)).permute(2,0,1).contiguous() # [3,64,64]
 
 
         #
@@ -193,11 +193,13 @@ class TrainDataset_Seg(Dataset):
         gt_32_array = np.array(gt_32_pil) # [32,32]
         gt_32_array = np.where(gt_32_array > 100, 1, 0)
         gt_32_array = to_categorical(gt_32_array, num_classes=self.n_classes)
+        gt_32_array = torch.tensor(gt_32_array).permute(2,0,1).contiguous() # [3,32,32]
 
         gt_16_pil = Image.open(gt_path).convert('L').resize((16, 16), Image.BICUBIC)
         gt_16_array = np.array(gt_16_pil) # [16,16]
         gt_16_array = np.where(gt_16_array > 100, 1, 0)
         gt_16_array = to_categorical(gt_16_array, num_classes=self.n_classes)
+        gt_16_array = torch.tensor(gt_16_array).permute(2,0,1).contiguous()
 
         res_array_gt = {}
         res_array_gt['64'] = gt_64_array

@@ -259,6 +259,7 @@ def main(args):
                 pred, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
                                                                  spatial_attn_query=spatial_attn_query, layer_name=layer,
                                                                  in_map=focus_map)
+                print(f'pred = {pred.shape}')
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
