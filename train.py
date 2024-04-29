@@ -364,7 +364,7 @@ def main(args):
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
 
-            if args.use_position_embedder :
+            if args.use_positioning_module :
                 save_model(args,
                             saving_folder='positioning_module',
                             saving_name=f'positioning-{saving_epoch}.pt',
