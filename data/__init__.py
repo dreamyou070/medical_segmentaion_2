@@ -44,8 +44,6 @@ def call_test_dataset(args, _data_name) :
     base_path = os.path.split(args.train_data_path)[0]
     test_base_path = os.path.join(base_path, 'test')
     data_path = os.path.join(test_base_path, _data_name)
-    image_root = os.path.join(data_path, 'images')
-    gt_root = os.path.join(data_path, 'masks')
 
     if args.image_processor == 'clip':
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
