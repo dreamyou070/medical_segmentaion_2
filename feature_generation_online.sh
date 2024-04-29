@@ -16,6 +16,7 @@ file_name="4_crossattn_module_reverse_channel_spatial_cascaded"
  #--positioning_module_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/positioning_module/positioning-000041.pt" \
  #--position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000041.pt" \
  #--segmentation_model_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000029.pt" \
+ #--vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000041.pt" \
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
@@ -23,7 +24,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
- --vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000041.pt" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
  --use_positioning_module --use_position_embedder \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
