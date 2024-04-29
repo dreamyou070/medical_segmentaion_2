@@ -164,8 +164,9 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    for epoch in range(args.start_epoch, args.max_train_epochs):
 
+    for epoch in range(args.start_epoch, args.max_train_epochs):
+        """
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
 
@@ -210,29 +211,29 @@ def main(args):
             # ----------------------------------------------------------------------------------------------------------- #
             # [1] pseudo feature
             # almost impossible
-            """
-            gt_64_array = batch['gt_64_array'].squeeze() # [1,64,64]
-            non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
-            feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
-            anomal_feat = feat[non_zero_index, :]  # [10,4]
-            if step == 0:
-                generator = DiagonalGaussianDistribution(parameters=anomal_feat, latent_dim=anomal_feat.shape[-1])
-            else:
-                generator.update(parameters=anomal_feat)
-            pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,4,256,256]
+            
+            #gt_64_array = batch['gt_64_array'].squeeze() # [1,64,64]
+            #non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
+            #feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
+            #anomal_feat = feat[non_zero_index, :]  # [10,4]
+            #if step == 0:
+            #    generator = DiagonalGaussianDistribution(parameters=anomal_feat, latent_dim=anomal_feat.shape[-1])
+            #else:
+            #    generator.update(parameters=anomal_feat)
+            #pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,4,256,256]
             # unet feature generating
             # how to condition ??
             
 
 
             # should unet again ?
-            pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
+            #pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
 
-            pseudo_label = torch.ones_like(batch['gt'])
-            pseudo_label[:, 0, :, :] = 0  # all class 1 samples
-            pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
-                                      target=pseudo_label.to(dtype=weight_dtype, device=accelerator.device))  # [class, 256,256]
-            """
+            #pseudo_label = torch.ones_like(batch['gt'])
+            #pseudo_label[:, 0, :, :] = 0  # all class 1 samples
+            #pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
+            #                          target=pseudo_label.to(dtype=weight_dtype, device=accelerator.device))  # [class, 256,256]
+            
             # ----------------------------------------------------------------------------------------------------------- #
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
@@ -331,6 +332,7 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
         # ----------------------------------------------------------------------------------------------------------- #
+        """
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
