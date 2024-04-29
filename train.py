@@ -169,7 +169,7 @@ def main(args):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
-
+        """
         for step, batch in enumerate(train_dataloader):
             total_loss = 0
             focus_map = None
@@ -333,7 +333,7 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
         # ----------------------------------------------------------------------------------------------------------- #
-
+        """
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)

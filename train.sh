@@ -2,14 +2,14 @@
 # 기존 논문들에서는 loss 를 2가지 이상을 사용하고 있구나 ?
 #
 
-port_number=53333
+port_number=52222
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_selfattn"
-file_name="test_without_position"
+file_name="test"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)
