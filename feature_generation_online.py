@@ -55,6 +55,7 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
     segmentation_head = None
+
     if args.use_segmentation_model :
         if args.use_simple_segmodel :
             segmentation_head = SemanticModel(n_classes=args.n_classes,
@@ -63,19 +64,28 @@ def main(args):
         else :
             segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm)
+        if args.segmentation_weights is not None :
+            segmentation_head.load_state_dict(torch.load(args.segmentation_weights))
 
     vision_head = None
     if args.image_processor == 'pvt' :
-        # generate more high semantic with reverse
         vision_head = vision_condition_head(reverse = args.reverse)
+        if args.vision_head_weights is not None :
+            vision_head.load_state_dict(torch.load(args.vision_head_weights))
+
     position_embedder = None
     if args.use_position_embedder :
         position_embedder = AllPositionalEmbedding()
+        if args.position_embedder_weights is not None :
+            position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
+
     positioning_module = None
     if args.use_positioning_module :
         positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
                                             use_self_attn=args.use_self_attn,
                                             n_classes = args.n_classes,)
+        if args.positioning_module_weights is not None :
+            positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
 
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
@@ -120,6 +130,8 @@ def main(args):
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
+        if args.positioning_module_weights is not None :
+            positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
@@ -560,6 +572,9 @@ if __name__ == "__main__":
     parser.add_argument("--use_simple_segmodel", action='store_true')
     parser.add_argument("--use_segmentation_model", action='store_true')
     parser.add_argument("--use_max_for_focus_map", action='store_true')
+    parser.add_argument("--positioning_module_weights", type=str, default=None)
+    parser.add_argument("--vision_head_weights", type=str, default=None)
+    parser.add_argument("--segmentation_model_weights", type=str, default=None)
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument
