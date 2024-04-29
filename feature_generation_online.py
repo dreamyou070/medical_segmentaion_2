@@ -54,8 +54,8 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
-    segmentation_head = None
 
+    segmentation_head = None
     if args.use_segmentation_model :
         if args.use_simple_segmodel :
             segmentation_head = SemanticModel(n_classes=args.n_classes,
@@ -130,8 +130,7 @@ def main(args):
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
-        if args.positioning_module_weights is not None :
-            positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
+
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
@@ -249,7 +248,8 @@ def main(args):
                 # self attention is too week ?
                 # didnot use spatial attention ...
                 # spatial query
-                query, channel_attn_query = query_dict[layer]  # head, pix_num, dim
+                query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
+                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                 res = int(query.shape[1] ** 0.5)
                 #if args.test_before_query:
                 #    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
@@ -258,20 +258,28 @@ def main(args):
                 query = query.permute(0, 3, 1, 2).contiguous()   # 1, dim, res, res
                 spatial_attn_query = query
                 if args.use_positioning_module :
-                    # spatial
-                    spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
-                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
+                    if args.previous_positioning_module:
+                        # spatial
+                        spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
+                    else :
+                        spatial_attn_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
+
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
+
+                # modeling spatial attentive query
+
                 if focus_map is None :
                     if args.use_max_for_focus_map :
                         focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
                     else :
                         focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+
                 pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                          spatial_attn_query=spatial_attn_query,
-                                                                          layer_name=layer,
-                                                                          in_map=focus_map)
+                                                                              spatial_attn_query=spatial_attn_query,
+                                                                              layer_name=layer,
+                                                                              in_map=focus_map)
+                # if I get only one feature map, is it really meaningful to use two separate feature ?
                 #pred = channel_attn_query
                 q_dict[res] = feature
                 # focus_map = [batch, 1, res,res]
@@ -575,6 +583,7 @@ if __name__ == "__main__":
     parser.add_argument("--positioning_module_weights", type=str, default=None)
     parser.add_argument("--vision_head_weights", type=str, default=None)
     parser.add_argument("--segmentation_model_weights", type=str, default=None)
+    parser.add_argument("--previous_positioning_module", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset_multi import passing_mvtec_argument

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 class Context_Exploration_Block(nn.Module):
+
     def __init__(self, input_channels):
         super(Context_Exploration_Block, self).__init__()
 
@@ -111,6 +112,10 @@ class Focus(nn.Module):
         # ------------------------------------------------------------------------------------------
         # [2] distrction removal
         # y = spatial attention result
+        if y == None :
+            y = x
+            # I have to modeling spatial attention for y
+
         refine1 = self.relu1(self.bn1.to(x.device)(y - (self.alpha.to(x.device) * fp)))
         refine2 = self.relu2(self.bn2.to(x.device)(refine1 + (self.beta.to(x.device) * fn))) # [1,320, 64, 64]
 
@@ -157,6 +162,7 @@ class CA_Block(nn.Module):
 # ################## Spatial Attention Block ######################
 ###################################################################
 class SA_Block(nn.Module):
+
     def __init__(self, in_dim):
         super(SA_Block, self).__init__()
         self.chanel_in = in_dim
@@ -250,14 +256,19 @@ class AllPositioning(nn.Module):
                                                do_up = do_up)
 
     def forward(self, x, layer_name):
+
+        # [1]
+        # when positioning, SA module
         net = self.position_net[layer_name]
         # generate spatial attention result and global_feature
         x, global_feat = net(x)
         return x, global_feat
 
-    def predict_seg(self,channel_attn_query, spatial_attn_query, layer_name, in_map) :
+    def predict_seg(self, channel_attn_query, spatial_attn_query, layer_name, in_map) :
         focus_net = self.focus_net[layer_name]
-        segment_out, refine2, output_map = focus_net(channel_attn_query, spatial_attn_query, in_map)
+        segment_out, refine2, output_map = focus_net(channel_attn_query,
+                                                     spatial_attn_query, # ???
+                                                     in_map)
         return segment_out, refine2, output_map
 
 

@@ -6,13 +6,17 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_selfattn"
-file_name="3_crossattn_module_reverse"
+file_name="4_crossattn_module_reverse_channel_spatial_cascaded"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)
 # [4] position embedding
 # [5] seg model
-accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
+#--network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000029.safetensors" \
+ #--positioning_module_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/positioning_module/positioning-000041.pt" \
+ #--position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000041.pt" \
+ #--segmentation_model_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000029.pt" \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number feature_generation_online.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
@@ -21,10 +25,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
  --vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000041.pt" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
- --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000029.safetensors" \
- --use_positioning_module --positioning_module_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/positioning_module/positioning-000041.pt" \
- --use_position_embedder --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000041.pt" \
- --segmentation_model_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000029.pt" \
+ --use_positioning_module --use_position_embedder \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
@@ -33,4 +34,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_model_training --image_processor 'pvt' \
- --use_simple_segmodel --use_segmentation_model --start_epoch 29
+ --use_simple_segmodel --use_segmentation_model --start_epoch 0
