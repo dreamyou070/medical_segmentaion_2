@@ -19,11 +19,11 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train" \
  --test_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/test" \
- --vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000029.pt" \
+ --vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000041.pt" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
  --network_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/model/lora-000029.safetensors" \
- --use_positioning_module --positioning_module_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/positioning_module/positioning-000029.pt" \
- --use_position_embedder --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000029.pt" \
+ --use_positioning_module --positioning_module_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/positioning_module/positioning-000041.pt" \
+ --use_position_embedder --position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000041.pt" \
  --segmentation_model_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000029.pt" \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
