@@ -193,12 +193,9 @@ def evaluation_check(segmentation_head,
                                 total_actual_num + total_predict_num + eps)
                     IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
                 # [1] WC Score
-                dataset_dice = DSC / len(folders)
-                print(f' {_data_name} finished !')
-                segmentation_head.train()
-                # saving score
-                # saving
-                if accelerator.is_main_process :
+                if accelerator.is_main_process:
+                    dataset_dice = DSC / len(folders)
+                    print(f' {_data_name} finished !')
                     print(f'  - precision dictionary = {IOU_dict}')
                     print(f'  - confusion_matrix = {confusion_matrix}')
                     confusion_matrix = confusion_matrix.tolist()
@@ -224,3 +221,4 @@ def evaluation_check(segmentation_head,
                         f.write(f'\n')
                         f.write(f' dice score = {dataset_dice} \n')
                         f.write(f' IOU score = {IOU} \n')
+                segmentation_head.train()
