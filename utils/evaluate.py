@@ -91,9 +91,13 @@ def evaluation_check(segmentation_head,
                     controller.reset()
                     q_dict = {}
                     for layer in args.trg_layer_list:
+                        # self attention is too week ?
+                        # didnot use spatial attention ...
+                        # spatial query
                         query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
                         res = int(query.shape[1] ** 0.5)
-                        channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1,2).contiguous()
+                        channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1,
+                                                                                                 2).contiguous()
                         query = query.reshape(1, res, res, -1)
                         query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
                         spatial_attn_query = query
@@ -102,18 +106,26 @@ def evaluation_check(segmentation_head,
                                 # spatial
                                 spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
                             else:
-                                spatial_attn_query, global_feat = positioning_module(channel_attn_query,layer_name=layer)
-                        if focus_map is None:
-                            if args.use_max_for_focus_map:
-                                focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                            else:
-                                focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+                                spatial_attn_query, global_feat = positioning_module(channel_attn_query,
+                                                                                     layer_name=layer)
 
-                        pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                                  spatial_attn_query=spatial_attn_query,
-                                                                                  layer_name=layer,
-                                                                                  in_map=focus_map)
-                        q_dict[res] = feature
+                            # channel_attn_query = [1, 320, 64, 64]
+                            # spatial_attn_query = [1, 320, 64, 64]
+                            # modeling spatial attentive query
+                            if focus_map is None:
+                                if args.use_max_for_focus_map:
+                                    focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                                else:
+                                    focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+
+                            pred, feature, focus_map = positioning_module.predict_seg(
+                                channel_attn_query=channel_attn_query,
+                                spatial_attn_query=spatial_attn_query,
+                                layer_name=layer,
+                                in_map=focus_map)
+                            q_dict[res] = feature
+                        else:
+                            q_dict[res] = channel_attn_query
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
                     if args.use_simple_segmodel:
                         _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
@@ -141,19 +153,20 @@ def evaluation_check(segmentation_head,
                     dice = float(dice)
                     DSC = DSC + dice
                     # [2] saving image (all in 256 X 256)
-                    original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
-                    gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r))
+                    if args.save_image :
+                        original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
+                        gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r))
 
-                    predict_pil = torch_to_pil(mask_pred_argmax.reshape((r, r)).contiguous().detach().cpu())
-                    merged_pil = Image.blend(original_pil, predict_pil, 0.4)
-                    total_img = Image.new('RGB', (r * 4, r))
-                    total_img.paste(original_pil, (0, 0))
-                    total_img.paste(gt_pil, (r, 0))
-                    total_img.paste(predict_pil, (r * 2, 0))
-                    total_img.paste(merged_pil, (r * 3, 0))
-                    pure_path = batch['pure_path'][0]
+                        predict_pil = torch_to_pil(mask_pred_argmax.reshape((r, r)).contiguous().detach().cpu())
+                        merged_pil = Image.blend(original_pil, predict_pil, 0.4)
+                        total_img = Image.new('RGB', (r * 4, r))
+                        total_img.paste(original_pil, (0, 0))
+                        total_img.paste(gt_pil, (r, 0))
+                        total_img.paste(predict_pil, (r * 2, 0))
+                        total_img.paste(merged_pil, (r * 3, 0))
+                        pure_path = batch['pure_path'][0]
 
-                    total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
+                        total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
 
                 #######################################################################################################################
                 #######################################################################################################################

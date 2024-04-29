@@ -166,7 +166,7 @@ def main(args):
     loss_list = []
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
-        """
+
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
 
@@ -176,7 +176,6 @@ def main(args):
             device = accelerator.device
             loss_dict = {}
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
@@ -264,28 +263,30 @@ def main(args):
 
                 # channel_attn_query = [1, 320, 64, 64]
                 # spatial_attn_query = [1, 320, 64, 64]
-
                 # modeling spatial attentive query
+                    if focus_map is None :
+                        if args.use_max_for_focus_map :
+                            focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                        else :
+                            focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
 
-                if focus_map is None :
-                    if args.use_max_for_focus_map :
-                        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                    else :
-                        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+                    pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
+                                                                                  spatial_attn_query=spatial_attn_query,
+                                                                                  layer_name=layer,
+                                                                                  in_map=focus_map)
+                    total_loss += loss_dicece(input = pred,  # [class, 256,256]
+                                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
+                    q_dict[res] = feature
+                else :
+                    q_dict[res] = channel_attn_query
 
-                pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                              spatial_attn_query=spatial_attn_query,
-                                                                              layer_name=layer,
-                                                                              in_map=focus_map)
                 # if I get only one feature map, is it really meaningful to use two separate feature ?
                 #pred = channel_attn_query
-                q_dict[res] = feature
                 # focus_map = [batch, 1, res,res]
                 # pred      = [batch, 2, res, res]
                 # ------------------------------------------------------------------------------------------------- #
                 # mask prediction
-                total_loss += loss_dicece(input = pred,  # [class, 256,256]
-                                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
+                
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             if args.use_simple_segmodel :
                 _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
@@ -332,7 +333,7 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
         # ----------------------------------------------------------------------------------------------------------- #
-        """
+
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
@@ -538,6 +539,7 @@ if __name__ == "__main__":
     parser.add_argument("--vision_head_weights", type=str, default=None)
     parser.add_argument("--segmentation_model_weights", type=str, default=None)
     parser.add_argument("--previous_positioning_module", action='store_true')
+    parser.add_argument("--save_image", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
