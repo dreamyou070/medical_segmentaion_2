@@ -61,6 +61,7 @@ def evaluation_check(segmentation_head,
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
+                    focus_map = None
                     if args.image_processor == 'pvt':
                         output = condition_model(batch["image_condition"])
                         encoder_hidden_states = vision_head(output)
