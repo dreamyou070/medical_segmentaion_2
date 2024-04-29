@@ -249,11 +249,8 @@ def main(args):
                 # didnot use spatial attention ...
                 # spatial query
                 query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
-                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                 res = int(query.shape[1] ** 0.5)
-                #if args.test_before_query:
-                #    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                #else:
+                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                 query = query.reshape(1, res, res, -1)
                 query = query.permute(0, 3, 1, 2).contiguous()   # 1, dim, res, res
                 spatial_attn_query = query

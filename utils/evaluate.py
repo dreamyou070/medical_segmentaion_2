@@ -56,110 +56,87 @@ def evaluation_check(segmentation_head,
             device = accelerator.device
             with torch.no_grad():
                 y_true_list, y_pred_list = [], []
-                for global_num, batch in enumerate(test_dataloader):
-                    if not args.without_condition:
-                        if args.use_image_condition:
-                            """ condition model is already on device and dtype """
-                            with torch.no_grad():
-                                if args.image_processor == 'pvt':
-                                    output = condition_model(batch["image_condition"])
-                                    encoder_hidden_states = vision_head(output)  #
 
-                                elif args.image_processor == 'vit':
-                                    with torch.no_grad():
-                                        output, pix_embedding = condition_model(**batch["image_condition"])
-                                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                for step, batch in enumerate(test_dataloader):
+                    device = accelerator.device
 
-                    if args.use_text_condition:
-                        with torch.set_grad_enabled(True):
-                            encoder_hidden_states = condition_model(batch["input_ids"].to(device))[
-                                "last_hidden_state"]  # [batch, 77, 768]
-                    # [1] original image (1,3,512,512)
-                    image = batch['image'].to(dtype=weight_dtype)
 
-                    # [2] gt image
-                    gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,128*128
-                    gt = batch['gt'].to(dtype=weight_dtype)  # 1,3,256,256
 
+                    if args.image_processor == 'pvt':
+                        output = condition_model(batch["image_condition"])
+                        encoder_hidden_states = vision_head(output)
+                    elif args.image_processor == 'vit':
+                        with torch.no_grad():
+                            output, pix_embedding = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            if args.not_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
+                            if args.only_use_cls_token:
+                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+                    gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
+                    gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
                     with torch.no_grad():
                         latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-                        if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
-                            if encoder_hidden_states.dim() != 3:
-                                encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                            if encoder_hidden_states.dim() != 3:
-                                encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                        unet(latents,
-                             0,
-                             encoder_hidden_states,
-                             trg_layer_list=args.trg_layer_list,
-                             noise_type=position_embedder).sample
-                    query_dict, key_dict = controller.query_dict, controller.key_dict
-                    controller.reset()
-                    q_dict = {}
-                    for layer in args.trg_layer_list:
-                        query = query_dict[layer][0]  # head, pix_num, dim
-                        res = int(query.shape[1] ** 0.5)
-                        if args.text_before_query:
-                            query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                        else:
-                            query = query.reshape(1, res, res, -1)
-                            query = query.permute(0, 3, 1, 2).contiguous()
-                        if args.use_positioning_module:
-                            query, global_feat = positioning_module(query, layer_name=layer)
-                            if res == 16:
-                                global_attn = global_feat
-                        q_dict[res] = query
-
-                    x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
-                    if args.use_simple_segmodel:
-                        _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-                        # [2] segmentation head
-                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-                    else:
-                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out,
-                                                                 global_attn)  # [1,160,256,256]
-                        # [2] segmentation head
-                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-
-                    # gt = gt.permute(0, 2, 3, 1).contiguous()  # .view(-1, gt.shape[-1]).contiguous()   # 1,256,256,3
-                    # gt = gt.view(-1, gt.shape[-1]).contiguous()
-                    with torch.no_grad():
-                        latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                    # ----------------------------------------------------------------------------------------------------------- #
                     with torch.set_grad_enabled(True):
                         if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
                             if encoder_hidden_states.dim() != 3:
                                 encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                             if encoder_hidden_states.dim() != 3:
                                 encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                        noise_pred = unet(latents, 0, encoder_hidden_states,
-                                          trg_layer_list=args.trg_layer_list,
-                                          noise_type=position_embedder).sample
+                        unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                             noise_type=position_embedder).sample
                     query_dict, key_dict = controller.query_dict, controller.key_dict
                     controller.reset()
                     q_dict = {}
                     for layer in args.trg_layer_list:
-                        query = query_dict[layer][0]  # head, pix_num, dim
+                        query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
                         res = int(query.shape[1] ** 0.5)
-                        if args.text_before_query:
-                            query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
-                        else:
-                            query = query.reshape(1, res, res, -1)
-                            query = query.permute(0, 3, 1, 2).contiguous()
-                        q_dict[res] = query
+                        channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1,2).contiguous()
+                        query = query.reshape(1, res, res, -1)
+                        query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
+                        spatial_attn_query = query
+                        if args.use_positioning_module:
+                            if args.previous_positioning_module:
+                                # spatial
+                                spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
+                            else:
+                                spatial_attn_query, global_feat = positioning_module(channel_attn_query,
+                                                                                     layer_name=layer)
 
+                        # channel_attn_query = [1, 320, 64, 64]
+                        # spatial_attn_query = [1, 320, 64, 64]
+
+                        # modeling spatial attentive query
+
+                        if focus_map is None:
+                            if args.use_max_for_focus_map:
+                                focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                            else:
+                                focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+
+                        pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
+                                                                                  spatial_attn_query=spatial_attn_query,
+                                                                                  layer_name=layer,
+                                                                                  in_map=focus_map)
+                        # if I get only one feature map, is it really meaningful to use two separate feature ?
+                        # pred = channel_attn_query
+                        q_dict[res] = feature
+                        # focus_map = [batch, 1, res,res]
+                        # pred      = [batch, 2, res, res]
+                        # ------------------------------------------------------------------------------------------------- #
+                        # mask prediction
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-
                     if args.use_simple_segmodel:
                         _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
                         # [2] segmentation head
                         masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
                     else:
                         features = segmentation_head.gen_feature(x16_out, x32_out, x64_out,
-                                                                 global_attn)  # [1,160,256,256]
+                                                                 global_feat)  # [1,160,256,256]
                         # [2] segmentation head
                         masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-
                     masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                                    masks_pred.shape[-1]).contiguous()
                     # [1] pred
