@@ -497,6 +497,6 @@ if __name__ == "__main__":
     parser.add_argument("--reverse", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
-    from data.dataset_multi import passing_mvtec_argument
+    from data.dataset import passing_mvtec_argument
     passing_mvtec_argument(args)
     main(args)

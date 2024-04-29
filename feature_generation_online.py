@@ -310,15 +310,6 @@ def main(args):
                 loss += focal_loss
                 loss_dict['focal_loss'] = focal_loss.item()
                 loss = loss.mean()
-            # ----------------------------------------------------------------------------------------------------------- #
-            # why does it takes so much time ... ?
-            # is there any other way to accelerate this process ?
-            # [3]
-            #if args.online_pseudo_loss :
-                #if args.anomal_small_loss:
-                #    loss = loss + pseudo_loss * args.pseudo_loss_weight + anomal_loss * args.anomal_loss_weight
-                #else :
-                #loss = loss + pseudo_loss * args.pseudo_loss_weight
 
             total_loss += loss.mean()
             current_loss = total_loss.detach().item()
@@ -379,57 +370,21 @@ def main(args):
                             saving_name=f'positioning-{saving_epoch}.pt',
                             unwrapped_nw=accelerator.unwrap_model(positioning_module),
                             save_dtype=save_dtype)
-
-            """
-            save_model(args,
-                       saving_folder='anomal_generator',
-                       saving_name=f'anomal-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(anomal_generator),
-                       save_dtype=save_dtype)
-            """
-
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
-        loader = test_dataloader
-        if args.check_training:
-            print(f'test with training data')
-            loader = train_dataloader
+        evaluation_check(segmentation_head,
+                         condition_model,
+                         unet,
+                         vae,
+                         controller,
+                         weight_dtype,
+                         epoch,
+                         position_embedder,
+                         vision_head,
+                         positioning_module,
+                         accelerator,
+                         args)
 
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head,
-                                                           loader,
-                                                           accelerator.device,
-                                                           condition_model,
-                                                           unet, vae, controller, weight_dtype, epoch,
-                                                           None,
-                                                           position_embedder, vision_head,
-                                                           positioning_module,
-                                                           args)
-
-        # saving
-        if is_main_process:
-            print(f'  - precision dictionary = {score_dict}')
-            print(f'  - confusion_matrix = {confusion_matrix}')
-            confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
-            with open(confusion_save_dir, 'a') as f:
-                f.write(f' epoch = {epoch + 1} \n')
-                for i in range(len(confusion_matrix)):
-                    for j in range(len(confusion_matrix[i])):
-                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                    f.write('\n')
-                f.write('\n')
-
-            score_save_dir = os.path.join(args.output_dir, 'score.txt')
-            with open(score_save_dir, 'a') as f:
-                dices = []
-                f.write(f' epoch = {epoch + 1} | ')
-                for k in score_dict:
-                    dice = float(score_dict[k])
-                    f.write(f'class {k} = {dice} ')
-                    dices.append(dice)
-                dice_coeff = sum(dices) / len(dices)
-                f.write(f'| dice_coeff = {dice_coeff}')
-                f.write(f'\n')
     accelerator.end_training()
 
 if __name__ == "__main__":
@@ -586,6 +541,6 @@ if __name__ == "__main__":
     parser.add_argument("--previous_positioning_module", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
-    from data.dataset_multi import passing_mvtec_argument
+    from data.dataset import passing_mvtec_argument
     passing_mvtec_argument(args)
     main(args)

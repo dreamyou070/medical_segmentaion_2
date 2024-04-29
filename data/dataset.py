@@ -2,66 +2,19 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 import torch
-import glob
 from PIL import Image
 from torchvision import transforms
-import cv2
 from tensorflow.keras.utils import to_categorical
-from torch import nn
 
-brain_class_map = {0: ['b','brain'],
-                   1: ['n','non-enhancing tumor core'],
-                   2: ['e','edema'],
-                   3: ['t','enhancing tumor'],}
-cardiac_class_map = {0: ['b','background'],
-                        1: ['l','left ventricle'],
-                        2: ['m','myocardium'],
-                        3: ['r','right ventricle'],}
-abdomen_class_map = {0: ['b','background'],
-                        1: ['x','aorta'],
-                        2: ['l','liver'],
-                        3: ['k','kidney'],
-                        4: ['t','tumor'],
-                        5: ['v','vein'],
-                        6: ['s','spleen'],
-                        7: ['p','pancreas'],
-                        8: ['g','gallbladder'],
-                        9: ['f','fat'],
-                        10: ['m','muscle'],
-                        11: ['h','heart'],
-                        12: ['i','intestine'],
-                        13: ['o','other'], }
-leader_polyp_class_map = {0: ['b','background'],
-                          1: ['p','non-neoplastic'],
-                          2: ['n','neoplastic'],}
-teeth_class_map = {0: ['b','background'],
-                     1: ['t','anomal']}
-
-# (i) normal- NOR,
-# (ii) patients with previous myocardial infarction- MINF,
-# (iii) patients with dilated cardiomyopathy- DCM,
-# (iv) patients with hypertrophic cardiomyopathy- HCM,
-# (v) patients with abnormal right ventricle- ARV
-
-base_prompts = ['this is a picture of ',
-                'this is a picture of a ',
-                'this is a picture of the ',]
-
-class_matching_map = {0 : np.array([0,0,0]),
-                          1 : np.array([255,0,0]),
-                          2 : np.array([0,255,0]),
-                          3 : np.array([0,0,255])}
 def passing_mvtec_argument(args):
     global argument
     argument = args
 
-
-class TrainDataset_Seg(Dataset):
+class TrainDataset(Dataset):
 
     def __init__(self,
                  root_dir,
                  resize_shape=(240, 240),
-                 tokenizer=None,
                  image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
@@ -87,7 +40,6 @@ class TrainDataset_Seg(Dataset):
                     gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
-        self.tokenizer = tokenizer
         self.image_processor = image_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
@@ -106,12 +58,6 @@ class TrainDataset_Seg(Dataset):
         np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
         pil = Image.fromarray(np_img)
         return pil
-
-    def get_input_ids(self, caption):
-        tokenizer_output = self.tokenizer(caption, padding="max_length", truncation=True, return_tensors="pt")
-        input_ids = tokenizer_output.input_ids
-        attention_mask = tokenizer_output.attention_mask
-        return input_ids, attention_mask
 
     def load_image(self, image_path, trg_h, trg_w, type='RGB'):
         image = Image.open(image_path)
@@ -144,42 +90,21 @@ class TrainDataset_Seg(Dataset):
             elif 0.75 <= random_p:
                 number = 4
             img = np.rot90(img, k=number) # ok, because it is 3 channel image
-
         img = self.transform(img.copy())
+
 
         # [2] gt dir
         gt_path = self.gt_paths[idx]  #
-
-        if argument.gt_ext_npy :
-            gt_arr = np.load(gt_path)     # 256,256 (brain tumor case)
-            if self.use_data_aug:
-                gt_arr = np.rot90(gt_arr, k=number)
-            if argument.obj_name == 'brain':
-                gt_arr = np.where(gt_arr==4, 3, gt_arr) # 4 -> 3
-            # make image from numpy
-
-            # [1] get final image
-            H, W = gt_arr.shape[0], gt_arr.shape[1]
-            mask_rgb = np.zeros((H, W, 3))
-            for h_index in range(H):
-                for w_index in range(W):
-                    mask_rgb[h_index, w_index] = class_matching_map[gt_arr[h_index, w_index]]
-            mask_pil = Image.fromarray(mask_rgb.astype(np.uint8))
-            mask_pil = mask_pil.resize((384,384), Image.BICUBIC)
-            mask_img = self.transform(np.array(mask_pil))
-
-
-        else :
-            try :
-                gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            except :
-                name, ext = os.path.splitext(gt_path)
-                gt_path = f'{name}.png'
-                gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-            if self.use_data_aug :
-                gt_img = np.rot90(gt_img, k=number)
-            gt_arr = np.array(gt_img) # 128,128
-            gt_arr = np.where(gt_arr > 100, 1, 0)
+        try :
+            gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+        except :
+            name, ext = os.path.splitext(gt_path)
+            gt_path = f'{name}.png'
+            gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
+        if self.use_data_aug :
+            gt_img = np.rot90(gt_img, k=number)
+        gt_arr = np.array(gt_img) # 128,128
+        gt_arr = np.where(gt_arr > 100, 1, 0)
 
         # [3] generate res 64 gt image
         gt_64_pil = Image.open(gt_path).convert('L').resize((self.latent_res, self.latent_res), Image.BICUBIC)
@@ -188,14 +113,14 @@ class TrainDataset_Seg(Dataset):
         gt_64_flat = gt_64_array.flatten()  # 64*64
         gt_64_array = torch.tensor(to_categorical(gt_64_array, num_classes=self.n_classes)).permute(2,0,1).contiguous() # [3,64,64]
 
-
-        #
+        # [3.2]
         gt_32_pil = Image.open(gt_path).convert('L').resize((32, 32), Image.BICUBIC)
         gt_32_array = np.array(gt_32_pil) # [32,32]
         gt_32_array = np.where(gt_32_array > 100, 1, 0)
         gt_32_array = to_categorical(gt_32_array, num_classes=self.n_classes)
         gt_32_array = torch.tensor(gt_32_array).permute(2,0,1).contiguous() # [3,32,32]
 
+        # [3.3]
         gt_16_pil = Image.open(gt_path).convert('L').resize((16, 16), Image.BICUBIC)
         gt_16_array = np.array(gt_16_pil) # [16,16]
         gt_16_array = np.where(gt_16_array > 100, 1, 0)
@@ -206,11 +131,6 @@ class TrainDataset_Seg(Dataset):
         res_array_gt['64'] = gt_64_array
         res_array_gt['32'] = gt_32_array
         res_array_gt['16'] = gt_16_array
-
-
-
-        # ex) 0, 1, 2
-        class_es = np.unique(gt_arr)
 
         gt_arr_ = to_categorical(gt_arr, num_classes=self.n_classes)
         class_num = gt_arr_.shape[-1]
@@ -224,50 +144,6 @@ class TrainDataset_Seg(Dataset):
         # [3] gt flatten
         gt_flat = gt_arr.flatten() # 128*128
 
-        if argument.use_image_by_caption :
-
-            # [3] caption
-            if argument.obj_name == 'brain':
-                class_map = brain_class_map
-            elif argument.obj_name == 'cardiac':
-                class_map = cardiac_class_map
-            elif argument.obj_name == 'abdomen':
-                class_map = abdomen_class_map
-            elif argument.obj_name == 'leader_polyp':
-                class_map = leader_polyp_class_map
-
-            if argument.use_base_prompt :
-                caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
-                caption = ''
-            caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            for i, class_idx in enumerate(class_es):
-                if argument.use_key_word :
-                    caption += class_map[class_idx][0]
-                else :
-                    caption += class_map[class_idx][1]
-
-                if i == class_es.shape[0] - 1:
-                    caption += ''
-                else:
-                    #caption += ', '
-                    caption += ' '
-        else :
-            if argument.use_base_prompt :
-                base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
-            else :
-                base_prompt = ''
-            caption = f'{base_prompt}{argument.obj_name}'
-
-        caption_token = self.tokenizer(caption,
-                                       padding="max_length",
-                                       truncation=True, return_tensors="pt")
-        input_ids = caption_token.input_ids
-
-        # [3] image pixel
-
-        # condition image = [384,384]
-        # gt =[3,256,256]
         gt_pil = gt.permute(1,2,0).cpu().numpy() * 255
         gt_pil = gt_pil.astype(np.uint8)
         # remove r channel to zero
@@ -301,25 +177,21 @@ class TrainDataset_Seg(Dataset):
                                                        return_tensors="pt",
                                                        padding=True)  # .data['pixel_values'] # [1,3,224,224]
             image_condition.data['pixel_values'] = (image_condition.data['pixel_values']).squeeze()
-            pixel_value = image_condition.data["pixel_values"]  # [3,224,224]
 
         # can i use visual attention mask in ViT ?
         return {'image': img,  # [3,512,512]
                 "gt": gt,                       # [3,256,256]
                 "gt_flat" : gt_flat,            # [128*128]
-                "input_ids": input_ids,
-                'caption' : caption,
                 "image_condition" : image_condition,
                 'res_array_gt' : res_array_gt,
                 'gt_64_flat' : gt_64_flat} # [197,1]
 
 
-class TestDataset_Seg(Dataset):
+class TestDataset(Dataset):
 
     def __init__(self,
                  root_dir,
                  resize_shape=(240, 240),
-                 tokenizer=None,
                  image_processor=None,
                  latent_res: int = 64,
                  n_classes: int = 4,
@@ -332,7 +204,6 @@ class TestDataset_Seg(Dataset):
         folders = os.listdir(self.root_dir)  # anomal
         for folder in folders:
             folder_dir = os.path.join(self.root_dir, folder)  # anomal
-            folder_res = folder.split('_')[-1]
             rgb_folder = os.path.join(folder_dir, f'images')  # anomal / image_256
             gt_folder = os.path.join(folder_dir, f'masks')  # [128,128]
             files = os.listdir(rgb_folder)  #
@@ -345,7 +216,6 @@ class TestDataset_Seg(Dataset):
                     gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
-        self.tokenizer = tokenizer
         self.image_processor = image_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
@@ -480,49 +350,7 @@ class TestDataset_Seg(Dataset):
         # [3] gt flatten
         gt_flat = gt_arr.flatten()  # 128*128
 
-        if argument.use_image_by_caption:
 
-            # [3] caption
-            if argument.obj_name == 'brain':
-                class_map = brain_class_map
-            elif argument.obj_name == 'cardiac':
-                class_map = cardiac_class_map
-            elif argument.obj_name == 'abdomen':
-                class_map = abdomen_class_map
-            elif argument.obj_name == 'leader_polyp':
-                class_map = leader_polyp_class_map
-
-            if argument.use_base_prompt:
-                caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            else:
-                caption = ''
-            caption = base_prompts[np.random.randint(0, len(base_prompts))]
-            for i, class_idx in enumerate(class_es):
-                if argument.use_key_word:
-                    caption += class_map[class_idx][0]
-                else:
-                    caption += class_map[class_idx][1]
-
-                if i == class_es.shape[0] - 1:
-                    caption += ''
-                else:
-                    # caption += ', '
-                    caption += ' '
-        else:
-            if argument.use_base_prompt:
-                base_prompt = base_prompts[np.random.randint(0, len(base_prompts))]
-            else:
-                base_prompt = ''
-            caption = f'{base_prompt}{argument.obj_name}'
-
-        caption_token = self.tokenizer(caption,
-                                       padding="max_length",
-                                       truncation=True, return_tensors="pt")
-        input_ids = caption_token.input_ids
-
-        # [3] image pixel
-
-        # condition image = [384,384]
         # gt =[3,256,256]
         gt_pil = gt.permute(1, 2, 0).cpu().numpy() * 255
         gt_pil = gt_pil.astype(np.uint8)
@@ -562,8 +390,6 @@ class TestDataset_Seg(Dataset):
         return {'image': img,  # [3,512,512]
                 "gt": gt,  # [3,256,256]
                 "gt_flat": gt_flat,  # [128*128]
-                "input_ids": input_ids,
-                'caption': caption,
                 "image_condition": image_condition,
                 'res_array_gt': res_array_gt,
                 'gt_64_flat': gt_64_flat}  # [197,1]
