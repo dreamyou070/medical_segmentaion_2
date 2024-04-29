@@ -64,8 +64,8 @@ def main(args):
         else :
             segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm)
-        if args.segmentation_weights is not None :
-            segmentation_head.load_state_dict(torch.load(args.segmentation_weights))
+        if args.segmentation_weightssegmentation_model_weights is not None :
+            segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
 
     vision_head = None
     if args.image_processor == 'pvt' :
