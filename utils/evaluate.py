@@ -43,6 +43,7 @@ def evaluation_check(segmentation_head,
         os.makedirs(inference_base_dir, exist_ok=True)
         epoch_dir = os.path.join(inference_base_dir, f'epoch_{epoch}')
         os.makedirs(epoch_dir, exist_ok=True)
+
         DSC = 0.0
 
         for _data_name in folders:
@@ -55,8 +56,8 @@ def evaluation_check(segmentation_head,
             test_dataloader = call_test_dataset(args, _data_name)
             test_dataloader = accelerator.prepare(test_dataloader)
 
-            device = accelerator.device
             with torch.no_grad():
+
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
@@ -119,8 +120,7 @@ def evaluation_check(segmentation_head,
                     else:
                         features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_feat)  # [1,160,256,256]
                         masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-                    masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
-                                                                                   masks_pred.shape[-1]).contiguous()
+
                     # [1] pred
                     class_num = masks_pred.shape[1]  # 4
                     mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
@@ -154,6 +154,8 @@ def evaluation_check(segmentation_head,
                     total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
 
                 #######################################################################################################################
+                #######################################################################################################################
+                #######################################################################################################################
                 # [1] pred
                 y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
                 y_pred = F.one_hot(y_pred, num_classes=class_num)  # [pixel_num, C]
@@ -174,33 +176,33 @@ def evaluation_check(segmentation_head,
                                 total_actual_num + total_predict_num + eps)
                     IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
                 # [1] WC Score
-            dataset_dice = DSC / len(folders)
-            print(f' {_data_name} finished !')
-            segmentation_head.train()
-            # saving score
-            # saving
-            if accelerator.is_main_process :
-                print(f'  - precision dictionary = {IOU_dict}')
-                print(f'  - confusion_matrix = {confusion_matrix}')
-                confusion_matrix = confusion_matrix.tolist()
-                confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
-                with open(confusion_save_dir, 'a') as f:
-                    f.write(f' data_name = {_data_name} \n')
-                    for i in range(len(confusion_matrix)):
-                        for j in range(len(confusion_matrix[i])):
-                            f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                dataset_dice = DSC / len(folders)
+                print(f' {_data_name} finished !')
+                segmentation_head.train()
+                # saving score
+                # saving
+                if accelerator.is_main_process :
+                    print(f'  - precision dictionary = {IOU_dict}')
+                    print(f'  - confusion_matrix = {confusion_matrix}')
+                    confusion_matrix = confusion_matrix.tolist()
+                    confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
+                    with open(confusion_save_dir, 'a') as f:
+                        f.write(f' data_name = {_data_name} \n')
+                        for i in range(len(confusion_matrix)):
+                            for j in range(len(confusion_matrix[i])):
+                                f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                            f.write('\n')
                         f.write('\n')
-                    f.write('\n')
 
-                score_save_dir = os.path.join(save_base_dir, 'score.txt')
-                with open(score_save_dir, 'a') as f:
-                    dices = []
-                    f.write(f' data_name = {_data_name} | ')
-                    for k in IOU_dict:
-                        dice = float(IOU_dict[k])
-                        f.write(f'class {k} = {dice} ')
-                        dices.append(dice)
-                    dice_coeff = sum(dices) / len(dices)
-                    f.write(f'| dice_coeff = {dice_coeff}')
-                    f.write(f'\n')
-                    f.write(f' dice score = {dataset_dice} \n')
+                    score_save_dir = os.path.join(save_base_dir, 'score.txt')
+                    with open(score_save_dir, 'a') as f:
+                        dices = []
+                        f.write(f' data_name = {_data_name} | ')
+                        for k in IOU_dict:
+                            dice = float(IOU_dict[k])
+                            f.write(f'class {k} = {dice} ')
+                            dices.append(dice)
+                        dice_coeff = sum(dices) / len(dices)
+                        f.write(f'| dice_coeff = {dice_coeff}')
+                        f.write(f'\n')
+                        f.write(f' dice score = {dataset_dice} \n')
