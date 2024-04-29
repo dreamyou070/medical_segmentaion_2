@@ -42,7 +42,7 @@ def call_test_dataset(args, _data_name) :
     # [1] data_path here
 
     base_path = os.path.split(args.train_data_path)[0]
-    test_base_path = os.path.joi(base_path, 'test')
+    test_base_path = os.path.join(base_path, 'test')
     data_path = os.path.join(test_base_path, _data_name)
     image_root = os.path.join(data_path, 'images')
     gt_root = os.path.join(data_path, 'masks')
