@@ -199,6 +199,9 @@ class SA_Block(nn.Module):
 # ##################### Positioning Module ########################
 ###################################################################
 class Positioning(nn.Module):
+
+    " why i need positioning module ? "
+
     def __init__(self, channel, use_channel_attn):
         super(Positioning, self).__init__()
         self.channel = channel
@@ -206,17 +209,20 @@ class Positioning(nn.Module):
         if self.use_channel_attn:
             self.cab = CA_Block(self.channel)
         self.sab = SA_Block(self.channel)
-        self.map =  nn.Conv2d(self.channel, 1, 11, 1, 5)  # as if average pooling
+        self.map = nn.Conv2d(self.channel, 1, 11, 1, 5)  # as if average pooling
 
     def forward(self, x):
+
         if self.use_channel_attn:
             self.cab = self.cab.to(x.device)
             x = self.cab(x) # is like self attntion
         self.sab = self.sab.to(x.device)
         sab = self.sab(x)
+
+        # global feature
         self.map = self.map.to(x.device)
         global_sab = self.map(sab)
-        return sab+global_sab, global_sab
+        return sab, sab+global_sab, global_sab
 
 class AllPositioning(nn.Module):
 
@@ -240,6 +246,7 @@ class AllPositioning(nn.Module):
         else:
             layer_names = self.layer_names
         for layer_name in layer_names.keys():
+
             self.position_net[layer_name] = Positioning(channel = int(layer_names[layer_name]),
                                                         use_channel_attn = use_channel_attn)
         # ------------------------------------------------------------------------------------------
@@ -261,8 +268,8 @@ class AllPositioning(nn.Module):
         # when positioning, SA module
         net = self.position_net[layer_name]
         # generate spatial attention result and global_feature
-        x, global_feat = net(x)
-        return x, global_feat
+        sab, sab_global_sab, global_sab = net(x)
+        return sab, sab_global_sab, global_sab
 
     def predict_seg(self, channel_attn_query, spatial_attn_query, layer_name, in_map) :
         focus_net = self.focus_net[layer_name]

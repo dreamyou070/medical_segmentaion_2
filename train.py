@@ -260,10 +260,9 @@ def main(args):
                         spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
                     else :
                         spatial_attn_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
-
-                # channel_attn_query = [1, 320, 64, 64]
-                # spatial_attn_query = [1, 320, 64, 64]
-                # modeling spatial attentive query
+                    # channel_attn_query = [1, 320, 64, 64]
+                    # spatial_attn_query = [1, 320, 64, 64]
+                    # modeling spatial attentive query
                     if focus_map is None :
                         if args.use_max_for_focus_map :
                             focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
@@ -271,11 +270,11 @@ def main(args):
                             focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
 
                     pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                                  spatial_attn_query=spatial_attn_query,
-                                                                                  layer_name=layer,
-                                                                                  in_map=focus_map)
+                                                                              spatial_attn_query=spatial_attn_query,
+                                                                              layer_name=layer,
+                                                                              in_map=focus_map)
                     total_loss += loss_dicece(input = pred,  # [class, 256,256]
-                                   target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
+                                              target= batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
                     q_dict[res] = feature
                 else :
                     q_dict[res] = channel_attn_query
