@@ -20,7 +20,7 @@ file_name="1_pvt_without_embedding"
 #--position_embedder_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/position_embedder/position-000041.pt" \
 #--segmentation_model_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/segmentation/segmentation-000029.pt" \
 #--vision_head_weights "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}/vision_head/vision-000041.pt" \
-accelerate launch --config_file ../../gpu_config/gpu_0_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number train.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \

@@ -169,7 +169,7 @@ def main(args):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
         epoch_loss_total =0
-        """
+
         for step, batch in enumerate(train_dataloader):
             total_loss = 0
             focus_map = None
@@ -370,7 +370,7 @@ def main(args):
                             saving_name=f'positioning-{saving_epoch}.pt',
                             unwrapped_nw=accelerator.unwrap_model(positioning_module),
                             save_dtype=save_dtype)
-        """
+
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
         evaluation_check(segmentation_head,
