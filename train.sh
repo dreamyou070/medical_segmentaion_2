@@ -8,8 +8,8 @@ obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
-sub_folder="up_16_32_64_selfattn"
-file_name="test"
+sub_folder="up_16_32_64_20240430"
+file_name="1_pvt_without_embedding"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)

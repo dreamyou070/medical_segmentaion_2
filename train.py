@@ -333,7 +333,7 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
         # ----------------------------------------------------------------------------------------------------------- #
-        """
+        
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
@@ -370,6 +370,7 @@ def main(args):
                             saving_name=f'positioning-{saving_epoch}.pt',
                             unwrapped_nw=accelerator.unwrap_model(positioning_module),
                             save_dtype=save_dtype)
+        """
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
         evaluation_check(segmentation_head,

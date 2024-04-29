@@ -45,7 +45,7 @@ def evaluation_check(segmentation_head,
         os.makedirs(epoch_dir, exist_ok=True)
 
         DSC = 0.0
-
+        IOU = 0.0
         for _data_name in folders:
 
             # [1] data_path here
@@ -151,7 +151,9 @@ def evaluation_check(segmentation_head,
                     intersection = (input_flat * target_flat)  # only both are class 1
                     dice = (2 * intersection.sum() + smooth) / (input.sum() + target.sum() + smooth)  # dice = every pixel by pixel
                     dice = float(dice)
+                    iou =  (intersection.sum() + smooth) / (input.sum() + target.sum() - intersection.sum() + smooth)
                     DSC = DSC + dice
+                    IOU = IOU + iou
                     # [2] saving image (all in 256 X 256)
                     if args.save_image :
                         original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
@@ -221,3 +223,4 @@ def evaluation_check(segmentation_head,
                         f.write(f'| dice_coeff = {dice_coeff}')
                         f.write(f'\n')
                         f.write(f' dice score = {dataset_dice} \n')
+                        f.write(f' IOU score = {IOU} \n')
