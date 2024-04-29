@@ -43,6 +43,8 @@ def evaluation_check(segmentation_head,
         os.makedirs(inference_base_dir, exist_ok=True)
         epoch_dir = os.path.join(inference_base_dir, f'epoch_{epoch}')
         os.makedirs(epoch_dir, exist_ok=True)
+        DSC = 0.0
+
         for _data_name in folders:
 
             # [1] data_path here
@@ -58,10 +60,6 @@ def evaluation_check(segmentation_head,
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
-                    device = accelerator.device
-
-
-
                     if args.image_processor == 'pvt':
                         output = condition_model(batch["image_condition"])
                         encoder_hidden_states = vision_head(output)
@@ -102,14 +100,7 @@ def evaluation_check(segmentation_head,
                                 # spatial
                                 spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
                             else:
-                                spatial_attn_query, global_feat = positioning_module(channel_attn_query,
-                                                                                     layer_name=layer)
-
-                        # channel_attn_query = [1, 320, 64, 64]
-                        # spatial_attn_query = [1, 320, 64, 64]
-
-                        # modeling spatial attentive query
-
+                                spatial_attn_query, global_feat = positioning_module(channel_attn_query,layer_name=layer)
                         if focus_map is None:
                             if args.use_max_for_focus_map:
                                 focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
@@ -120,22 +111,13 @@ def evaluation_check(segmentation_head,
                                                                                   spatial_attn_query=spatial_attn_query,
                                                                                   layer_name=layer,
                                                                                   in_map=focus_map)
-                        # if I get only one feature map, is it really meaningful to use two separate feature ?
-                        # pred = channel_attn_query
                         q_dict[res] = feature
-                        # focus_map = [batch, 1, res,res]
-                        # pred      = [batch, 2, res, res]
-                        # ------------------------------------------------------------------------------------------------- #
-                        # mask prediction
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
                     if args.use_simple_segmodel:
                         _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-                        # [2] segmentation head
                         masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
                     else:
-                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out,
-                                                                 global_feat)  # [1,160,256,256]
-                        # [2] segmentation head
+                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_feat)  # [1,160,256,256]
                         masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
                     masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
                                                                                    masks_pred.shape[-1]).contiguous()
@@ -143,12 +125,20 @@ def evaluation_check(segmentation_head,
                     class_num = masks_pred.shape[1]  # 4
                     mask_pred_argmax = torch.argmax(masks_pred, dim=1).flatten()  # 256*256
                     # masks_pred = [batch, 2, 256,256]
-
                     r = int(mask_pred_argmax.shape[0] ** .5)
                     y_pred_list.append(mask_pred_argmax)
                     y_true = gt_flat.squeeze()
                     y_true_list.append(y_true)
 
+                    smooth = 1
+                    target = y_true
+                    input = mask_pred_argmax
+                    input_flat = input
+                    target_flat = target
+                    intersection = (input_flat * target_flat)  # only both are class 1
+                    dice = (2 * intersection.sum() + smooth) / (input.sum() + target.sum() + smooth)  # dice = every pixel by pixel
+                    dice = float(dice)
+                    DSC = DSC + dice
                     # [2] saving image (all in 256 X 256)
                     original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
                     gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r))
@@ -184,8 +174,9 @@ def evaluation_check(segmentation_head,
                                 total_actual_num + total_predict_num + eps)
                     IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
                 # [1] WC Score
-            segmentation_head.train()
+            dataset_dice = DSC / len(folders)
             print(f' {_data_name} finished !')
+            segmentation_head.train()
             # saving score
             # saving
             if accelerator.is_main_process :
@@ -212,3 +203,4 @@ def evaluation_check(segmentation_head,
                     dice_coeff = sum(dices) / len(dices)
                     f.write(f'| dice_coeff = {dice_coeff}')
                     f.write(f'\n')
+                    f.write(f' dice score = {dataset_dice} \n')
