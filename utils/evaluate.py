@@ -152,6 +152,7 @@ def evaluation_check(segmentation_head,
                     total_img.paste(predict_pil, (r * 2, 0))
                     total_img.paste(merged_pil, (r * 3, 0))
                     pure_path = batch['pure_path'][0]
+
                     total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
 
                 #######################################################################################################################

@@ -256,6 +256,7 @@ class TestDataset(Dataset):
 
         # [1] base
         img_path = self.image_paths[idx]
+        pure_path = os.path.split(img_path)[-1]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
         if self.use_data_aug:
@@ -390,4 +391,5 @@ class TestDataset(Dataset):
                 "gt_flat": gt_flat,  # [128*128]
                 "image_condition": image_condition,
                 'res_array_gt': res_array_gt,
-                'gt_64_flat': gt_64_flat}  # [197,1]
+                'gt_64_flat': gt_64_flat,
+                'pure_path' : pure_path}  # [197,1]
