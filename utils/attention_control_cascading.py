@@ -21,6 +21,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             is_cross_attention = False
             if context is not None:
                 is_cross_attention = True
+                print(f'layer_name: {layer_name} : hidden_states = {hidden_states.shape}')
 
             if noise_type is not None and argument.use_position_embedder :
                 """ cross attention position embedding """
