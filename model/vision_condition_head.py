@@ -1,7 +1,7 @@
 from torch import nn
 class vision_condition_head(nn.Module):
 
-    def __init__(self, reverse=False):
+    def __init__(self, reverse=False, use_one=False):
         super(vision_condition_head, self).__init__()
         multi_dims = [64, 128, 320, 512]
         condition_dim = 768
@@ -12,6 +12,7 @@ class vision_condition_head(nn.Module):
         self.fc_4 = nn.Linear(multi_dims[3], condition_dim)
 
         self.reverse = reverse
+        self.use_one = use_one
 
     def forward(self, x):
 
@@ -37,10 +38,17 @@ class vision_condition_head(nn.Module):
             condition_dict[32] = y2
             condition_dict[16] = y3
             condition_dict[8] = y4
-        else :
-            condition_dict[64] = y4
-            condition_dict[32] = y3
-            condition_dict[16] = y2
-            condition_dict[8] = y1
+
+        if not self.reverse :
+
+            elif self.use_one :
+                condition_dict[64] = y3
+                condition_dict[32] = y3
+                condition_dict[16] = y3
+            else :
+                condition_dict[64] = y4
+                condition_dict[32] = y3
+                condition_dict[16] = y2
+                condition_dict[8] = y1
 
         return condition_dict

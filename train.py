@@ -69,11 +69,8 @@ def main(args):
 
     vision_head = None
     if args.image_processor == 'pvt' :
-        vision_head = vision_condition_head(reverse = args.reverse)
-        if args.vision_head_weights is not None :
-            vision_head.load_state_dict(torch.load(args.vision_head_weights))
-
-    position_embedder = None
+        vision_head = vision_condition_head(reverse = args.reverse,
+                                            use_one = args.use_one)
     if args.use_position_embedder :
         position_embedder = AllPositionalEmbedding()
         if args.position_embedder_weights is not None :
@@ -257,9 +254,9 @@ def main(args):
                 if args.use_positioning_module :
                     if args.previous_positioning_module:
                         # spatial
-                        spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
+                        _, spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
                     else :
-                        spatial_attn_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
+                        _, spatial_attn_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
                     # channel_attn_query = [1, 320, 64, 64]
                     # spatial_attn_query = [1, 320, 64, 64]
                     # modeling spatial attentive query
@@ -540,6 +537,7 @@ if __name__ == "__main__":
     parser.add_argument("--segmentation_model_weights", type=str, default=None)
     parser.add_argument("--previous_positioning_module", action='store_true')
     parser.add_argument("--save_image", action='store_true')
+    parser.add_argument("--use_one", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
