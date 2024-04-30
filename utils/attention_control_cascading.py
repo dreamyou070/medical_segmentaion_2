@@ -33,14 +33,15 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             # change query dim to 768
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
-                if len(controller.query_list) == 0 :
-                    controller.query_list.append(query)
-                else :
+                if len(controller.query_list) != 0 :
                     before_query = controller.query_list[0]
                     controller.query_list = []
-                    controller.query_list.append(query) # save final query (batch, pix_num, dim)
+
                     positioning = noise_type[1]
                     # change context
+                    # ok,
+                    # before_query = [batch, pix_num, dim = 320]
+                    # layer_name = [batch, pix_num, dim = 640]
                     context = positioning(before_query, layer_name)
             context = context if context is not None else hidden_states
             if type(context) == dict :
@@ -75,7 +76,8 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
                 # [2] after channel attn [Batch, pix_num, dim]
-                controller.save_query(hidden_states, layer_name)
+                #controller.save_query(hidden_states, layer_name)
+                controller.query_list.append(hidden_states)  # add final hidden layer
             hidden_states = self.to_out[0](hidden_states)
             # it does not add original query again
             return hidden_states
