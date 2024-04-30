@@ -27,25 +27,25 @@ class SelfFeatureMerger(nn.Module):
     # all cross attention #
 
     layer_names_res_dim = {'down_blocks_0_attentions_0_transformer_blocks_0_attn2': (64, 320), # before query
-                           'down_blocks_0_attentions_1_transformer_blocks_0_attn2': (64, 640), # present layer
+                           'down_blocks_0_attentions_1_transformer_blocks_0_attn2': (64, 320), # present layer
 
-                           'down_blocks_1_attentions_0_transformer_blocks_0_attn2': (32, 640),
-                           'down_blocks_1_attentions_1_transformer_blocks_0_attn2': (32, 1280),
+                           'down_blocks_1_attentions_0_transformer_blocks_0_attn2': (32, 320),
+                           'down_blocks_1_attentions_1_transformer_blocks_0_attn2': (32, 640),
 
-                           'down_blocks_2_attentions_0_transformer_blocks_0_attn2': (16, 1280),
+                           'down_blocks_2_attentions_0_transformer_blocks_0_attn2': (16, 640),
                            'down_blocks_2_attentions_1_transformer_blocks_0_attn2': (16, 1280),
 
                            'mid_block_attentions_0_transformer_blocks_0_attn2': (8, 1280),
 
                            'up_blocks_1_attentions_0_transformer_blocks_0_attn2': (16, 1280),
                            'up_blocks_1_attentions_1_transformer_blocks_0_attn2': (16, 1280),
-                           'up_blocks_1_attentions_2_transformer_blocks_0_attn2': (16, 640),
+                           'up_blocks_1_attentions_2_transformer_blocks_0_attn2': (16, 1280),
 
-                           'up_blocks_2_attentions_0_transformer_blocks_0_attn2': (32, 640),
+                           'up_blocks_2_attentions_0_transformer_blocks_0_attn2': (32, 1280),
                            'up_blocks_2_attentions_1_transformer_blocks_0_attn2': (32, 640),
-                           'up_blocks_2_attentions_2_transformer_blocks_0_attn2': (32, 320),
+                           'up_blocks_2_attentions_2_transformer_blocks_0_attn2': (32, 640),
 
-                           'up_blocks_3_attentions_0_transformer_blocks_0_attn2': (64, 320),
+                           'up_blocks_3_attentions_0_transformer_blocks_0_attn2': (64, 640),
                            'up_blocks_3_attentions_1_transformer_blocks_0_attn2': (64, 320),
                            'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320),
                            }
