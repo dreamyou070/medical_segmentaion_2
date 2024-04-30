@@ -32,7 +32,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             # query = [batch, pix_num, dim]
             # change query dim to 768
 
-            if trg_layer_list is not None and layer_name in trg_layer_list:
+            if trg_layer_list is not None and layer_name in trg_layer_list[0]:
                 if len(controller.query_list) != 0 :
                     # before_query = [batch, pix_num, dim = 320]
                     # layer_name =   [batch, pix_num, dim = 640]
@@ -70,10 +70,14 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
-            if trg_layer_list is not None and layer_name in trg_layer_list:
+            if trg_layer_list is not None and layer_name in trg_layer_list[0]:
                 # [2] after channel attn [Batch, pix_num, dim]
                 #controller.save_query(hidden_states, layer_name)
                 controller.query_list.append(hidden_states)  # add final hidden layer
+            if trg_layer_list is not None and layer_name in trg_layer_list[1]:
+                # [2] after channel attn [Batch, pix_num, dim]
+                controller.save_query(hidden_states, layer_name)
+
             hidden_states = self.to_out[0](hidden_states)
             # it does not add original query again
             return hidden_states

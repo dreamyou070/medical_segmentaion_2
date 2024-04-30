@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_20240430"
-file_name="6_unet_selfguided"
+file_name="7_unet_selfguided_with_semantic_head"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)
@@ -49,9 +49,11 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
                     'up_blocks_3_attentions_0_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_1_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2']" \
+ --trg_layers "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_3_attentions_2_transformer_blocks_0_attn2']" \
  --n_classes 2 --mask_res 64 --batch_size 1 \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
  --use_image_condition --image_model_training --image_processor 'pvt' \
  --use_simple_segmodel --use_segmentation_model --start_epoch 0 --use_positioning_module \
  --channel_spatial_cascaded --self_condition
-

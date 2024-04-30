@@ -3,6 +3,7 @@
 # 1.1. extracting edge feature
 # 1.2. deep features are extracted according to edge feature
 import argparse, math, random, json
+from model.segmentation_unet import SemanticModel
 from tqdm import tqdm
 from accelerate.utils import set_seed
 import torch
@@ -11,7 +12,6 @@ import os
 from attention_store import AttentionStore
 from data import call_dataset
 from model import call_model_package
-from model.segmentation_unet_self import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
 from utils.attention_control_cascading import passing_argument, register_attention_control
@@ -55,7 +55,9 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
 
-    segmentation_head = SemanticModel(n_classes=args.n_classes)
+    segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                      mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm)
 
     vision_head = None
     if args.image_processor == 'pvt':
@@ -197,17 +199,32 @@ def main(args):
                 unet(latents,
                      0,
                      encoder_hidden_states,
-                     trg_layer_list=args.trg_layer_list,
+                     trg_layer_list=[args.trg_layer_list,args.trg_layers],
                      noise_type=[position_embedder, self_feature_merger]).sample
             feature = controller.query_list[0] # 1, 64*64, 320
+            query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
-            res = int(feature.shape[1] ** 0.5 )
-            query = feature.reshape(1, res, res, -1)
-            query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
-            masks_pred = segmentation_head(query)  # [1,2,256,256]  # [1,160,256,256]
+            q_dict = {}
+            global_feature = None
+            for layer in args.trg_layers:
+                query = query_dict[layer][0]  # head, pix_num, dim
+                res = int(query.shape[1] ** 0.5)
+                if args.text_before_query:
+                    query = reshape_batch_dim_to_heads_3D_4D(query)  # 1, res, res, dim
+                else:
+                    query = query.reshape(1, res, res, -1)
+                    query = query.permute(0, 3, 1, 2).contiguous()
+                q_dict[res] = query
+
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
+            masks_pred = segmentation_head.segment_feature(features)  # [1,3,256,256]
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype))  # [class, 64,64]
+
             total_loss += loss.mean()
             current_loss = total_loss.detach().item()
 
@@ -364,6 +381,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_train_epochs", type=int, default=None, )
     parser.add_argument("--gradient_checkpointing", action="store_true", help="enable gradient checkpointing")
     parser.add_argument("--trg_layer_list", type=arg_as_list, default=[])
+    parser.add_argument("--trg_layers", type=arg_as_list, default=[])
     parser.add_argument("--use_focal_loss", action='store_true')
     parser.add_argument("--position_embedder_weights", type=str, default=None)
     parser.add_argument("--use_position_embedder", action='store_true')
