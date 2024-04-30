@@ -19,7 +19,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
+from utils.evaluate_self import evaluation_check
 from monai.losses import DiceLoss, DiceCELoss
 from model.focus_net import PFNet
 from model.vision_condition_head import vision_condition_head
@@ -68,9 +68,7 @@ def main(args):
 
 
     from model.self_feature_merging import SelfFeatureMerger
-    self_feature_merger = SelfFeatureMerger(use_channel_attn=args.use_channel_attn,
-                                            use_self_attn=args.use_self_attn,
-                                            n_classes=args.n_classes, )
+    self_feature_merger = SelfFeatureMerger()
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -271,7 +269,7 @@ def main(args):
                          epoch,
                          position_embedder,
                          vision_head,
-                         positioning_module,
+                         self_feature_merger,
                          accelerator,
                          args)
 
