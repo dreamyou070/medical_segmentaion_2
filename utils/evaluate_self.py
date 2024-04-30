@@ -102,11 +102,21 @@ def evaluation_check(segmentation_head,
                              trg_layer_list=args.trg_layer_list,
                              noise_type=[position_embedder, self_feature_merger]).sample
                     feature = controller.query_list[0]  # 1, 64*64, 320
+                    query_dict, key_dict = controller.query_dict, controller.key_dict
                     controller.reset()
-                    res = int(feature.shape[1] ** 0.5)
-                    query = feature.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
-                    masks_pred = segmentation_head(query)  # [1,2,256,256]  # [1,160,256,256]
+                    q_dict = {}
+                    global_feature = None
+                    for layer in args.trg_layers:
+                        query = query_dict[layer][0]  # head, pix_num, dim
+                        res = int(query.shape[1] ** 0.5)
+                        query = query.reshape(1, res, res, -1)
+                        query = query.permute(0, 3, 1, 2).contiguous()
+                        q_dict[res] = query
+
+                    x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+                    _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,4,256,256]
+                    masks_pred = segmentation_head.segment_feature(features)  # here problem
+                    masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
 
                     # [1] pred
                     class_num = masks_pred.shape[1]  # 4
