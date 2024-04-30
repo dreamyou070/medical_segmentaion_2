@@ -511,8 +511,7 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained_segmentation_model", type=str)
     parser.add_argument("--use_batchnorm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
-
-    parser.add_argument("--aggregation_model_b", action='store_true')
+    parser.add_argument("--use_layer_norm", action='store_true')
     parser.add_argument("--aggregation_model_c", action='store_true')
     parser.add_argument("--aggregation_model_d", action='store_true')
     parser.add_argument("--norm_type", type=str, default='batchnorm',
