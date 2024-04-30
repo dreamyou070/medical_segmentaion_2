@@ -161,8 +161,7 @@ class AllPositionalEmbedding(nn.Module):
 
 class SingleInternalCrossAttention(nn.Module):
 
-    def __init__(self,
-                 max_len: int = 64 * 64,
+    def __init__(self,,
                  d_model: int = 320, ):
         super().__init__()
         self.layer = nn.Linear(d_model, 768)
@@ -173,8 +172,8 @@ class SingleInternalCrossAttention(nn.Module):
         if x.dim() == 4:
             start_dim = 4
             x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C # batch, len, dim
-        self.layer = self.layer.to(x.device)
-        x = self.layer(x)                                    # batch, len, dim
+
+        x = self.layer.to(x.device)(x)                                    # batch, len, dim
         return x
 
 class SelfFeatureMerger(nn.Module):
@@ -212,8 +211,7 @@ class SelfFeatureMerger(nn.Module):
         self.internal_cross_encodings = {}
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
-            self.internal_cross_encodings[layer_name] = SingleInternalCrossAttention(max_len = res*res,
-                                                                                     d_model = dim)
+            self.internal_cross_encodings[layer_name] = SingleInternalCrossAttention(d_model = dim)
 
     def forward(self,
                 x: torch.Tensor,
