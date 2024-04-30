@@ -209,19 +209,18 @@ class Positioning(nn.Module):
         if self.use_channel_attn:
             self.cab = CA_Block(self.channel)
         self.sab = SA_Block(self.channel)
-        self.map = nn.Conv2d(self.channel, 1, 11, 1, 5)  # as if average pooling
+        self.map = nn.Conv2d(self.channel, 1, 11, 1, 5)  # output shae same
 
     def forward(self, x):
 
         if self.use_channel_attn:
             self.cab = self.cab.to(x.device)
             x = self.cab(x) # is like self attntion
+        # spatial attention
         self.sab = self.sab.to(x.device)
         sab = self.sab(x)
-
         # global feature
-        self.map = self.map.to(x.device)
-        global_sab = self.map(sab)
+        global_sab = self.map.to(x.device)(sab)
         return sab, sab+global_sab, global_sab
 
 class AllPositioning(nn.Module):

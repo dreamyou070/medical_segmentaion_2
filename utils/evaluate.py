@@ -139,9 +139,6 @@ def evaluation_check(segmentation_head,
                                     spatial_attn_query=spatial_attn_query,
                                     layer_name=layer,
                                     in_map=focus_map)
-                                total_loss += loss_dicece(input=pred,  # [class, 256,256]
-                                                          target=batch['res_array_gt'][str(res)].to(
-                                                              dtype=weight_dtype)).mean()
                                 q_dict[res] = feature
 
                             else:

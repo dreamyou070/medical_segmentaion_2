@@ -6,6 +6,7 @@ class AttentionStore :
         self.query_dict = {}
         self.key_dict = {}
         self.attention_dict = {}
+        self.query_list = []
 
     def get_empty_store(self):
         return {}

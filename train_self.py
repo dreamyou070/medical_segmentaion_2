@@ -11,10 +11,10 @@ import os
 from attention_store import AttentionStore
 from data import call_dataset
 from model import call_model_package
-from model.segmentation_unet import SemanticModel
+from model.segmentation_unet_self import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
-from utils.attention_control import passing_argument, register_attention_control
+from utils.attention_control_cascading import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
@@ -33,10 +33,10 @@ def bce_iou_loss(pred, target):
     loss = bce_out + iou_out
     return loss
 
+
 # image conditioned segmentation mask generating
 
 def main(args):
-
     print(f'\n step 1. setting')
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -55,41 +55,22 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
 
-    segmentation_head = None
-    if args.use_segmentation_model :
-
-        args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
-
-        if args.use_simple_segmodel :
-            segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                              mask_res=args.mask_res,
-                                              use_layer_norm = args.use_layer_norm,
-                                              double = args.double)
-        else :
-            segmentation_head = PFNet(n_classes=args.n_classes,
-                                      mask_res=args.mask_res,
-                                      use_layer_norm = args.use_layer_norm,
-                                      double = args.double)
-        if args.segmentation_model_weights is not None :
-            segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
+    segmentation_head = SemanticModel(n_classes=args.n_classes)
 
     vision_head = None
-    if args.image_processor == 'pvt' :
-        vision_head = vision_condition_head(reverse = args.reverse,
-                                            use_one = args.use_one)
-    if args.use_position_embedder :
+    if args.image_processor == 'pvt':
+        vision_head = vision_condition_head(reverse=args.reverse,
+                                            use_one=args.use_one)
+    if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding()
-        if args.position_embedder_weights is not None :
+        if args.position_embedder_weights is not None:
             position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
 
-    positioning_module = None
-    if args.use_positioning_module :
-        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
-                                            use_self_attn=args.use_self_attn,
-                                            n_classes = args.n_classes,)
-        if args.positioning_module_weights is not None :
-            positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
 
+    from model.self_feature_merging import SelfFeatureMerger
+    self_feature_merger = SelfFeatureMerger(use_channel_attn=args.use_channel_attn,
+                                            use_self_attn=args.use_self_attn,
+                                            n_classes=args.n_classes, )
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
@@ -99,14 +80,12 @@ def main(args):
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
     trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
-                                                        args.learning_rate, condition_modality=condition_modality,)
-    if args.use_position_embedder :
+                                                        args.learning_rate, condition_modality=condition_modality, )
+    if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-    if args.use_positioning_module:
-        trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
-    if args.use_segmentation_model :
+    if args.use_segmentation_model:
         trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -135,13 +114,10 @@ def main(args):
                                                                                                       optimizer,
                                                                                                       train_dataloader,
                                                                                                       lr_scheduler)
-    if args.use_positioning_module:
-        positioning_module = accelerator.prepare(positioning_module)
-
-    if args.use_position_embedder :
+    if args.use_position_embedder:
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
     unet, network = transform_models_if_DDP([unet, network])
@@ -175,7 +151,7 @@ def main(args):
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        epoch_loss_total =0
+        epoch_loss_total = 0
 
         for step, batch in enumerate(train_dataloader):
             total_loss = 0
@@ -201,118 +177,35 @@ def main(args):
                             elif args.image_processor == 'vit':
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-            image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
+            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
-            gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
+            gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
 
             # ----------------------------------------------------------------------------------------------------------- #
             with torch.set_grad_enabled(True):
-                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
+                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type = position_embedder).sample
+                unet(latents,
+                     0,
+                     encoder_hidden_states,
+                     trg_layer_list=args.trg_layer_list,
+                     noise_type=[position_embedder, self_feature_merger]).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-            global_feature = None
-            for layer in args.trg_layer_list:
+            feature = controller.query_list[0]
+            res = int(feature.shape[1] ** 0.5 )
+            query = feature.reshape(1, res, res, -1)
+            query = query.permute(0, 3, 1, 2).contiguous()  # 1, 1280, res, res
+            masks_pred = segmentation_head.segment_feature(query)  # [1,2,  256,256]  # [1,160,256,256]
 
-                query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
-                # [1] channel attention query
-                res = int(query.shape[1] ** 0.5)
-                channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
-
-                # [2] spatial attention query
-                if args.use_positioning_module :
-                    """ let's make more global attentive feature """
-
-                    if args.previous_positioning_module:
-                        query = query.reshape(1, res, res, -1)
-                        query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                        # make prediction by my-self
-                        # how to connect with previous ?
-                        spatial_attn_query, spatial_global_attn_query, focus_map = positioning_module(query, layer_name=layer)
-
-                        if global_feature == None :
-                            global_feature = focus_map
-                        else :
-                            # upsampling focus map
-                            global_feature += global_feature + focus_map
-
-                        pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                                  spatial_attn_query=spatial_attn_query,
-                                                                                  layer_name=layer,
-                                                                                  in_map=focus_map)
-                        total_loss += loss_dicece(input=pred,  # [class, 256,256]
-                                                  target=batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
-                        q_dict[res] = feature
-
-                    elif args.channel_spatial_cascaded :
-
-                        query = query.reshape(1, res, res, -1)
-                        query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                        spatial_attn_query, spatial_global_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
-                        # global_feat = [batch, 1, res, res]
-                        #if focus_map is None:
-                        #    if args.use_max_for_focus_map:
-                        #        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                        #    else:
-                        #        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
-                        focus_map = global_feat
-                        pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
-                                                                                  spatial_attn_query=spatial_attn_query,
-                                                                                  layer_name=layer,
-                                                                                  in_map=focus_map)
-                        total_loss += loss_dicece(input=pred,  # [class, 256,256]
-                                                  target=batch['res_array_gt'][str(res)].to(dtype=weight_dtype)).mean()
-                        q_dict[res] = feature
-
-                    else :
-                        query = query.reshape(1, res, res, -1)
-                        query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                        _, spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
-                        fetaure = torch.cat([channel_attn_query, spatial_attn_query], dim=1)
-                        q_dict[res] = fetaure
-
-                else :
-
-                    q_dict[res] = channel_attn_query
-
-                # if I get only one feature map, is it really meaningful to use two separate feature ?
-                #pred = channel_attn_query
-                # focus_map = [batch, 1, res,res]
-                # pred      = [batch, 2, res, res]
-                # ------------------------------------------------------------------------------------------------- #
-                # mask prediction
-                
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            if args.use_simple_segmodel :
-                _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-                # [2] segmentation head
-                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-            else :
-                features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_feat)  # [1,160,256,256]
-                # [2] segmentation head
-                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
-                                   target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
-            else:
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                loss = loss.mean()
-
+                loss = loss_dicece(input=masks_pred,  # [class, 256,256]
+                                   target=batch['gt'].to(dtype=weight_dtype))  # [class, 256,256]
             total_loss += loss.mean()
             current_loss = total_loss.detach().item()
 
@@ -336,7 +229,7 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
         # ----------------------------------------------------------------------------------------------------------- #
-        
+
         accelerator.wait_for_everyone()
         if is_main_process:
             saving_epoch = str(epoch + 1).zfill(6)
@@ -346,33 +239,26 @@ def main(args):
                        unwrapped_nw=accelerator.unwrap_model(network),
                        save_dtype=save_dtype)
 
-            if args.use_segmentation_model :
+            if args.use_segmentation_model:
                 save_model(args,
                            saving_folder='segmentation',
                            saving_name=f'segmentation-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                            save_dtype=save_dtype)
 
-            if args.use_position_embedder :
+            if args.use_position_embedder:
                 save_model(args,
                            saving_folder='position_embedder',
                            saving_name=f'position-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(position_embedder),
                            save_dtype=save_dtype)
 
-            if args.image_processor == 'pvt' :
+            if args.image_processor == 'pvt':
                 save_model(args,
                            saving_folder='vision_head',
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
-
-            if args.use_positioning_module :
-                save_model(args,
-                            saving_folder='positioning_module',
-                            saving_name=f'positioning-{saving_epoch}.pt',
-                            unwrapped_nw=accelerator.unwrap_model(positioning_module),
-                            save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
@@ -390,6 +276,7 @@ def main(args):
                          args)
 
     accelerator.end_training()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -547,5 +434,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
+
     passing_mvtec_argument(args)
     main(args)
