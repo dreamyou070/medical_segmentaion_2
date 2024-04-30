@@ -8,7 +8,7 @@ trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_20240430"
-file_name="6_test_train_self"
+file_name="6_unet_selfguided"
 # [1] lora
 # [2] positioning_module (almost for self attn) -> self attn already have channel atten, i erase
 # [3] condition model (almost for cross attn)

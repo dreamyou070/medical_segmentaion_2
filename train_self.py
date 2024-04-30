@@ -196,7 +196,7 @@ def main(args):
             res = int(feature.shape[1] ** 0.5 )
             query = feature.reshape(1, res, res, -1)
             query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
-            masks_pred = segmentation_head.segment_feature(query)  # [1,2,256,256]  # [1,160,256,256]
+            masks_pred = segmentation_head(query)  # [1,2,256,256]  # [1,160,256,256]
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype))  # [class, 64,64]

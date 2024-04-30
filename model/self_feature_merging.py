@@ -16,8 +16,6 @@ class SingleInternalCrossAttention(nn.Module):
             start_dim = 4
             x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C # batch, len, dim
             x = x.permute(0,2,1).contiguous()
-        print(f'x = {x.shape}')
-        print(f'self.layer = {self.layer.weight.shape}')
         x = self.layer.to(x.device)(x)                                    # batch, len, dim
         return x
 

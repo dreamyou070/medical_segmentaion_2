@@ -61,29 +61,34 @@ def evaluation_check(segmentation_head,
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
+                    total_loss = 0
                     focus_map = None
-                    if not args.image_model_training:
-                        if args.image_processor == 'pvt':
-                            output = condition_model(batch["image_condition"])
-                            encoder_hidden_states = vision_head(output)
-                        elif args.image_processor == 'vit':
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                    else:
-                        with torch.set_grad_enabled(True):
-                            if args.image_processor == 'pvt':
-                                output = condition_model(batch["image_condition"])
-                                encoder_hidden_states = vision_head(output)
-                            elif args.image_processor == 'vit':
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                    loss_dict = {}
+                    encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+                    if not args.without_condition:
+
+                        if args.use_image_condition:
+
+                            if not args.image_model_training:
+                                if args.image_processor == 'pvt':
+                                    output = condition_model(batch["image_condition"])
+                                    encoder_hidden_states = vision_head(output)
+                                elif args.image_processor == 'vit':
+                                    output, pix_embedding = condition_model(**batch["image_condition"])
+                                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                            else:
+                                with torch.set_grad_enabled(True):
+                                    if args.image_processor == 'pvt':
+                                        output = condition_model(batch["image_condition"])
+                                        encoder_hidden_states = vision_head(output)
+                                    elif args.image_processor == 'vit':
+                                        output, pix_embedding = condition_model(**batch["image_condition"])
+                                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
                     image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
                     gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
                     gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-
                     with torch.no_grad():
                         latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
                     # ----------------------------------------------------------------------------------------------------------- #
                     with torch.set_grad_enabled(True):
                         if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
@@ -96,12 +101,11 @@ def evaluation_check(segmentation_head,
                              encoder_hidden_states,
                              trg_layer_list=args.trg_layer_list,
                              noise_type=[position_embedder, self_feature_merger]).sample
-                    query_dict, key_dict = controller.query_dict, controller.key_dict
-                    feature = controller.query_list[0]
+                    feature = controller.query_list[0]  # 1, 64*64, 320
                     res = int(feature.shape[1] ** 0.5)
                     query = feature.reshape(1, res, res, -1)
-                    query = query.permute(0, 3, 1, 2).contiguous()  # 1, 1280, res, res
-                    masks_pred = segmentation_head.segment_feature(query)  # [1,2,  256,256]  # [1,160,256,256]
+                    query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
+                    masks_pred = segmentation_head(query)  # [1,2,256,256]  # [1,160,256,256]
 
                     # [1] pred
                     class_num = masks_pred.shape[1]  # 4
