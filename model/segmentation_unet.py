@@ -99,7 +99,8 @@ class SemanticModel(nn.Module):
     def __init__(self,
                  n_classes,
                  use_layer_norm=True,
-                 mask_res=128,):
+                 mask_res=128,
+                 double = False):
         super(SemanticModel, self).__init__()
 
         c = 320
@@ -114,17 +115,18 @@ class SemanticModel(nn.Module):
         self.upsample_layer_3 = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
 
         self.use_layer_norm = use_layer_norm
+        factor = 1 if not double else 2
         if self.use_layer_norm:
             if mask_res == 128:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160, kernel_size=2),
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3*factor, out_channels=160, kernel_size=2),
                                                        nn.LayerNorm([160 , 128, 128]),)
             if mask_res == 256:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3*factor, out_channels=160*3, kernel_size=2),
                                                        nn.LayerNorm([160*3, 128, 128]),
                                                        Up_conv(in_channels=160*3, out_channels=160, kernel_size=2),
                                                        nn.LayerNorm([160, 256,256]))
             if mask_res == 512:
-                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3, out_channels=160*3, kernel_size=2),
+                self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3*factor, out_channels=160*3, kernel_size=2),
                                                        nn.LayerNorm([160*3, 128, 128]),
                                                        Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
                                                        nn.LayerNorm([160*2, 256, 256]),
