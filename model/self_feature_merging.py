@@ -16,6 +16,8 @@ class SingleInternalCrossAttention(nn.Module):
             start_dim = 4
             x = einops.rearrange(x, 'b c h w -> b (h w) c')  # B,H*W,C # batch, len, dim
             x = x.permute(0,2,1).contiguous()
+        print(f'x = {x.shape}')
+        print(f'self.layer = {self.layer.weight.shape}')
         x = self.layer.to(x.device)(x)                                    # batch, len, dim
         return x
 
@@ -45,7 +47,8 @@ class SelfFeatureMerger(nn.Module):
 
                            'up_blocks_3_attentions_0_transformer_blocks_0_attn2': (64, 320),
                            'up_blocks_3_attentions_1_transformer_blocks_0_attn2': (64, 320),
-                           'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320), }
+                           'up_blocks_3_attentions_2_transformer_blocks_0_attn2': (64, 320),
+                           }
 
     def __init__(self,) -> None:
         super().__init__()
@@ -55,7 +58,6 @@ class SelfFeatureMerger(nn.Module):
         for layer_name in self.layer_dict.keys() :
             res, dim = self.layer_dict[layer_name]
             self.internal_cross_encodings[layer_name] = SingleInternalCrossAttention(d_model = dim)
-            print(f'Layer {layer_name} is added to the internal cross attention list')
 
     def forward(self,
                 x: torch.Tensor,
