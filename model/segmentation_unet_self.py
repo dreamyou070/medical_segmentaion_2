@@ -101,10 +101,9 @@ class SemanticModel(nn.Module):
                  n_classes,):
         super(SemanticModel, self).__init__()
 
-        self.outc = OutConv(1280, n_classes)
+        self.outc = OutConv(320, n_classes)
 
     def forward(self, feature):
-
-        logits = self.outc(feature)
+        logits = self.outc(feature) # [1, 2, 64, 64]
         return logits
 

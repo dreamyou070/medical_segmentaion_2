@@ -27,8 +27,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
  --use_position_embedder \
- --trg_layer_list "[
-                    'down_blocks_0_attentions_0_transformer_blocks_0_attn2'
+ --trg_layer_list "['down_blocks_0_attentions_0_transformer_blocks_0_attn2',
                     'down_blocks_0_attentions_1_transformer_blocks_0_attn2',
 
                     'down_blocks_1_attentions_0_transformer_blocks_0_attn2',
@@ -50,7 +49,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
                     'up_blocks_3_attentions_0_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_1_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2']" \
- --n_classes 2 --mask_res 256 --batch_size 1 \
+ --n_classes 2 --mask_res 64 --batch_size 1 \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
  --use_image_condition --image_model_training --image_processor 'pvt' \
  --use_simple_segmodel --use_segmentation_model --start_epoch 0 --use_positioning_module \

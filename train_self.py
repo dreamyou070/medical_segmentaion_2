@@ -178,10 +178,8 @@ def main(args):
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-
             # ----------------------------------------------------------------------------------------------------------- #
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
@@ -194,16 +192,14 @@ def main(args):
                      encoder_hidden_states,
                      trg_layer_list=args.trg_layer_list,
                      noise_type=[position_embedder, self_feature_merger]).sample
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            feature = controller.query_list[0]
+            feature = controller.query_list[0] # 1, 64*64, 320
             res = int(feature.shape[1] ** 0.5 )
             query = feature.reshape(1, res, res, -1)
-            query = query.permute(0, 3, 1, 2).contiguous()  # 1, 1280, res, res
-            masks_pred = segmentation_head.segment_feature(query)  # [1,2,  256,256]  # [1,160,256,256]
-
+            query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
+            masks_pred = segmentation_head.segment_feature(query)  # [1,2,256,256]  # [1,160,256,256]
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
-                                   target=batch['gt'].to(dtype=weight_dtype))  # [class, 256,256]
+                                   target=batch['gt'].to(dtype=weight_dtype))  # [class, 64,64]
             total_loss += loss.mean()
             current_loss = total_loss.detach().item()
 

@@ -33,19 +33,15 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             # change query dim to 768
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
-                print(f'trg_layer_list: {trg_layer_list}')
-                print(f"Layer Name: {layer_name} : query = {query.shape}")
-                """
                 if len(controller.query_list) == 0 :
                     controller.query_list.append(query)
-
                 else :
                     before_query = controller.query_list[0]
                     controller.query_list = []
-                    controller.query_list.append(query)
+                    controller.query_list.append(query) # save final query (batch, pix_num, dim)
                     positioning = noise_type[1]
+                    # change context
                     context = positioning(before_query, layer_name)
-                """
             context = context if context is not None else hidden_states
             if type(context) == dict :
                 p = query.shape[1]
