@@ -29,7 +29,7 @@ class TrainDataset(Dataset):
             folder_dir = os.path.join(self.root_dir, folder) # anomal
             folder_res = folder.split('_')[-1]
             rgb_folder = os.path.join(folder_dir, f'image_{folder_res}') # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'mask_{mask_res}')    # [128,128]
+            gt_folder = os.path.join(folder_dir, f'mask_{folder_res}')    # [128,128]
             files = os.listdir(rgb_folder) #
             for file in files:
                 name, ext = os.path.splitext(file)
@@ -97,7 +97,7 @@ class TrainDataset(Dataset):
         gt_path = self.gt_paths[idx]  #
         try :
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
-        except :
+        except : # here
             name, ext = os.path.splitext(gt_path)
             gt_path = f'{name}.png'
             gt_img = self.load_image(gt_path, self.mask_res, self.mask_res, type='L')
