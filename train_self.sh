@@ -29,7 +29,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_position_embedder \
  --trg_layer_list "['down_blocks_0_attentions_0_transformer_blocks_0_attn2',
                     'down_blocks_0_attentions_1_transformer_blocks_0_attn2',
-
                     'down_blocks_1_attentions_0_transformer_blocks_0_attn2',
                     'down_blocks_1_attentions_1_transformer_blocks_0_attn2',
 
