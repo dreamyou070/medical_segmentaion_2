@@ -193,6 +193,7 @@ def main(args):
                      trg_layer_list=args.trg_layer_list,
                      noise_type=[position_embedder, self_feature_merger]).sample
             feature = controller.query_list[0] # 1, 64*64, 320
+            controller.reset()
             res = int(feature.shape[1] ** 0.5 )
             query = feature.reshape(1, res, res, -1)
             query = query.permute(0, 3, 1, 2).contiguous()  # 1,320,64,64
