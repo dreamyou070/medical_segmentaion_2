@@ -99,7 +99,7 @@ def evaluation_check(segmentation_head,
                         unet(latents,
                              0,
                              encoder_hidden_states,
-                             trg_layer_list=args.trg_layer_list,
+                             trg_layer_list=[args.trg_layer_list, args.trg_layers],
                              noise_type=[position_embedder, self_feature_merger]).sample
                     feature = controller.query_list[0]  # 1, 64*64, 320
                     query_dict, key_dict = controller.query_dict, controller.key_dict
