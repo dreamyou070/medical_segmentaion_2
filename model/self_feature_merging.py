@@ -161,7 +161,7 @@ class AllPositionalEmbedding(nn.Module):
 
 class SingleInternalCrossAttention(nn.Module):
 
-    def __init__(self,,
+    def __init__(self,
                  d_model: int = 320, ):
         super().__init__()
         self.layer = nn.Linear(d_model, 768)
