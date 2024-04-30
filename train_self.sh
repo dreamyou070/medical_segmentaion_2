@@ -27,7 +27,8 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train" \
  --network_dim 144 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
  --use_position_embedder \
- --trg_layer_list "['down_blocks_0_attentions_0_transformer_blocks_0_attn2'
+ --trg_layer_list "[
+                    'down_blocks_0_attentions_0_transformer_blocks_0_attn2'
                     'down_blocks_0_attentions_1_transformer_blocks_0_attn2',
 
                     'down_blocks_1_attentions_0_transformer_blocks_0_attn2',

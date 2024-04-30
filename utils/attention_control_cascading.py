@@ -21,7 +21,6 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             is_cross_attention = False
             if context is not None:
                 is_cross_attention = True
-                print(f'layer_name: {layer_name} : hidden_states = {hidden_states.shape}')
 
             if noise_type is not None and argument.use_position_embedder :
                 """ cross attention position embedding """
@@ -34,6 +33,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             # change query dim to 768
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
+                print(f'trg_layer_list: {trg_layer_list}')
                 print(f"Layer Name: {layer_name} : query = {query.shape}")
                 """
                 if len(controller.query_list) == 0 :
