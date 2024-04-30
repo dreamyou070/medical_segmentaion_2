@@ -39,16 +39,10 @@ class vision_condition_head(nn.Module):
             condition_dict[16] = y3
             condition_dict[8] = y4
 
-        if not self.reverse :
-
-            elif self.use_one :
-                condition_dict[64] = y3
-                condition_dict[32] = y3
-                condition_dict[16] = y3
-            else :
-                condition_dict[64] = y4
-                condition_dict[32] = y3
-                condition_dict[16] = y2
-                condition_dict[8] = y1
+        else :
+            condition_dict[64] = y4
+            condition_dict[32] = y3
+            condition_dict[16] = y2
+            condition_dict[8] = y1
 
         return condition_dict
