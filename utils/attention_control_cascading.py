@@ -33,7 +33,8 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             # change query dim to 768
 
             if trg_layer_list is not None and layer_name in trg_layer_list:
-
+                print(f"Layer Name: {layer_name} : query = {query.shape}")
+                """
                 if len(controller.query_list) == 0 :
                     controller.query_list.append(query)
 
@@ -43,7 +44,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                     controller.query_list.append(query)
                     positioning = noise_type[1]
                     context = positioning(before_query, layer_name)
-
+                """
             context = context if context is not None else hidden_states
             if type(context) == dict :
                 p = query.shape[1]
