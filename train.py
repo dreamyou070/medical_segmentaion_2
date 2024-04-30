@@ -183,69 +183,31 @@ def main(args):
             loss_dict = {}
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
             if not args.without_condition:
+
                 if args.use_image_condition:
+
                     if not args.image_model_training:
-
                         if args.image_processor == 'pvt':
-
                             output = condition_model(batch["image_condition"])
                             encoder_hidden_states = vision_head(output)
-
                         elif args.image_processor == 'vit':
-
-                            with torch.no_grad():
-                                output, pix_embedding = condition_model(**batch["image_condition"])
-                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                            output, pix_embedding = condition_model(**batch["image_condition"])
+                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
                     else:
-
                         with torch.set_grad_enabled(True):
-
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
                                 encoder_hidden_states = vision_head(output)
-
                             elif args.image_processor == 'vit':
-
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-
             image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
-            # ----------------------------------------------------------------------------------------------------------- #
-            # [1] pseudo feature
-            # almost impossible
-            
-            #gt_64_array = batch['gt_64_array'].squeeze() # [1,64,64]
-            #non_zero_index = torch.nonzero(gt_64_array).flatten()  # class 1 index
-            #feat = torch.flatten((latents), start_dim=2).squeeze().transpose(1, 0)  # pixel_num, dim [pixel,160]
-            #anomal_feat = feat[non_zero_index, :]  # [10,4]
-            #if step == 0:
-            #    generator = DiagonalGaussianDistribution(parameters=anomal_feat, latent_dim=anomal_feat.shape[-1])
-            #else:
-            #    generator.update(parameters=anomal_feat)
-            #pseudo_feature = generator.sample(mask_res=args.mask_res, device=device, weight_dtype=weight_dtype) # [1,4,256,256]
-            # unet feature generating
-            # how to condition ??
-            # should unet again ?
-            #pseudo_masks_pred = segmentation_head.segment_feature(pseudo_feature)  # 1,2,265,265
-            #pseudo_label = torch.ones_like(batch['gt'])
-            #pseudo_label[:, 0, :, :] = 0  # all class 1 samples
-            #pseudo_loss = loss_dicece(input=pseudo_masks_pred,  # [class, 256,256]
-            #                          target=pseudo_label.to(dtype=weight_dtype, device=accelerator.device))  # [class, 256,256]
-            
+
             # ----------------------------------------------------------------------------------------------------------- #
             with torch.set_grad_enabled(True):
                 if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
@@ -257,18 +219,17 @@ def main(args):
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
-            for layer in args.trg_layer_list:
-                query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
 
+            for layer in args.trg_layer_list:
+
+                query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
                 # [1] channel attention query
                 res = int(query.shape[1] ** 0.5)
                 channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
 
                 # [2] spatial attention query
                 if args.use_positioning_module :
-
                     """ let's make more global attentive feature """
-
 
                     if args.previous_positioning_module:
                         query = query.reshape(1, res, res, -1)
@@ -292,13 +253,13 @@ def main(args):
 
                         query = query.reshape(1, res, res, -1)
                         query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                        _, spatial_attn_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
-                        if focus_map is None:
-                            if args.use_max_for_focus_map:
-                                focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                            else:
-                                focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
-
+                        spatial_attn_query, spatial_global_query, global_feat = positioning_module(channel_attn_query, layer_name=layer)
+                        #if focus_map is None:
+                        #    if args.use_max_for_focus_map:
+                        #        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
+                        #    else:
+                        #        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
+                        focus_map = global_feat
                         pred, feature, focus_map = positioning_module.predict_seg(channel_attn_query=channel_attn_query,
                                                                                   spatial_attn_query=spatial_attn_query,
                                                                                   layer_name=layer,
