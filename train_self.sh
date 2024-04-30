@@ -53,5 +53,5 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
  --use_image_condition --image_model_training --image_processor 'pvt' \
  --use_simple_segmodel --use_segmentation_model --start_epoch 0 --use_positioning_module \
- --channel_spatial_cascaded
+ --channel_spatial_cascaded --self_condition
 

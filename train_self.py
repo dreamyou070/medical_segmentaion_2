@@ -85,6 +85,8 @@ def main(args):
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
     if args.use_segmentation_model:
         trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    if args.self_condition:
+        trainable_params.append({"params": self_feature_merger.parameters(), "lr": args.unet_lr})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -112,12 +114,18 @@ def main(args):
                                                                                                       optimizer,
                                                                                                       train_dataloader,
                                                                                                       lr_scheduler)
+    if args.self_condition:
+        self_feature_merger = accelerator.prepare(self_feature_merger)
+        self_feature_merger = transform_models_if_DDP([self_feature_merger])[0]
+
     if args.use_position_embedder:
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
+
     if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
+
     unet, network = transform_models_if_DDP([unet, network])
     if args.use_segmentation_model:
         segmentation_head = transform_models_if_DDP([segmentation_head])[0]
@@ -159,7 +167,6 @@ def main(args):
             if not args.without_condition:
 
                 if args.use_image_condition:
-
                     if not args.image_model_training:
                         if args.image_processor == 'pvt':
                             output = condition_model(batch["image_condition"])
@@ -253,6 +260,12 @@ def main(args):
                            saving_folder='vision_head',
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
+                           save_dtype=save_dtype)
+            if args.self_condition:
+                save_model(args,
+                           saving_folder='self_feature_merger',
+                           saving_name=f'self_feature_merger-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(self_feature_merger),
                            save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
@@ -426,6 +439,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_image", action='store_true')
     parser.add_argument("--use_one", action='store_true')
     parser.add_argument("--channel_spatial_cascaded", action='store_true')
+    parser.add_argument("--self_condition", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
