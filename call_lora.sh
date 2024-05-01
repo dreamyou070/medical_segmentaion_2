@@ -10,7 +10,7 @@ layer_name='layer_3'
 sub_folder="up_16_32_64_20240501"
 file_name="3_class_0_pvt_image_encoder" #
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number call_lora.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
