@@ -111,6 +111,18 @@ def main(args):
                                  **net_kwargs, )
         network = accelerator.prepare(network)
         networks.append(network)
+    # make teacher network
+    teacher_network = create_network(1.0,
+                                     args.network_dim,
+                                     args.network_alpha,
+                                     vae,
+                                     condition_model=condition_model,
+                                     unet=unet,
+                                     neuron_dropout=args.network_dropout,
+                                     condition_modality=condition_modality,
+                                     **net_kwargs, )
+    teacher_network = accelerator.prepare(teacher_network)
+
 
     segmentation_head = None
     if args.use_segmentation_model :
@@ -211,7 +223,7 @@ def main(args):
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, optimizer, lr_scheduler = accelerator.prepare(segmentation_head, unet, optimizer, lr_scheduler)
-
+    segmentation_head = accelerator.prepare(segmentation_head)
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
     if args.use_position_embedder:
@@ -352,6 +364,9 @@ def main(args):
                            save_dtype=save_dtype)
 
         accelerator.wait_for_everyone()
+        # ----------------------------------------------------------------------------------------------------------- #
+        # lora merging
+
 
         if is_main_process:
             if args.use_segmentation_model :
