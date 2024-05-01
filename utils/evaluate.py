@@ -91,67 +91,9 @@ def evaluation_check(segmentation_head,
                     controller.reset()
                     q_dict = {}
                     for layer in args.trg_layer_list:
-
-                        query, channel_attn_query = query_dict[layer]  # 1, pix_num, dim
-                        # [1] channel attention query
+                        query = query_dict[layer][0]
                         res = int(query.shape[1] ** 0.5)
-                        channel_attn_query = channel_attn_query.reshape(1, res, res, -1).permute(0, 3, 1,
-                                                                                                 2).contiguous()
-
-                        # [2] spatial attention query
-                        if args.use_positioning_module:
-                            """ let's make more global attentive feature """
-
-                            if args.previous_positioning_module:
-                                query = query.reshape(1, res, res, -1)
-                                query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                                _, spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
-                                if focus_map is None:
-                                    if args.use_max_for_focus_map:
-                                        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                                    else:
-                                        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
-
-                                pred, feature, focus_map = positioning_module.predict_seg(
-                                    channel_attn_query=channel_attn_query,
-                                    spatial_attn_query=spatial_attn_query,
-                                    layer_name=layer,
-                                    in_map=focus_map)
-                                total_loss += loss_dicece(input=pred,  # [class, 256,256]
-                                                          target=batch['res_array_gt'][str(res)].to(
-                                                              dtype=weight_dtype)).mean()
-                                q_dict[res] = feature
-
-                            elif args.channel_spatial_cascaded:
-
-                                query = query.reshape(1, res, res, -1)
-                                query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                                spatial_attn_query, spatial_global_query, global_feat = positioning_module(
-                                    channel_attn_query, layer_name=layer)
-                                # if focus_map is None:
-                                #    if args.use_max_for_focus_map:
-                                #        focus_map = torch.max(channel_attn_query, dim=1, keepdim=True).values
-                                #    else:
-                                #        focus_map = torch.mean(channel_attn_query, dim=1, keepdim=True)
-                                focus_map = global_feat
-                                pred, feature, focus_map = positioning_module.predict_seg(
-                                    channel_attn_query=channel_attn_query,
-                                    spatial_attn_query=spatial_attn_query,
-                                    layer_name=layer,
-                                    in_map=focus_map)
-                                q_dict[res] = feature
-
-                            else:
-                                query = query.reshape(1, res, res, -1)
-                                query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
-                                _, spatial_attn_query, global_feat = positioning_module(query, layer_name=layer)
-                                fetaure = torch.cat([channel_attn_query, spatial_attn_query], dim=1)
-                                q_dict[res] = fetaure
-
-                        else:
-
-                            q_dict[res] = channel_attn_query
-
+                        q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
                     if args.use_simple_segmodel:
                         _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
