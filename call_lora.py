@@ -110,19 +110,8 @@ def main(args):
                                  condition_modality=condition_modality,
                                  **net_kwargs, )
         network = accelerator.prepare(network)
-        trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr,
-                                                             args.unet_lr,
-                                                             args.learning_rate,
-                                                             condition_modality=condition_modality,)
-        trainable_params.extend(trainable_params_)
         networks.append(network)
-        """
-        network.apply_to(condition_model,
-                         unet,
-                         True,
-                         True,
-                         condition_modality=condition_modality)
-        """
+
     segmentation_head = None
     if args.use_segmentation_model :
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
@@ -190,6 +179,7 @@ def main(args):
         data_loaders.append(train_dataloader)
 
     print(f'\n step 5. optimizer')
+    trainable_params = []
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt':
@@ -241,7 +231,7 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    """
+
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         for network, train_dataloader in zip(networks, data_loaders):
@@ -253,6 +243,14 @@ def main(args):
                              condition_modality=condition_modality)
             network.to(weight_dtype)
 
+            # [2] get parameter
+            trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr,
+                                                                 args.unet_lr,
+                                                                 args.learning_rate,
+                                                                 condition_modality=condition_modality, )
+            trainable_params.extend(trainable_params_)
+            optimizer = get_optimizer(args, trainable_params)
+            
             accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
             epoch_loss_total =0
 
@@ -337,6 +335,8 @@ def main(args):
                     progress_bar.set_postfix(**loss_dict)
                 if global_step >= args.max_train_steps:
                     break
+
+            trainable_params = trainable_params[:-1]
             # ----------------------------------------------------------------------------------------------------------- #
             accelerator.wait_for_everyone()
             if is_main_process:
