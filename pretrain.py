@@ -59,7 +59,7 @@ def main(args):
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
-    train_dataloader, test_dataloader, tokenizer = call_dataset(args)
+    train_dataloader = call_dataset(args)
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -78,44 +78,11 @@ def main(args):
     print(f'\n step 6. lr')
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
-    print(f'\n step 7. loss function')
-    loss_CE = nn.CrossEntropyLoss()
-    loss_FC = Multiclass_FocalLoss()
-    if args.use_monai_focal_loss:
-        loss_FC = FocalLoss(include_background=False,
-                            to_onehot_y=True,
-                            gamma=2.0,
-                            weight=None,
-                            reduction=LossReduction.MEAN,
-                            use_softmax=True)
-    loss_Dice = DiceLoss(include_background=False,
-                         to_onehot_y=False,
-                         sigmoid=False,
-                         softmax=True,
-                         other_act=None,
-                         squared_pred=False,
-                         jaccard=False,
-                         reduction=LossReduction.MEAN,
-                         smooth_nr=1e-5,
-                         smooth_dr=1e-5,
-                         batch=False,
-                         weight=None)
-
-    loss_dicece = DiceCELoss(include_background=False,
-                             to_onehot_y=False,
-                             sigmoid=False,
-                             softmax=True,
-                             squared_pred=True,
-                             lambda_dice=args.dice_weight,
-                             smooth_nr=1e-5,
-                             smooth_dr=1e-5,
-                             weight=None, )
-
     print(f'\n step 8. model to device')
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
+    segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler = \
+      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler)
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
@@ -347,10 +314,6 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained_segmentation_model", type=str)
     parser.add_argument("--use_batchnorm", action='store_true')
     parser.add_argument("--use_instance_norm", action='store_true')
-    parser.add_argument("--aggregation_model_a", action='store_true')
-    parser.add_argument("--aggregation_model_b", action='store_true')
-    parser.add_argument("--aggregation_model_c", action='store_true')
-    parser.add_argument("--aggregation_model_d", action='store_true')
     parser.add_argument("--norm_type", type=str, default='batchnorm',
                         choices=['batch_norm', 'instance_norm', 'layer_norm'])
     parser.add_argument("--non_linearity", type=str, default='relu', choices=['relu', 'leakyrelu', 'gelu'])
