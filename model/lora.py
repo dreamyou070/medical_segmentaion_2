@@ -95,6 +95,9 @@ class LoRAModule(torch.nn.Module):
         self.org_module.forward = self.forward
         #del self.org_module
 
+    def restore(self):
+        self.org_module.forward = self.org_forward
+
     def forward(self, x):
         org_forwarded = self.org_forward(x)
 
@@ -1234,6 +1237,17 @@ class LoRANetwork(torch.nn.Module):
                 lora.apply_to()
                 self.add_module(lora.lora_name, lora)
 
+    def restore(self, condition_modality = 'text'):
+
+        if condition_modality == 'text':
+
+            for lora in self.text_encoder_loras + self.unet_loras:
+                lora.restore()
+
+        elif condition_modality == 'image':
+
+            for lora in self.image_encoder_loras + self.unet_loras:
+                lora.restore()
 
     def is_mergeable(self):
         return True
