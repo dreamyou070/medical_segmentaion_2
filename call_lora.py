@@ -17,6 +17,14 @@ from model.diffusion_model import transform_models_if_DDP
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
+import os
+import torch
+from data.dataset import TrainDataset, TestDataset
+from PIL import Image
+import requests
+from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
+from torchvision import transforms
+from torchvision.transforms.functional import InterpolationMode
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.loss import FocalLoss, Multiclass_FocalLoss
@@ -74,6 +82,7 @@ def main(args):
 
     num_nets = 5
     networks = []
+    trainable_params = []
     for i in range(num_nets) :
         net_kwargs = {}
         if args.network_args is not None:
@@ -103,6 +112,10 @@ def main(args):
                                  condition_modality=condition_modality,
                                  **net_kwargs, )
         networks.append(network)
+        network = accelerator.prepare(network)
+        trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
+                                                            args.learning_rate, condition_modality=condition_modality, )
+        trainable_params.extend(trainable_params_)
     """
     network.apply_to(condition_model,
                      unet,
@@ -149,50 +162,45 @@ def main(args):
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)
     set_seed(args.seed)
-    train_dataloader = call_dataset(args)
+    train_folder = args.train_data_path
+    groups = os.listdir(train_folder)
+    data_loaders = []
+    for group in groups:
+        train_dir = os.path.join(train_folder, group)
+        if args.image_processor == 'clip':
+            processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
-    """
+        elif args.image_processor == 'vit':
+            processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 
+        elif args.image_processor == 'pvt':
+            processor = transforms.Compose([transforms.Resize((384, 384)),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
+        train_dataset = TrainDataset(root_dir=train_dir,
+                                     resize_shape=[args.resize_shape, args.resize_shape],
+                                     image_processor=processor,
+                                     latent_res=args.latent_res,
+                                     n_classes=args.n_classes,
+                                     mask_res=args.mask_res,
+                                     use_data_aug=args.use_data_aug, )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        train_dataloader = torch.utils.data.DataLoader(train_dataset,
+                                                       batch_size=args.batch_size,
+                                                       shuffle=True)
+        data_loaders.append(train_dataloader)
+        train_dataloader = accelerator.prepare(train_dataloader)
 
     print(f'\n step 5. optimizer')
-    args.max_train_steps = len(train_dataloader) * args.max_train_epochs
-    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
-                                                        args.learning_rate, condition_modality=condition_modality,)
-    if args.use_position_embedder :
+
+    if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
     if args.use_positioning_module:
         trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
-    if args.use_segmentation_model :
+    if args.use_segmentation_model:
         trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
@@ -215,43 +223,22 @@ def main(args):
     print(f'\n step 8. model to device')
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(segmentation_head,
-                                                                                                      unet,
-                                                                                                      network,
-                                                                                                      optimizer,
-                                                                                                      train_dataloader,
-                                                                                                      lr_scheduler)
+    segmentation_head, unet, optimizer, lr_scheduler = accelerator.prepare(segmentation_head, unet, optimizer, lr_scheduler)
+
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
-
-    if args.use_position_embedder :
+    if args.use_position_embedder:
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
-    if args.image_processor == 'pvt' :
+    if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
-    unet, network = transform_models_if_DDP([unet, network])
-    if args.use_segmentation_model:
-        segmentation_head = transform_models_if_DDP([segmentation_head])[0]
-    if args.gradient_checkpointing:
-        unet.train()
-        if args.use_segmentation_model:
-            segmentation_head.train()
-        for t_enc in condition_models:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
-    else:
-        unet.eval()
-        for t_enc in condition_models:
-            t_enc.eval()
-        del t_enc
-        network.prepare_grad_etc()
 
     print(f'\n step 9. registering saving tensor')
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
+    """
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
