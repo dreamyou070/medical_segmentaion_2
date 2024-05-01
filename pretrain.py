@@ -19,7 +19,6 @@ from utils.evaluate import evaluation_check
 from monai.utils import DiceCEReduction, LossReduction
 from monai.losses import FocalLoss
 from monai.losses import DiceLoss, DiceCELoss
-from model.reduction_model import ReductionNet
 from model.vision_condition_head import vision_condition_head
 
 # image conditioned segmentation mask generating
@@ -46,10 +45,7 @@ def main(args):
     segmentation_head = SemanticModel(n_classes=args.n_classes,
                                       mask_res=args.mask_res,
                                       use_layer_norm = args.use_layer_norm)
-    reduction_net = None
-    if args.reducing_redundancy :
-        reduction_net = ReductionNet(768, args.n_classes,
-                                     use_weighted_reduct=args.use_weighted_reduct)
+
     vision_head = None
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse)
@@ -71,8 +67,6 @@ def main(args):
                                                         args.unet_lr,
                                                         args.learning_rate,
                                                         condition_modality=condition_modality,)
-    if args.reducing_redundancy :
-        trainable_params.append({"params": reduction_net.parameters(), "lr": args.learning_rate})
     if args.use_position_embedder :
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
@@ -122,9 +116,6 @@ def main(args):
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler = \
       accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, test_dataloader, lr_scheduler)
-    if args.reducing_redundancy :
-        reduction_net = accelerator.prepare(reduction_net)
-        reduction_net = transform_models_if_DDP([reduction_net])[0]
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
@@ -181,12 +172,6 @@ def main(args):
                             with torch.no_grad():
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
                     else:
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
@@ -197,12 +182,6 @@ def main(args):
                             elif args.image_processor == 'vit':
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                                if args.not_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                                if args.only_use_cls_token:
-                                    encoder_hidden_states = encoder_hidden_states[:, 0, :]
-                                if args.reducing_redundancy:
-                                    encoder_hidden_states = reduction_net(encoder_hidden_states)
 
                 if args.use_text_condition:
                     with torch.set_grad_enabled(True):
@@ -267,12 +246,6 @@ def main(args):
                        saving_name=f'segmentation-{saving_epoch}.pt',
                        unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
-            if args.reducing_redundancy :
-                save_model(args,
-                           saving_folder='reduction_net',
-                           saving_name=f'reduction-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(reduction_net),
-                           save_dtype=save_dtype)
             if args.use_position_embedder :
                 save_model(args,
                            saving_folder='position_embedder',
@@ -286,45 +259,7 @@ def main(args):
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
 
-        # ----------------------------------------------------------------------------------------------------------- #
-        # [7] evaluate
-        loader = test_dataloader
-        if args.check_training:
-            print(f'test with training data')
-            loader = train_dataloader
-
-        score_dict, confusion_matrix, _ = evaluation_check(segmentation_head,
-                                                           loader,
-                                                           accelerator.device,
-                                                           condition_model,
-                                                           unet, vae, controller, weight_dtype, epoch,
-                                                           reduction_net, position_embedder, vision_head, args)
-
-        # saving
-        if is_main_process:
-            print(f'  - precision dictionary = {score_dict}')
-            print(f'  - confusion_matrix = {confusion_matrix}')
-            confusion_matrix = confusion_matrix.tolist()
-            confusion_save_dir = os.path.join(args.output_dir, 'confusion.txt')
-            with open(confusion_save_dir, 'a') as f:
-                f.write(f' epoch = {epoch + 1} \n')
-                for i in range(len(confusion_matrix)):
-                    for j in range(len(confusion_matrix[i])):
-                        f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                    f.write('\n')
-                f.write('\n')
-
-            score_save_dir = os.path.join(args.output_dir, 'score.txt')
-            with open(score_save_dir, 'a') as f:
-                dices = []
-                f.write(f' epoch = {epoch + 1} | ')
-                for k in score_dict:
-                    dice = float(score_dict[k])
-                    f.write(f'class {k} = {dice} ')
-                    dices.append(dice)
-                dice_coeff = sum(dices) / len(dices)
-                f.write(f'| dice_coeff = {dice_coeff}')
-                f.write(f'\n')
+        
     accelerator.end_training()
 
 if __name__ == "__main__":
