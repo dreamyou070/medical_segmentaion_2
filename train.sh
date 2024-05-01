@@ -1,7 +1,7 @@
 # !/bin/bash
 # 기존 논문들에서는 loss 를 2가지 이상을 사용하고 있구나 ?
 #
-port_number=58822
+port_number=58833
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
