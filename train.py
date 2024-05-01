@@ -78,6 +78,7 @@ def main(args):
     if args.image_processor == 'pvt' :
         vision_head = vision_condition_head(reverse = args.reverse,
                                             use_one = args.use_one)
+    position_embedder = None
     if args.use_position_embedder :
         position_embedder = AllPositionalEmbedding()
         if args.position_embedder_weights is not None :
