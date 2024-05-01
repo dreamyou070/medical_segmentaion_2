@@ -34,30 +34,30 @@ class vision_condition_head(nn.Module):
 
     def forward(self, x):
 
-        x1 = x[0] # [batch, 64, 128, 128]
-        x2 = x[1] # [batch, 128, 64, 64]
+        x1 = x[0] # [batch, 64,  64, 64]
+        x2 = x[1] # [batch, 128, 32, 32]
         x3 = x[2] # [batch, 320, 16, 16]
         x4 = x[3] # [batch, 512, 8, 8] # global feature
 
-        x43 = self.feature_up_4_3(x4) # [batch, 320, 16, 16]
-        x4_out = torch.cat([x43, x3], dim=1)
+        x43 = self.feature_up_4_3(x4)        # [batch, 320, 16, 16]
+        x4_out = torch.cat([x43, x3], dim=1) # [batch, 640, 16, 16]
         x4_out = self.feature_4_conv(x4_out) # [batch, 320, 16, 16]
 
-        x32 = self.feature_up_3_2(x3) # [batch, 128, 32, 32]
-        x3_out = torch.cat([x32, x2], dim=1)
+        x32 = self.feature_up_3_2(x3)        # [batch, 128, 32, 32]
+        x3_out = torch.cat([x32, x2], dim=1) # [batch, 256, 32, 32]
         x3_out = self.feature_3_conv(x3_out) # [batch, 128, 32, 32]
 
-        x21 = self.feature_up_3_2(x2) # [batch, 64, 64, 64]
-        x2_out = torch.cat([x21, x1], dim=1)
+        x21 = self.feature_up_2_1(x2)        # [batch, 128,32,32] -> [batch, 64, 64, 64]
+        x2_out = torch.cat([x21, x1], dim=1) # [batch, 128, 64, 64] # here problem
         x2_out = self.feature_2_conv(x2_out) # [batch, 64, 64, 64]
 
         #x1 = x[0].permute(0, 2, 3, 1) # batch, h, w, c
         #x2 = x[1].permute(0, 2, 3, 1)
         #x3 = x[2].permute(0, 2, 3, 1)
         x4 = x4.permute(0, 2, 3, 1) # batch, h, w, c
-        x3 = x43.permute(0, 2, 3, 1) # batch, h, w, c
-        x2 = x32.permute(0, 2, 3, 1) # batch, h, w, c
-        x1 = x21.permute(0, 2, 3, 1) # batch, h, w, c
+        x3 = x4_out.permute(0, 2, 3, 1) # batch, h, w, c
+        x2 = x3_out.permute(0, 2, 3, 1) # batch, h, w, c
+        x1 = x2_out.permute(0, 2, 3, 1) # batch, h, w, c
 
         x4 = x4.reshape(1, -1, 512)
         x3 = x3.reshape(1, -1, 320)

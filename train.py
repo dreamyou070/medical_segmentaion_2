@@ -58,9 +58,7 @@ def main(args):
 
     segmentation_head = None
     if args.use_segmentation_model :
-
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
-
         if args.use_simple_segmodel :
             segmentation_head = SemanticModel(n_classes=args.n_classes,
                                               mask_res=args.mask_res,
