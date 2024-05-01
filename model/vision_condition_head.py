@@ -47,7 +47,7 @@ class vision_condition_head(nn.Module):
         x3_out = torch.cat([x32, x2], dim=1)
         x3_out = self.feature_3_conv(x3_out) # [batch, 128, 32, 32]
 
-        x21 = self.feature_up_3_2(x2) # [batch, 64, 64, 64]
+        x21 = self.feature_up_2_1(x2) # [batch, 64, 64, 64]
         x2_out = torch.cat([x21, x1], dim=1)
         x2_out = self.feature_2_conv(x2_out) # [batch, 64, 64, 64]
 

@@ -266,7 +266,7 @@ def main(args):
                         with torch.set_grad_enabled(True):
                             if args.image_processor == 'pvt':
                                 output = condition_model(batch["image_condition"])
-                                encoder_hidden_states = vision_head(output)
+                                encoder_hidden_states = vision_head(output) #############
                             elif args.image_processor == 'vit':
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
