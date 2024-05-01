@@ -328,15 +328,14 @@ def main(args):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad(set_to_none=True)
-
+                if accelerator.sync_gradients:
+                    progress_bar.update(1)
+                    global_step += 1
+                    if is_main_process:
+                        progress_bar.set_postfix(**loss_dict)
+                    #if global_step >= args.max_train_steps:
+                    #    break
             # ----------------------------------------------------------------------------------------------------------- #
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
-                if is_main_process:
-                    progress_bar.set_postfix(**loss_dict)
-                if global_step >= args.max_train_steps:
-                    break
             trainable_params = trainable_params[:-1]
             number += 1
             accelerator.wait_for_everyone()
@@ -347,10 +346,6 @@ def main(args):
                            saving_name=f'lora-{saving_epoch}.safetensors',
                            unwrapped_nw=accelerator.unwrap_model(network),
                            save_dtype=save_dtype)
-
-
-
-
         accelerator.wait_for_everyone()
         if is_main_process:
             if args.use_segmentation_model :
@@ -397,7 +392,7 @@ def main(args):
                          args)
 
     accelerator.end_training()
-    """
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
