@@ -354,7 +354,7 @@ def main(args):
             number += 1
             accelerator.wait_for_everyone()
             # [2] erasing lora network
-            network.restore(modality = condition_modality)
+            network.restore(condition_modality =  condition_modality)
             if is_main_process:
                 saving_epoch = str(epoch + 1).zfill(6)
                 save_model(args,
