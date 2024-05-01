@@ -467,6 +467,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_image", action='store_true')
     parser.add_argument("--use_one", action='store_true')
     parser.add_argument("--channel_spatial_cascaded", action='store_true')
+    parser.add_argument("--base_path", type = str)
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument

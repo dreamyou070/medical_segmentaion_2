@@ -24,20 +24,16 @@ class TrainDataset(Dataset):
         # [1] base image
         self.root_dir = root_dir
         image_paths, gt_paths = [], []
-        folders = os.listdir(self.root_dir) # anomal
-        for folder in folders :
-            folder_dir = os.path.join(self.root_dir, folder) # anomal
-            folder_res = folder.split('_')[-1]
-            rgb_folder = os.path.join(folder_dir, f'image_{folder_res}') # anomal / image_256
-            gt_folder = os.path.join(folder_dir, f'mask_{folder_res}')    # [128,128]
-            files = os.listdir(rgb_folder) #
-            for file in files:
-                name, ext = os.path.splitext(file)
-                image_paths.append(os.path.join(rgb_folder, file))
-                if argument.gt_ext_npy :
-                    gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
-                else :
-                    gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
+        rgb_folder = os.path.join(self.root_dir, f'image_256') # anomal / image_256
+        gt_folder = os.path.join(self.root_dir, f'mask_256')    # [128,128]
+        files = os.listdir(rgb_folder) #
+        for file in files:
+            name, ext = os.path.splitext(file)
+            image_paths.append(os.path.join(rgb_folder, file))
+            if argument.gt_ext_npy :
+                gt_paths.append(os.path.join(gt_folder, f'{name}.npy'))
+            else :
+                gt_paths.append(os.path.join(gt_folder, f'{name}{ext}'))
 
         self.resize_shape = resize_shape
         self.image_processor = image_processor

@@ -41,7 +41,7 @@ def call_test_dataset(args, _data_name) :
 
     # [1] data_path here
 
-    base_path = os.path.split(args.train_data_path)[0]
+    base_path = args.base_path
     test_base_path = os.path.join(base_path, 'test')
     data_path = os.path.join(test_base_path, _data_name)
 
