@@ -115,7 +115,6 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    kl_weight = 1e-6
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         epoch_loss_total = 0
@@ -124,17 +123,13 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
-
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-
             if not args.without_condition:
                 if args.use_image_condition:
                     if not args.image_model_training:
-
                         if args.image_processor == 'pvt':
                             output = condition_model(batch["image_condition"])
                             encoder_hidden_states = vision_head(output)
-
                         elif args.image_processor == 'vit':
                             with torch.no_grad():
                                 output, pix_embedding = condition_model(**batch["image_condition"])
@@ -145,7 +140,6 @@ def main(args):
                                 output = condition_model(batch["image_condition"])
                                 # encoder hidden states is dictionary
                                 encoder_hidden_states = vision_head(output)
-
                             elif args.image_processor == 'vit':
                                 output, pix_embedding = condition_model(**batch["image_condition"])
                                 encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
@@ -170,16 +164,12 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-
                 noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
                              noise_type = position_embedder).sample
-                controller.reset()
+            controller.reset()
             target = torch.rand_like(noise_pred).to(dtype=weight_dtype, device=device)
-
-            loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none",).mean([1,2,3])
-            loss = loss.mean()
+            loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none",).mean([1,2,3]).mean()
             current_loss = loss.detach().item()
-
             if epoch == args.start_epoch:
                 loss_list.append(current_loss)
             else:
@@ -226,8 +216,6 @@ def main(args):
                            saving_name=f'vision-{saving_epoch}.pt',
                            unwrapped_nw=accelerator.unwrap_model(vision_head),
                            save_dtype=save_dtype)
-
-
     accelerator.end_training()
 
 if __name__ == "__main__":
