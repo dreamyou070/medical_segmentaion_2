@@ -110,8 +110,10 @@ def main(args):
                                  condition_modality=condition_modality,
                                  **net_kwargs, )
         network = accelerator.prepare(network)
-        trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
-                                                            args.learning_rate, condition_modality=condition_modality, )
+        trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr,
+                                                             args.unet_lr,
+                                                             args.learning_rate,
+                                                             condition_modality=condition_modality,)
         trainable_params.extend(trainable_params_)
         networks.append(network)
         """
@@ -121,7 +123,6 @@ def main(args):
                          True,
                          condition_modality=condition_modality)
         """
-
     segmentation_head = None
     if args.use_segmentation_model :
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
@@ -163,19 +164,17 @@ def main(args):
     train_folder = args.train_data_path
     groups = os.listdir(train_folder)
     data_loaders = []
+    data_num = 0
     for group in groups:
         train_dir = os.path.join(train_folder, group)
         if args.image_processor == 'clip':
             processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
         elif args.image_processor == 'vit':
             processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
-
         elif args.image_processor == 'pvt':
             processor = transforms.Compose([transforms.Resize((384, 384)),
                                             transforms.ToTensor(),
                                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
         train_dataset = TrainDataset(root_dir=train_dir,
                                      resize_shape=[args.resize_shape, args.resize_shape],
                                      image_processor=processor,
@@ -183,16 +182,14 @@ def main(args):
                                      n_classes=args.n_classes,
                                      mask_res=args.mask_res,
                                      use_data_aug=args.use_data_aug, )
-
         train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                        batch_size=args.batch_size,
                                                        shuffle=True)
+        data_num += len(train_dataloader)
         train_dataloader = accelerator.prepare(train_dataloader)
         data_loaders.append(train_dataloader)
 
-
     print(f'\n step 5. optimizer')
-
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt':
@@ -204,6 +201,7 @@ def main(args):
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
+    args.max_train_steps = data_num * args.max_train_epochs
     lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
     print(f'\n step 7. loss function')
@@ -243,7 +241,7 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-
+    """
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         for network, train_dataloader in zip(networks, data_loaders):
