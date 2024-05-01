@@ -241,8 +241,7 @@ def main(args):
                              True,
                              True,
                              condition_modality=condition_modality)
-            network.to(weight_dtype)
-
+            network = accelerator.prepare(network)
             # [2] get parameter
             trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr,
                                                                  args.unet_lr,
