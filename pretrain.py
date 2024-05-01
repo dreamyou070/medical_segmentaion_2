@@ -14,11 +14,6 @@ from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
-from utils.loss import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
-from monai.utils import DiceCEReduction, LossReduction
-from monai.losses import FocalLoss
-from monai.losses import DiceLoss, DiceCELoss
 from model.vision_condition_head import vision_condition_head
 
 # image conditioned segmentation mask generating
@@ -42,9 +37,6 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
-    segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                      mask_res=args.mask_res,
-                                      use_layer_norm = args.use_layer_norm)
 
     vision_head = None
     if args.image_processor == 'pvt' :
@@ -71,8 +63,6 @@ def main(args):
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt' :
         trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
-    trainable_params.append({"params": segmentation_head.parameters(),
-                             "lr": args.learning_rate})
     optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
 
     print(f'\n step 6. lr')
@@ -81,8 +71,7 @@ def main(args):
     print(f'\n step 8. model to device')
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler = \
-      accelerator.prepare(segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler)
+    unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, network, optimizer, train_dataloader, lr_scheduler)
     if args.use_position_embedder :
         position_embedder = accelerator.prepare(position_embedder)
         position_embedder = transform_models_if_DDP([position_embedder])[0]
@@ -91,10 +80,8 @@ def main(args):
         vision_head = transform_models_if_DDP([vision_head])[0]
 
     unet, network = transform_models_if_DDP([unet, network])
-    segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
-        segmentation_head.train()
         for t_enc in condition_models:
             t_enc.train()
             if args.train_text_encoder:
@@ -198,11 +185,6 @@ def main(args):
                        saving_folder='model',
                        saving_name=f'lora-{saving_epoch}.safetensors',
                        unwrapped_nw=accelerator.unwrap_model(network),
-                       save_dtype=save_dtype)
-            save_model(args,
-                       saving_folder='segmentation',
-                       saving_name=f'segmentation-{saving_epoch}.pt',
-                       unwrapped_nw=accelerator.unwrap_model(segmentation_head),
                        save_dtype=save_dtype)
             if args.use_position_embedder :
                 save_model(args,

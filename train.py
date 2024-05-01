@@ -231,7 +231,6 @@ def main(args):
                 # [2] spatial attention query
                 if args.use_positioning_module :
                     """ let's make more global attentive feature """
-
                     if args.previous_positioning_module:
                         query = query.reshape(1, res, res, -1)
                         query = query.permute(0, 3, 1, 2).contiguous()  # 1, dim, res, res
@@ -281,7 +280,6 @@ def main(args):
                         q_dict[res] = fetaure
 
                 else :
-
                     q_dict[res] = channel_attn_query
 
                 # if I get only one feature map, is it really meaningful to use two separate feature ?

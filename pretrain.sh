@@ -7,9 +7,8 @@ obj_name="leader_polyp"
 trigger_word="leader_polyp"
 benchmark="Pranet"
 layer_name='layer_3'
-sub_folder="up_16_32_64"
+sub_folder="up_16_32_64_20240501"
 file_name="33_pvt_image_encoder_with_position_embedder_reverse" #
-
 
 accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --main_process_port $port_number pretrain.py --log_with wandb \
@@ -31,4 +30,4 @@ accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
  --optimizer_args weight_decay=0.00005 \
  --use_image_condition \
  --image_processor 'pvt' \
- --image_model_training --reverse
+ --image_model_training --reverse --use_position_embedder
