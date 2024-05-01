@@ -33,6 +33,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 p = query.shape[1]
                 res = int(p ** 0.5)
                 context = context[res]
+            #
             key_ = self.to_k(context)
             value = self.to_v(context)
 

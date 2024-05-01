@@ -285,7 +285,9 @@ def main(args):
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                         if encoder_hidden_states.dim() != 3:
                             encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                    unet(latents, 0,
+                         encoder_hidden_states,
+                         trg_layer_list=args.trg_layer_list,
                          noise_type = position_embedder).sample
                 query_dict, key_dict = controller.query_dict, controller.key_dict
                 controller.reset()
