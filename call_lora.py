@@ -223,7 +223,7 @@ def main(args):
     condition_model = accelerator.prepare(condition_model)
     condition_models = transform_models_if_DDP([condition_model])
     segmentation_head, unet, optimizer, lr_scheduler = accelerator.prepare(segmentation_head, unet, optimizer, lr_scheduler)
-    segmentation_head = accelerator.prepare(segmentation_head)
+    segmentation_head = accelerator.prepare(segmentation_head)[0]
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
     if args.use_position_embedder:
@@ -366,9 +366,26 @@ def main(args):
         accelerator.wait_for_everyone()
         # ----------------------------------------------------------------------------------------------------------- #
         # lora merging
-
+        teacher_state_dict = teacher_network.state_dict()
+        for k in teacher_state_dict.keys():
+            teacher_state_dict[k].data = torch.mean(torch.stack([network.state_dict[k].data for network in networks]), dim=0)
+        teacher_network.load_state_dict(teacher_state_dict)
+        teacher_network.apply_to(condition_model,
+                                    unet,
+                                    True,
+                                    True,
+                                    condition_modality=condition_modality)
+        teacher_network = accelerator.prepare(teacher_network)
+        teacher_network = transform_models_if_DDP([teacher_network])[0]
+        # ----------------------------------------------------------------------------------------------------------- #
 
         if is_main_process:
+            save_model(args,
+                          saving_folder='teacher_model',
+                          saving_name=f'lora-{saving_epoch}.safetensors',
+                          unwrapped_nw=accelerator.unwrap_model(teacher_network),
+                          save_dtype=save_dtype)
+
             if args.use_segmentation_model :
                 save_model(args,
                            saving_folder='segmentation',
