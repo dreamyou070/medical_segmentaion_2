@@ -261,7 +261,7 @@ def main(args):
                                                                  args.learning_rate,
                                                                  condition_modality=condition_modality, )
             trainable_params.extend(trainable_params_)
-            optimizer = get_optimizer(args, trainable_params)
+            _,_, optimizer = get_optimizer(args, trainable_params)
 
             accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
             epoch_loss_total =0
