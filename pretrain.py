@@ -106,16 +106,21 @@ def main(args):
         del t_enc
         network.prepare_grad_etc()
 
-
+    print(f'\n step 9. registering saving tensor')
+    controller = AttentionStore()
+    register_attention_control(unet, controller)
 
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
+    kl_weight = 1e-6
     for epoch in range(args.start_epoch, args.max_train_epochs):
+
         epoch_loss_total = 0
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+
         for step, batch in enumerate(train_dataloader):
             device = accelerator.device
             loss_dict = {}
@@ -166,9 +171,9 @@ def main(args):
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-                noise_pred = unet(latents, 0,
-                                  encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                noise_pred = unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
                              noise_type = position_embedder).sample
+                controller.reset()
             target = torch.rand_like(noise_pred).to(dtype=weight_dtype, device=device)
 
             loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none",).mean([1,2,3])
