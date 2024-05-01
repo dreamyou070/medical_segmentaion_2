@@ -24,12 +24,15 @@ class vision_condition_head(nn.Module):
                                        nn.BatchNorm2d(64),
                                        nn.UpsamplingBilinear2d(scale_factor=2))
         # --------------------------------------------------------------------------------------------------------
-        self.feature_4_conv = nn.Sequential(nn.Conv2d(640, 320, kernel_size=3, stride=1, padding=1, dilation=1),
+        self.feature_4_conv = nn.Sequential(nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, dilation=1),
+                                            nn.Sigmoid())
+        self.feature_3_conv = nn.Sequential(nn.Conv2d(640, 320, kernel_size=3, stride=1, padding=1, dilation=1),
                                        nn.Sigmoid())
-        self.feature_3_conv = nn.Sequential(nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1, dilation=1),
+        self.feature_2_conv = nn.Sequential(nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1, dilation=1),
                                        nn.Sigmoid())
-        self.feature_2_conv = nn.Sequential(nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1, dilation=1),
+        self.feature_1_conv = nn.Sequential(nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1, dilation=1),
                                        nn.Sigmoid())
+
 
 
     def forward(self, x):
@@ -39,27 +42,33 @@ class vision_condition_head(nn.Module):
         x3 = x[2] # [batch, 320, 16, 16]
         x4 = x[3] # [batch, 512, 8, 8] # global feature
 
+
+        x4_out = self.feature_4_conv(x4) # [batch, 8, 8, 512] -> [batch, 8, 8, 512]
+
         x43 = self.feature_up_4_3(x4)        # [batch, 320, 16, 16]
-        x4_out = torch.cat([x43, x3], dim=1) # [batch, 640, 16, 16]
-        x4_out = self.feature_4_conv(x4_out) # [batch, 320, 16, 16]
+        x3_out = torch.cat([x43, x3], dim=1) # [batch, 640, 16, 16]
+        x3_out = self.feature_3_conv(x3_out) # [batch, 320, 16, 16]
 
         x32 = self.feature_up_3_2(x3)        # [batch, 128, 32, 32]
-        x3_out = torch.cat([x32, x2], dim=1) # [batch, 256, 32, 32]
-        x3_out = self.feature_3_conv(x3_out) # [batch, 128, 32, 32]
+        x2_out = torch.cat([x32, x2], dim=1) # [batch, 256, 32, 32]
+        x2_out = self.feature_2_conv(x2_out) # [batch, 128, 32, 32]
 
         x21 = self.feature_up_2_1(x2)        # [batch, 128,32,32] -> [batch, 64, 64, 64]
-        x2_out = torch.cat([x21, x1], dim=1) # [batch, 128, 64, 64] # here problem
-        x2_out = self.feature_2_conv(x2_out) # [batch, 64, 64, 64]
+        x1_out = torch.cat([x21, x1], dim=1) # [batch, 128, 64, 64] # here problem
+        x1_out = self.feature_1_conv(x1_out) # [batch, 64, 64, 64]
 
         #x1 = x[0].permute(0, 2, 3, 1) # batch, h, w, c
         #x2 = x[1].permute(0, 2, 3, 1)
         #x3 = x[2].permute(0, 2, 3, 1)
-        x4 = x4.permute(0, 2, 3, 1) # batch, h, w, c
-        x3 = x4_out.permute(0, 2, 3, 1) # batch, h, w, c
-        x2 = x3_out.permute(0, 2, 3, 1) # batch, h, w, c
-        x1 = x2_out.permute(0, 2, 3, 1) # batch, h, w, c
 
-        x4 = x4.reshape(1, -1, 512)
+        # should use sigmoid
+
+        x4 = x4_out.permute(0, 2, 3, 1) # batch, h, w, c
+        x3 = x3_out.permute(0, 2, 3, 1) # batch, h, w, c
+        x2 = x2_out.permute(0, 2, 3, 1) # batch, h, w, c
+        x1 = x1_out.permute(0, 2, 3, 1) # batch, h, w, c
+
+        x4 = x4.reshape(1, -1, 512) # batch, 64, 64, 512 -> batch, 64*64, 512
         x3 = x3.reshape(1, -1, 320)
         x2 = x2.reshape(1, -1, 128)
         x1 = x1.reshape(1, -1, 64)
@@ -77,7 +86,6 @@ class vision_condition_head(nn.Module):
 
 
         # why don't i sigmoid to extract only region specific feature ?
-
 
         if self.reverse :
 
