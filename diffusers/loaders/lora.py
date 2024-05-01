@@ -428,7 +428,7 @@ class LoraLoaderMixin:
                 logger.warn(warn_message)
 
         if USE_PEFT_BACKEND and len(state_dict.keys()) > 0:
-            from peft import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
+            from peft_origin import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
 
             if adapter_name in getattr(unet, "peft_config", {}):
                 raise ValueError(
@@ -438,7 +438,7 @@ class LoraLoaderMixin:
             state_dict = convert_unet_state_dict_to_peft(state_dict)
 
             if network_alphas is not None:
-                # The alphas state dict have the same structure as Unet, thus we convert it to peft format using
+                # The alphas state dict have the same structure as Unet, thus we convert it to peft_origin format using
                 # `convert_unet_state_dict_to_peft` method.
                 network_alphas = convert_unet_state_dict_to_peft(network_alphas)
 
@@ -577,7 +577,7 @@ class LoraLoaderMixin:
                     }
 
                 if USE_PEFT_BACKEND:
-                    from peft import LoraConfig
+                    from peft_origin import LoraConfig
 
                     lora_config_kwargs = get_peft_kwargs(
                         rank, network_alphas, text_encoder_lora_state_dict, is_unet=False
@@ -705,7 +705,7 @@ class LoraLoaderMixin:
             }
 
         if len(state_dict.keys()) > 0:
-            from peft import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
+            from peft_origin import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
 
             if adapter_name in getattr(transformer, "peft_config", {}):
                 raise ValueError(
@@ -1051,7 +1051,7 @@ class LoraLoaderMixin:
             unet.fuse_lora(lora_scale, safe_fusing=safe_fusing, adapter_names=adapter_names)
 
         if USE_PEFT_BACKEND:
-            from peft.tuners.tuners_utils import BaseTunerLayer
+            from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
             def fuse_text_encoder_lora(text_encoder, lora_scale=1.0, safe_fusing=False, adapter_names=None):
                 merge_kwargs = {"safe_merge": safe_fusing}
@@ -1069,7 +1069,7 @@ class LoraLoaderMixin:
                         elif "adapter_names" not in supported_merge_kwargs and adapter_names is not None:
                             raise ValueError(
                                 "The `adapter_names` argument is not supported with your PEFT version. "
-                                "Please upgrade to the latest version of PEFT. `pip install -U peft`"
+                                "Please upgrade to the latest version of PEFT. `pip install -U peft_origin`"
                             )
 
                         module.merge(**merge_kwargs)
@@ -1082,7 +1082,7 @@ class LoraLoaderMixin:
                     raise ValueError(
                         "The `adapter_names` argument is not supported in your environment. Please switch to PEFT "
                         "backend to use this argument by installing latest PEFT and transformers."
-                        " `pip install -U peft transformers`"
+                        " `pip install -U peft_origin transformers`"
                     )
 
                 for _, attn_module in text_encoder_attn_modules(text_encoder):
@@ -1125,14 +1125,14 @@ class LoraLoaderMixin:
             if not USE_PEFT_BACKEND:
                 unet.unfuse_lora()
             else:
-                from peft.tuners.tuners_utils import BaseTunerLayer
+                from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
                 for module in unet.modules():
                     if isinstance(module, BaseTunerLayer):
                         module.unmerge()
 
         if USE_PEFT_BACKEND:
-            from peft.tuners.tuners_utils import BaseTunerLayer
+            from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
             def unfuse_text_encoder_lora(text_encoder):
                 for module in text_encoder.modules():
@@ -1323,10 +1323,10 @@ class LoraLoaderMixin:
         """
         if not USE_PEFT_BACKEND:
             raise ValueError(
-                "PEFT backend is required for this method. Please install the latest version of PEFT `pip install -U peft`"
+                "PEFT backend is required for this method. Please install the latest version of PEFT `pip install -U peft_origin`"
             )
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         active_adapters = []
         unet = getattr(self, self.unet_name) if not hasattr(self, "unet") else self.unet
@@ -1343,7 +1343,7 @@ class LoraLoaderMixin:
         """
         if not USE_PEFT_BACKEND:
             raise ValueError(
-                "PEFT backend is required for this method. Please install the latest version of PEFT `pip install -U peft`"
+                "PEFT backend is required for this method. Please install the latest version of PEFT `pip install -U peft_origin`"
             )
 
         set_adapters = {}
@@ -1374,7 +1374,7 @@ class LoraLoaderMixin:
         if not USE_PEFT_BACKEND:
             raise ValueError("PEFT backend is required for this method.")
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         # Handle the UNET
         unet = getattr(self, self.unet_name) if not hasattr(self, "unet") else self.unet

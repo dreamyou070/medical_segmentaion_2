@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-PEFT utilities: Utilities related to peft library
+PEFT utilities: Utilities related to peft_origin library
 """
 import collections
 import importlib
@@ -31,7 +31,7 @@ def recurse_remove_peft_layers(model):
     r"""
     Recursively replace all instances of `LoraLayer` with corresponding new layers in `model`.
     """
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     has_base_layer_pattern = False
     for module in model.modules():
@@ -40,7 +40,7 @@ def recurse_remove_peft_layers(model):
             break
 
     if has_base_layer_pattern:
-        from peft.utils import _get_submodules
+        from peft_origin.utils import _get_submodules
 
         key_list = [key for key, _ in model.named_modules() if "lora" not in key]
         for key in key_list:
@@ -53,7 +53,7 @@ def recurse_remove_peft_layers(model):
     else:
         # This is for backwards compatibility with PEFT <= 0.6.2.
         # TODO can be removed once that PEFT version is no longer supported.
-        from peft.tuners.lora import LoraLayer
+        from peft_origin.tuners.lora import LoraLayer
 
         for name, module in model.named_children():
             if len(list(module.children())) > 0:
@@ -107,7 +107,7 @@ def scale_lora_layers(model, weight):
         weight (`float`):
             The weight to be given to the LoRA layers.
     """
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     for module in model.modules():
         if isinstance(module, BaseTunerLayer):
@@ -126,7 +126,7 @@ def unscale_lora_layers(model, weight: Optional[float] = None):
             re-initialized to the correct value. If 0.0 is passed, we will re-initialize the scale with the correct
             value.
     """
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     for module in model.modules():
         if isinstance(module, BaseTunerLayer):
@@ -182,7 +182,7 @@ def get_peft_kwargs(rank_dict, network_alpha_dict, peft_state_dict, is_unet=True
 
 
 def get_adapter_name(model):
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     for module in model.modules():
         if isinstance(module, BaseTunerLayer):
@@ -191,7 +191,7 @@ def get_adapter_name(model):
 
 
 def set_adapter_layers(model, enabled=True):
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     for module in model.modules():
         if isinstance(module, BaseTunerLayer):
@@ -203,7 +203,7 @@ def set_adapter_layers(model, enabled=True):
 
 
 def delete_adapter_layers(model, adapter_name):
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     for module in model.modules():
         if isinstance(module, BaseTunerLayer):
@@ -225,7 +225,7 @@ def delete_adapter_layers(model, adapter_name):
 
 
 def set_weights_and_activate_adapters(model, adapter_names, weights):
-    from peft.tuners.tuners_utils import BaseTunerLayer
+    from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
     # iterate over each adapter, make it active and set the corresponding scaling weight
     for adapter_name, weight in zip(adapter_names, weights):
@@ -257,9 +257,9 @@ def check_peft_version(min_version: str) -> None:
             The version of PEFT to check against.
     """
     if not is_peft_available():
-        raise ValueError("PEFT is not installed. Please install it with `pip install peft`")
+        raise ValueError("PEFT is not installed. Please install it with `pip install peft_origin`")
 
-    is_peft_version_compatible = version.parse(importlib.metadata.version("peft")) > version.parse(min_version)
+    is_peft_version_compatible = version.parse(importlib.metadata.version("peft_origin")) > version.parse(min_version)
 
     if not is_peft_version_compatible:
         raise ValueError(

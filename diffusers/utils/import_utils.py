@@ -271,10 +271,10 @@ except importlib_metadata.PackageNotFoundError:
     _invisible_watermark_available = False
 
 
-_peft_available = importlib.util.find_spec("peft") is not None
+_peft_available = importlib.util.find_spec("peft_origin") is not None
 try:
-    _peft_version = importlib_metadata.version("peft")
-    logger.debug(f"Successfully imported peft version {_peft_version}")
+    _peft_version = importlib_metadata.version("peft_origin")
+    logger.debug(f"Successfully imported peft_origin version {_peft_version}")
 except importlib_metadata.PackageNotFoundError:
     _peft_available = False
 

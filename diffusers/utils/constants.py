@@ -38,12 +38,12 @@ DIFFUSERS_DYNAMIC_MODULE_NAME = "diffusers_modules"
 HF_MODULES_CACHE = os.getenv("HF_MODULES_CACHE", os.path.join(HF_HOME, "modules"))
 DEPRECATED_REVISION_ARGS = ["fp16", "non-ema"]
 
-# Below should be `True` if the current version of `peft` and `transformers` are compatible with
+# Below should be `True` if the current version of `peft_origin` and `transformers` are compatible with
 # PEFT backend. Will automatically fall back to PEFT backend if the correct versions of the libraries are
 # available.
 # For PEFT it is has to be greater than or equal to 0.6.0 and for transformers it has to be greater than or equal to 4.34.0.
 _required_peft_version = is_peft_available() and version.parse(
-    version.parse(importlib.metadata.version("peft")).base_version
+    version.parse(importlib.metadata.version("peft_origin")).base_version
 ) >= version.parse(MIN_PEFT_VERSION)
 _required_transformers_version = is_transformers_available() and version.parse(
     version.parse(importlib.metadata.version("transformers")).base_version
@@ -52,4 +52,4 @@ _required_transformers_version = is_transformers_available() and version.parse(
 USE_PEFT_BACKEND = _required_peft_version and _required_transformers_version
 
 if USE_PEFT_BACKEND and _CHECK_PEFT:
-    dep_version_check("peft")
+    dep_version_check("peft_origin")

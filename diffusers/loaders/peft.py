@@ -41,7 +41,7 @@ class PeftAdapterMixin:
         [documentation](https://huggingface.co/docs/peft).
 
         Args:
-            adapter_config (`[~peft.PeftConfig]`):
+            adapter_config (`[~peft_origin.PeftConfig]`):
                 The configuration of the adapter to add; supported adapters are non-prefix tuning and adaption prompt
                 methods.
             adapter_name (`str`, *optional*, defaults to `"default"`):
@@ -50,9 +50,9 @@ class PeftAdapterMixin:
         check_peft_version(min_version=MIN_PEFT_VERSION)
 
         if not is_peft_available():
-            raise ImportError("PEFT is not available. Please install PEFT to use this function: `pip install peft`.")
+            raise ImportError("PEFT is not available. Please install PEFT to use this function: `pip install peft_origin`.")
 
-        from peft import PeftConfig, inject_adapter_in_model
+        from peft_origin import PeftConfig, inject_adapter_in_model
 
         if not self._hf_peft_config_loaded:
             self._hf_peft_config_loaded = True
@@ -96,7 +96,7 @@ class PeftAdapterMixin:
                 f" current loaded adapters are: {list(self.peft_config.keys())}"
             )
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         _adapters_has_been_set = False
 
@@ -108,7 +108,7 @@ class PeftAdapterMixin:
                 elif not hasattr(module, "set_adapter") and len(adapter_name) != 1:
                     raise ValueError(
                         "You are trying to set multiple adapters and you have a PEFT version that does not support multi-adapter inference. Please upgrade to the latest version of PEFT."
-                        " `pip install -U peft` or `pip install -U git+https://github.com/huggingface/peft.git`"
+                        " `pip install -U peft_origin` or `pip install -U git+https://github.com/huggingface/peft.git`"
                     )
                 else:
                     module.active_adapter = adapter_name
@@ -131,7 +131,7 @@ class PeftAdapterMixin:
         if not self._hf_peft_config_loaded:
             raise ValueError("No adapter loaded. Please load an adapter first.")
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         for _, module in self.named_modules():
             if isinstance(module, BaseTunerLayer):
@@ -154,7 +154,7 @@ class PeftAdapterMixin:
         if not self._hf_peft_config_loaded:
             raise ValueError("No adapter loaded. Please load an adapter first.")
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         for _, module in self.named_modules():
             if isinstance(module, BaseTunerLayer):
@@ -174,12 +174,12 @@ class PeftAdapterMixin:
         check_peft_version(min_version=MIN_PEFT_VERSION)
 
         if not is_peft_available():
-            raise ImportError("PEFT is not available. Please install PEFT to use this function: `pip install peft`.")
+            raise ImportError("PEFT is not available. Please install PEFT to use this function: `pip install peft_origin`.")
 
         if not self._hf_peft_config_loaded:
             raise ValueError("No adapter loaded. Please load an adapter first.")
 
-        from peft.tuners.tuners_utils import BaseTunerLayer
+        from peft_origin.tuners.tuners_utils import BaseTunerLayer
 
         for _, module in self.named_modules():
             if isinstance(module, BaseTunerLayer):

@@ -47,7 +47,7 @@ global_rng = random.Random()
 logger = get_logger(__name__)
 
 _required_peft_version = is_peft_available() and version.parse(
-    version.parse(importlib.metadata.version("peft")).base_version
+    version.parse(importlib.metadata.version("peft_origin")).base_version
 ) > version.parse("0.5")
 _required_transformers_version = is_transformers_available() and version.parse(
     version.parse(importlib.metadata.version("transformers")).base_version
@@ -308,7 +308,7 @@ def require_peft_version_greater(peft_version):
 
     def decorator(test_case):
         correct_peft_version = is_peft_available() and version.parse(
-            version.parse(importlib.metadata.version("peft")).base_version
+            version.parse(importlib.metadata.version("peft_origin")).base_version
         ) > version.parse(peft_version)
         return unittest.skipUnless(
             correct_peft_version, f"test requires PEFT backend with the version greater than {peft_version}"

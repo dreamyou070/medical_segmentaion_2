@@ -284,7 +284,7 @@ def _unwrap_model(model):
         model = model._orig_mod
 
     if is_peft_available():
-        from peft import PeftModel
+        from peft_origin import PeftModel
 
         if isinstance(model, PeftModel):
             model = model.base_model.model
