@@ -10,8 +10,6 @@ import torch
 from torch import nn
 import os
 from attention_store import AttentionStore
-from data import call_dataset
-from model import call_model_package
 from model.segmentation_unet import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
 from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
@@ -111,18 +109,18 @@ def main(args):
                                  neuron_dropout=args.network_dropout,
                                  condition_modality=condition_modality,
                                  **net_kwargs, )
-        networks.append(network)
         network = accelerator.prepare(network)
         trainable_params_ = network.prepare_optimizer_params(args.text_encoder_lr, args.unet_lr,
                                                             args.learning_rate, condition_modality=condition_modality, )
         trainable_params.extend(trainable_params_)
-    """
-    network.apply_to(condition_model,
-                     unet,
-                     True,
-                     True,
-                     condition_modality=condition_modality)
-    """
+        networks.append(network)
+        """
+        network.apply_to(condition_model,
+                         unet,
+                         True,
+                         True,
+                         condition_modality=condition_modality)
+        """
 
     segmentation_head = None
     if args.use_segmentation_model :
@@ -189,8 +187,9 @@ def main(args):
         train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                        batch_size=args.batch_size,
                                                        shuffle=True)
-        data_loaders.append(train_dataloader)
         train_dataloader = accelerator.prepare(train_dataloader)
+        data_loaders.append(train_dataloader)
+
 
     print(f'\n step 5. optimizer')
 
@@ -238,7 +237,7 @@ def main(args):
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
-    """
+
     print(f'\n step 10. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
                         disable=not accelerator.is_local_main_process, desc="steps")
@@ -247,128 +246,136 @@ def main(args):
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
-        accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
-        epoch_loss_total =0
+        for network, train_dataloader in zip(networks, data_loaders):
+            # [1] applying
+            network.apply_to(condition_model,
+                             unet,
+                             True,
+                             True,
+                             condition_modality=condition_modality)
+            network.to(weight_dtype)
 
-        for step, batch in enumerate(train_dataloader):
-            total_loss = 0
+            accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+            epoch_loss_total =0
 
-            loss_dict = {}
-            encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
-            if not args.without_condition:
+            for step, batch in enumerate(train_dataloader):
+                total_loss = 0
 
-                if args.use_image_condition:
+                loss_dict = {}
+                encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+                if not args.without_condition:
 
-                    with torch.set_grad_enabled(True):
-                        if args.image_processor == 'pvt':
-                            output = condition_model(batch["image_condition"])
-                            encoder_hidden_states = vision_head(output)
-                        elif args.image_processor == 'vit':
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+                    if args.use_image_condition:
 
-            image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
-            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
-            gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
+                        with torch.set_grad_enabled(True):
+                            if args.image_processor == 'pvt':
+                                output = condition_model(batch["image_condition"])
+                                encoder_hidden_states = vision_head(output)
+                            elif args.image_processor == 'vit':
+                                output, pix_embedding = condition_model(**batch["image_condition"])
+                                encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
 
-            with torch.no_grad():
-                latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                image = batch['image'].to(dtype=weight_dtype)      # 1,3,512,512
+                gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
+                gt = batch['gt'].to(dtype=weight_dtype)            # 1,2,256,256
 
+                with torch.no_grad():
+                    latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
+                # ----------------------------------------------------------------------------------------------------------- #
+                with torch.set_grad_enabled(True):
+                    if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
+                        if encoder_hidden_states.dim() != 3:
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                        if encoder_hidden_states.dim() != 3:
+                            encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                    unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                         noise_type = position_embedder).sample
+                query_dict, key_dict = controller.query_dict, controller.key_dict
+                controller.reset()
+                q_dict = {}
+
+                for layer in args.trg_layer_list:
+                    query = query_dict[layer][0]
+                    res = int(query.shape[1] ** 0.5)
+                    q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
+                x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+                _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+                # [2] segmentation head
+                masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+                masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+                if args.use_dice_ce_loss:
+                    loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
+                                       target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
+                else:
+                    loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
+                    loss_dict['cross_entropy_loss'] = loss.item()
+                    # [5.2] Focal Loss
+                    focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                    if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
+                    loss += focal_loss
+                    loss_dict['focal_loss'] = focal_loss.item()
+                    loss = loss.mean()
+
+                total_loss += loss.mean()
+                current_loss = total_loss.detach().item()
+
+                if epoch == args.start_epoch:
+                    loss_list.append(current_loss)
+                else:
+                    epoch_loss_total -= loss_list[step]
+                    loss_list[step] = current_loss
+                epoch_loss_total += current_loss
+                avr_loss = epoch_loss_total / len(loss_list)
+                loss_dict['avr_loss'] = avr_loss
+                accelerator.backward(loss)
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
+                if accelerator.sync_gradients:
+                    progress_bar.update(1)
+                    global_step += 1
+                if is_main_process:
+                    progress_bar.set_postfix(**loss_dict)
+                if global_step >= args.max_train_steps:
+                    break
             # ----------------------------------------------------------------------------------------------------------- #
-            with torch.set_grad_enabled(True):
-                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict :
-                    if encoder_hidden_states.dim() != 3:
-                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                    if encoder_hidden_states.dim() != 3:
-                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
-                     noise_type = position_embedder).sample
-            query_dict, key_dict = controller.query_dict, controller.key_dict
-            controller.reset()
-            q_dict = {}
-
-            for layer in args.trg_layer_list:
-                query = query_dict[layer][0]
-                res = int(query.shape[1] ** 0.5)
-                q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
-            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-            # [2] segmentation head
-            masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
-            if args.use_dice_ce_loss:
-                loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
-                                   target=batch['gt'].to(dtype=weight_dtype)) #  [class, 256,256]
-            else:
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
-                # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                loss = loss.mean()
-
-            total_loss += loss.mean()
-            current_loss = total_loss.detach().item()
-
-            if epoch == args.start_epoch:
-                loss_list.append(current_loss)
-            else:
-                epoch_loss_total -= loss_list[step]
-                loss_list[step] = current_loss
-            epoch_loss_total += current_loss
-            avr_loss = epoch_loss_total / len(loss_list)
-            loss_dict['avr_loss'] = avr_loss
-            accelerator.backward(loss)
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad(set_to_none=True)
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
+            accelerator.wait_for_everyone()
             if is_main_process:
-                progress_bar.set_postfix(**loss_dict)
-            if global_step >= args.max_train_steps:
-                break
-        # ----------------------------------------------------------------------------------------------------------- #
-        
-        accelerator.wait_for_everyone()
-        if is_main_process:
-            saving_epoch = str(epoch + 1).zfill(6)
-            save_model(args,
-                       saving_folder='model',
-                       saving_name=f'lora-{saving_epoch}.safetensors',
-                       unwrapped_nw=accelerator.unwrap_model(network),
-                       save_dtype=save_dtype)
-
-            if args.use_segmentation_model :
+                saving_epoch = str(epoch + 1).zfill(6)
                 save_model(args,
-                           saving_folder='segmentation',
-                           saving_name=f'segmentation-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                           saving_folder='model',
+                           saving_name=f'lora-{saving_epoch}.safetensors',
+                           unwrapped_nw=accelerator.unwrap_model(network),
                            save_dtype=save_dtype)
 
-            if args.use_position_embedder :
-                save_model(args,
-                           saving_folder='position_embedder',
-                           saving_name=f'position-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
-                           save_dtype=save_dtype)
+                if args.use_segmentation_model :
+                    save_model(args,
+                               saving_folder='segmentation',
+                               saving_name=f'segmentation-{saving_epoch}.pt',
+                               unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                               save_dtype=save_dtype)
 
-            if args.image_processor == 'pvt' :
-                save_model(args,
-                           saving_folder='vision_head',
-                           saving_name=f'vision-{saving_epoch}.pt',
-                           unwrapped_nw=accelerator.unwrap_model(vision_head),
-                           save_dtype=save_dtype)
+                if args.use_position_embedder :
+                    save_model(args,
+                               saving_folder='position_embedder',
+                               saving_name=f'position-{saving_epoch}.pt',
+                               unwrapped_nw=accelerator.unwrap_model(position_embedder),
+                               save_dtype=save_dtype)
 
-            if args.use_positioning_module :
-                save_model(args,
-                            saving_folder='positioning_module',
-                            saving_name=f'positioning-{saving_epoch}.pt',
-                            unwrapped_nw=accelerator.unwrap_model(positioning_module),
-                            save_dtype=save_dtype)
+                if args.image_processor == 'pvt' :
+                    save_model(args,
+                               saving_folder='vision_head',
+                               saving_name=f'vision-{saving_epoch}.pt',
+                               unwrapped_nw=accelerator.unwrap_model(vision_head),
+                               save_dtype=save_dtype)
+
+                if args.use_positioning_module :
+                    save_model(args,
+                                saving_folder='positioning_module',
+                                saving_name=f'positioning-{saving_epoch}.pt',
+                                unwrapped_nw=accelerator.unwrap_model(positioning_module),
+                                save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
