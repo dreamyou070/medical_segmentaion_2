@@ -233,7 +233,7 @@ def main(args):
     loss_list = []
 
     for epoch in range(args.start_epoch, args.max_train_epochs):
-
+        number = 0
         for network, train_dataloader in zip(networks, data_loaders):
             # [1] applying
             network.apply_to(condition_model,
@@ -250,7 +250,7 @@ def main(args):
                                                                  condition_modality=condition_modality, )
             trainable_params.extend(trainable_params_)
             optimizer = get_optimizer(args, trainable_params)
-            
+
             accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
             epoch_loss_total =0
 
@@ -328,52 +328,58 @@ def main(args):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad(set_to_none=True)
-                if accelerator.sync_gradients:
-                    progress_bar.update(1)
-                    global_step += 1
+
+            # ----------------------------------------------------------------------------------------------------------- #
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                global_step += 1
                 if is_main_process:
                     progress_bar.set_postfix(**loss_dict)
                 if global_step >= args.max_train_steps:
                     break
-
             trainable_params = trainable_params[:-1]
-            # ----------------------------------------------------------------------------------------------------------- #
+            number += 1
             accelerator.wait_for_everyone()
             if is_main_process:
                 saving_epoch = str(epoch + 1).zfill(6)
                 save_model(args,
-                           saving_folder='model',
+                           saving_folder=f'model_{number}',
                            saving_name=f'lora-{saving_epoch}.safetensors',
                            unwrapped_nw=accelerator.unwrap_model(network),
                            save_dtype=save_dtype)
 
-                if args.use_segmentation_model :
-                    save_model(args,
-                               saving_folder='segmentation',
-                               saving_name=f'segmentation-{saving_epoch}.pt',
-                               unwrapped_nw=accelerator.unwrap_model(segmentation_head),
-                               save_dtype=save_dtype)
 
-                if args.use_position_embedder :
-                    save_model(args,
-                               saving_folder='position_embedder',
-                               saving_name=f'position-{saving_epoch}.pt',
-                               unwrapped_nw=accelerator.unwrap_model(position_embedder),
-                               save_dtype=save_dtype)
 
-                if args.image_processor == 'pvt' :
-                    save_model(args,
-                               saving_folder='vision_head',
-                               saving_name=f'vision-{saving_epoch}.pt',
-                               unwrapped_nw=accelerator.unwrap_model(vision_head),
-                               save_dtype=save_dtype)
 
-                if args.use_positioning_module :
-                    save_model(args,
-                                saving_folder='positioning_module',
-                                saving_name=f'positioning-{saving_epoch}.pt',
-                                unwrapped_nw=accelerator.unwrap_model(positioning_module),
-                                save_dtype=save_dtype)
+        accelerator.wait_for_everyone()
+        if is_main_process:
+            if args.use_segmentation_model :
+                save_model(args,
+                           saving_folder='segmentation',
+                           saving_name=f'segmentation-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                           save_dtype=save_dtype)
+
+            if args.use_position_embedder :
+                save_model(args,
+                           saving_folder='position_embedder',
+                           saving_name=f'position-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
+                           save_dtype=save_dtype)
+
+            if args.image_processor == 'pvt' :
+                save_model(args,
+                           saving_folder='vision_head',
+                           saving_name=f'vision-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(vision_head),
+                           save_dtype=save_dtype)
+
+            if args.use_positioning_module :
+                save_model(args,
+                            saving_folder='positioning_module',
+                            saving_name=f'positioning-{saving_epoch}.pt',
+                            unwrapped_nw=accelerator.unwrap_model(positioning_module),
+                            save_dtype=save_dtype)
 
         # ----------------------------------------------------------------------------------------------------------- #
         # [7] evaluate
