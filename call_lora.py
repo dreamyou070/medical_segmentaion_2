@@ -341,8 +341,6 @@ def main(args):
             accelerator.wait_for_everyone()
             # [2] erasing lora network
             network.restore(modality = condition_modality)
-            
-
             if is_main_process:
                 saving_epoch = str(epoch + 1).zfill(6)
                 save_model(args,
@@ -350,7 +348,9 @@ def main(args):
                            saving_name=f'lora-{saving_epoch}.safetensors',
                            unwrapped_nw=accelerator.unwrap_model(network),
                            save_dtype=save_dtype)
+
         accelerator.wait_for_everyone()
+
         if is_main_process:
             if args.use_segmentation_model :
                 save_model(args,
