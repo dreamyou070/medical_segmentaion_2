@@ -500,7 +500,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
                            prefix,
-                           student_networks) -> List[LoRAModule]:
+                           student_networks) -> List[TeacherLoRAModule]:
 
             loras = []
             skipped = []
@@ -776,7 +776,7 @@ class TeacherLoRANetwork(torch.nn.Module):
         self.mid_lr_weight = mid_lr_weight
         self.up_lr_weight = up_lr_weight
 
-    def get_lr_weight(self, lora: LoRAModule) -> float:
+    def get_lr_weight(self, lora: TeacherLoRAModule) -> float:
         lr_weight = 1.0
         block_idx = get_block_index(lora.lora_name)
         if block_idx < 0:
