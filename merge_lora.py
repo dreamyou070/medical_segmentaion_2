@@ -103,7 +103,7 @@ def main(args):
                                      condition_modality=condition_modality,)
         student_net.load_weights(net_weight_dir)
         student_net.requires_grad_(False)
-        student_net.to(weight_dtype, device = accelerator.device)
+        student_net.to(accelerator.device, dtype=weight_dtype)
         student_nets.append(student_net)
 
     print(f' (3) make teacher networks')
