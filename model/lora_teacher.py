@@ -127,7 +127,9 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
+
         if student_modules is not None :
+            print(f'len of student_modules : {len(student_modules)}')
             if len(student_modules) > 0:
                 self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
                 self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
@@ -554,12 +556,13 @@ class TeacherLoRANetwork(torch.nn.Module):
 
                             # --------------------------------------------------------------------------------------------------
                             # [3] make lora module
-                            print(f'generating lora_name = {lora_name}')
+                            # im module = 80
                             student_modules = []
 
                             for student_lora in student_networks:
                                 for student_lora in (student_lora.image_encoder_loras + student_lora.unet_loras):
                                     if student_lora.lora_name == lora_name:
+                                        student_lora.lora_name = None
                                         student_modules.append(student_lora)
                             if block_wise == None :
                                 lora = module_class(lora_name,
@@ -570,8 +573,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
                                                     module_dropout=module_dropout,
-                                                    #student_modules=student_modules
-                                                    )
+                                                    student_modules=student_modules)
                                 loras.append(lora)
                             else :
                                 for i, block in enumerate(BLOCKS) :
@@ -584,8 +586,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                             dropout=dropout,
                                                             rank_dropout=rank_dropout,
                                                             module_dropout=module_dropout,
-                                                            #student_modules=student_modules
-                                                            )
+                                                            student_modules=student_modules)
                                         loras.append(lora)
             return loras, skipped
 
