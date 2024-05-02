@@ -456,7 +456,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
                                                     module_dropout=module_dropout,
-                                                    student_loras = student_modules)
+                                                    student_modules = student_modules)
                                 loras.append(lora)
 
                             else :
@@ -469,7 +469,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                             alpha,
                                                             dropout=dropout,
                                                             rank_dropout=rank_dropout,
-                                                            module_dropout=module_dropout,)
+                                                            module_dropout=module_dropout,
+                                                            student_modules = student_modules)
                                         loras.append(lora)
             return loras, skipped
 
