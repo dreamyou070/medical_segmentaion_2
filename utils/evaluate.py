@@ -143,8 +143,12 @@ def evaluation_check(segmentation_head,
             # [1] making confusion matrix
             confusion_matrix = state.metrics['confusion_matrix']
             Iou = generate_Iou(confusion_matrix)
-            mean_Iou = np.mean(Iou)
+            print(f' Iou = {Iou}')
             Dice = generate_Dice(confusion_matrix)
+            print(f' Dice = {Dice}')
+            import time
+            time.sleep(10)
+            mean_Iou = np.mean(Iou)
             mean_Dice = np.mean(Dice)
 
             # [2] saving
