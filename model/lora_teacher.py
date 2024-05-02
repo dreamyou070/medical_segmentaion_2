@@ -127,9 +127,10 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
-        if len(student_modules) > 0:
-            self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-            self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        if student_modules is not None :
+            if len(student_modules) > 0:
+                self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+                self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
         self.student_modules = student_modules #
 
     def apply_to(self):
