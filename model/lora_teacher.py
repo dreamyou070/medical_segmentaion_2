@@ -151,9 +151,8 @@ class TeacherLoRAModule(torch.nn.Module):
                 return org_forwarded
         value = 0
         for alpha, module in zip(self.alphas, self.student_modules) :
-            print(f'alpha device = {alpha.device}')
-            print(f'module device = {module.device}')
-            value += alpha * module.lora_down.to(x.device)(x)
+
+            value += alpha.to(x.device) * module.lora_down.to(x.device)(x)
 
         lx = value
         # normal dropout
@@ -174,7 +173,7 @@ class TeacherLoRAModule(torch.nn.Module):
             scale = self.scale
 
         for beta, module in zip(self.betas, self.student_modules) :
-            lx += beta * module.lora_up.to(x.device)(lx)
+            lx += beta.to(x.device) * module.lora_up.to(x.device)(lx)
 
         return org_forwarded + lx * self.multiplier * scale
 
