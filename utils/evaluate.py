@@ -150,7 +150,6 @@ def evaluation_check(segmentation_head,
             # [2] saving
             if accelerator.is_main_process:
                 print(f' {_data_name} finished !')
-                print(f'  - confusion_matrix = {confusion_matrix}')
                 confusion_matrix = confusion_matrix.tolist()
                 confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
                 with open(confusion_save_dir, 'a') as f:
@@ -165,9 +164,13 @@ def evaluation_check(segmentation_head,
                     # [1] Iou score
                     for i, score in enumerate(Iou):
                         f.write(f'class {i} IoU Score = {score} ')
+                        print(f'class {i} IoU Score = {score} ')
                     f.write(f'| mean IoU Score = {mean_Iou} \n')
+                    print(f'| mean IoU Score = {mean_Iou} \n')
                     # [2] Dice score
                     for i, score in enumerate(Dice):
                         f.write(f'class {i} Dice Score = {score} ')
+                        print(f'class {i} Dice Score = {score} ')
                     f.write(f'| mean Dice Score = {mean_Dice} \n')
+                    print(f'| mean Dice Score = {mean_Dice} \n')
             segmentation_head.train()

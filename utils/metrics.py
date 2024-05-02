@@ -15,5 +15,5 @@ def generate_Dice(confusion_matrix):
     ground_truth_set = confusion_matrix.sum(axis=1)
     predicted_set = confusion_matrix.sum(axis=0)
     union = ground_truth_set + predicted_set + eps
-    Dice = intersection / union
+    Dice = (2 * intersection) / union
     return Dice
