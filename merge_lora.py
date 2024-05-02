@@ -641,7 +641,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                 for lora in self.image_encoder_loras + self.unet_loras:
                     #assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
-                    print(f'created lora name = {lora.lora_name}')
+                    if accelerator.is_main_process :
+                        print(f'created lora name = {lora.lora_name}')
 
 
         # ------------------------------------------------------------------------------------------------------------------------
@@ -1024,7 +1025,7 @@ def main(args):
                                        unet=unet,
                                        neuron_dropout=args.network_dropout,
                                        condition_modality=condition_modality,
-                                       student_loras=[student_nets[0]],)
+                                       student_loras=student_nets,)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
