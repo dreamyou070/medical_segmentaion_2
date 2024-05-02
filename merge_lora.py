@@ -543,7 +543,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                                   index,
                                                                   root_module=image_encoder,
                                                                   target_replace_modules=target_replace_module_condition,
-                                                                  prefix=prefix_)
+                                                                  prefix=prefix_,
+                                                                  student_loras = student_loras)
                     self.image_encoder_loras.extend(image_encoder_loras)
                     skipped_ie += skipped
                 print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
