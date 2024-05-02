@@ -189,12 +189,12 @@ def main(args):
 
     print(f'\n step 8. model to device')
     condition_model,segmentation_head, unet, teacher_network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(condition_model,
-                                                                                                                              segmentation_head,
-                                                                                                                              unet,
-                                                                                                                              teacher_network,
-                                                                                                                              optimizer,
-                                                                                                                              train_dataloader,
-                                                                                                                              lr_scheduler)
+                                                                                                                        segmentation_head,
+                                                                                                                        unet,
+                                                                                                                        teacher_network,
+                                                                                                                        optimizer,
+                                                                                                                        train_dataloader,
+                                                                                                                        lr_scheduler)
     condition_model, unet, teacher_network = transform_models_if_DDP([condition_model, unet, teacher_network])
     if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
