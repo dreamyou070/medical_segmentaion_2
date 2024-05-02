@@ -132,8 +132,6 @@ class TeacherLoRAModule(torch.nn.Module):
         self.alpha_3 = nn.Parameter(torch.tensor(1.0))
         self.alpha_4 = nn.Parameter(torch.tensor(1.0))
         self.alpha_5 = nn.Parameter(torch.tensor(1.0))
-
-        self.alphas = [self.alpha_1, self.alpha_2, self.alpha_3, self.alpha_4, self.alpha_5]
         # self.betas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
 
         for i, student_module in enumerate(student_modules):
@@ -832,13 +830,10 @@ class TeacherLoRANetwork(torch.nn.Module):
         def enumerate_params(loras):
             params = []
             for lora in loras:
-                for name, param in lora.named_parameters():
-                    if 'lora' not in name :
-                        params.extend(param)
+                params.extend(lora.parameters())
             return params
 
         if condition_modality == 'text':
-
             if self.text_encoder_loras:
                 param_data = {"params": enumerate_params(self.text_encoder_loras)}
                 if text_encoder_lr is not None:
