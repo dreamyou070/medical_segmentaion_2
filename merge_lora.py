@@ -116,29 +116,23 @@ def main(args):
                                              condition_modality=condition_modality,
                                              student_networks=student_nets,)
     # applying
-    teacher_network.apply_to(condition_model, unet, True, True,
-                             condition_modality=condition_modality)
+    teacher_network.apply_to(condition_model, unet, True, True, condition_modality=condition_modality)
 
     print(f' (4) segmentation network')
     segmentation_head = None
     if args.use_segmentation_model:
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
         if args.use_simple_segmodel:
-            segmentation_head = SemanticModel(n_classes=args.n_classes,
-                                              mask_res=args.mask_res,
-                                              use_layer_norm=args.use_layer_norm,
-                                              double=args.double)
+            segmentation_head = SemanticModel(n_classes=args.n_classes, mask_res=args.mask_res,
+                                              use_layer_norm=args.use_layer_norm, double=args.double)
         else:
-            segmentation_head = PFNet(n_classes=args.n_classes,
-                                      mask_res=args.mask_res,
-                                      use_layer_norm=args.use_layer_norm,
-                                      double=args.double)
+            segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm, double=args.double)
         if args.segmentation_model_weights is not None:
             segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
     vision_head = None
     if args.image_processor == 'pvt':
-        vision_head = vision_condition_head(reverse=args.reverse,
-                                            use_one=args.use_one)
+        vision_head = vision_condition_head(reverse=args.reverse, use_one=args.use_one)
     position_embedder = None
     if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding()
@@ -193,39 +187,33 @@ def main(args):
                              weight=None, )
 
     print(f'\n step 8. model to device')
-    condition_model = accelerator.prepare(condition_model)
-    condition_models = transform_models_if_DDP([condition_model])
-    segmentation_head, unet, teacher_network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(segmentation_head,
-                                                                                                              unet,
-                                                                                                              teacher_network,
-                                                                                                              optimizer,
-                                                                                                              train_dataloader,
-                                                                                                              lr_scheduler)
-    if args.use_positioning_module:
-        positioning_module = accelerator.prepare(positioning_module)
-
-    if args.use_position_embedder:
-        position_embedder = accelerator.prepare(position_embedder)
-        position_embedder = transform_models_if_DDP([position_embedder])[0]
+    condition_model,segmentation_head, unet, teacher_network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(condition_model,
+                                                                                                                              segmentation_head,
+                                                                                                                              unet,
+                                                                                                                              teacher_network,
+                                                                                                                              optimizer,
+                                                                                                                              train_dataloader,
+                                                                                                                              lr_scheduler)
+    condition_model, unet, teacher_network = transform_models_if_DDP([condition_model, unet, teacher_network])
     if args.image_processor == 'pvt':
         vision_head = accelerator.prepare(vision_head)
         vision_head = transform_models_if_DDP([vision_head])[0]
-    unet, teacher_network = transform_models_if_DDP([unet, teacher_network])
+    if args.use_positioning_module:
+        positioning_module = accelerator.prepare(positioning_module)
+        positioning_module = transform_models_if_DDP([positioning_module])[0]
+    if args.use_position_embedder:
+        position_embedder = accelerator.prepare(position_embedder)
+        position_embedder = transform_models_if_DDP([position_embedder])[0]
     if args.use_segmentation_model:
         segmentation_head = transform_models_if_DDP([segmentation_head])[0]
     if args.gradient_checkpointing:
         unet.train()
         if args.use_segmentation_model:
             segmentation_head.train()
-        for t_enc in condition_models:
-            t_enc.train()
-            if args.train_text_encoder:
-                t_enc.text_model.embeddings.requires_grad_(True)
+        condition_model.train()
     else:
         unet.eval()
-        for t_enc in condition_models:
-            t_enc.eval()
-        del t_enc
+        condition_model.eval()
         teacher_network.prepare_grad_etc()
 
     print(f'\n step 9. registering saving tensor')
@@ -274,13 +262,10 @@ def main(args):
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                     if encoder_hidden_states.dim() != 3:
                         encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                unet(latents, 0, encoder_hidden_states,
-                     trg_layer_list=args.trg_layer_list,
-                     noise_type=position_embedder).sample
+                unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list, noise_type=position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
             controller.reset()
             q_dict = {}
-
             for layer in args.trg_layer_list:
                 query = query_dict[layer][0]
                 res = int(query.shape[1] ** 0.5)
