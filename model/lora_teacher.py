@@ -555,10 +555,11 @@ class TeacherLoRANetwork(torch.nn.Module):
                             # [3] make lora module
                             print(f'generating lora_name = {lora_name}')
                             student_modules = []
+
                             for student_lora in student_networks:
                                 for student_lora in (student_lora.image_encoder_loras + student_lora.unet_loras):
                                     if student_lora.lora_name == lora_name:
-                                        student_modules.append(lora)
+                                        student_modules.append(student_lora)
                             if block_wise == None :
                                 lora = module_class(lora_name,
                                                     child_module,
