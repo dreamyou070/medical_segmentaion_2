@@ -497,7 +497,7 @@ class TeacherLoRANetwork(torch.nn.Module):
 
                             student_modules = []
                             for student_lora in student_networks:
-                                loras = student_lora.text_encoder_loras + student_lora.unet_loras
+                                loras = student_lora.image_encoder_loras + student_lora.unet_loras
                                 for lora in loras:
                                     if lora.lora_name == lora_name:
                                         student_modules.append(lora)
