@@ -286,87 +286,6 @@ def parse_block_lr_kwargs(nw_kwargs):
     return down_lr_weight, mid_lr_weight, up_lr_weight
 
 
-def create_network(multiplier: float,
-                   network_dim: Optional[int],
-                   network_alpha: Optional[float],
-                   vae: AutoencoderKL,
-                   condition_model: Union[CLIPTextModel, List[CLIPTextModel]],
-                   unet,
-                   neuron_dropout: Optional[float] = None,
-                   condition_modality = 'text',
-                   **kwargs,):
-
-    if network_dim is None:
-        network_dim = 4  # default
-    if network_alpha is None:
-        network_alpha = 1.0
-
-    # extract dim/alpha for conv2d, and block dim
-    conv_dim = kwargs.get("conv_dim", None)
-    conv_alpha = kwargs.get("conv_alpha", None)
-    if conv_dim is not None:
-        conv_dim = int(conv_dim)
-        if conv_alpha is None:
-            conv_alpha = 1.0
-        else:
-            conv_alpha = float(conv_alpha)
-
-    # block dim/alpha/lr
-    block_dims = kwargs.get("block_dims", None)
-    down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
-
-    # 以上のいずれかに指定があればblockごとのdim(rank)を有効にする
-    if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
-        block_alphas = kwargs.get("block_alphas", None)
-        conv_block_dims = kwargs.get("conv_block_dims", None)
-        conv_block_alphas = kwargs.get("conv_block_alphas", None)
-
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(
-            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
-        )
-
-        # remove block dim/alpha without learning rate
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(
-            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
-        )
-
-    else:
-        block_alphas = None
-        conv_block_dims = None
-        conv_block_alphas = None
-
-    # rank/module dropout
-    rank_dropout = kwargs.get("rank_dropout", None)
-    if rank_dropout is not None:
-        rank_dropout = float(rank_dropout)
-    module_dropout = kwargs.get("module_dropout", None)
-    if module_dropout is not None:
-        module_dropout = float(module_dropout)
-
-    net_key_names = kwargs.get('key_layers', None)
-    # すごく引数が多いな ( ^ω^)･･･
-    network = LoRANetwork(condition_model=condition_model,
-                          unet=unet,
-                          multiplier=multiplier,
-                          lora_dim=network_dim,
-                          alpha=network_alpha,
-                          dropout=neuron_dropout,
-                          rank_dropout=rank_dropout,
-                          module_dropout=module_dropout,
-                          conv_lora_dim=conv_dim,
-                          conv_alpha=conv_alpha,
-                          block_dims=block_dims,
-                          block_alphas=block_alphas,
-                          conv_block_dims=conv_block_dims,
-                          conv_block_alphas=conv_block_alphas,
-                          varbose=True,
-                          net_key_names=net_key_names,
-                          condition_modality=condition_modality,)
-
-    if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
-        network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
-
-    return network
 
 
 
@@ -999,13 +918,14 @@ def main(args):
 
     student_nets = []
     for net_weight in network_weights:
-        from model.lora import LoRANetwork
-        student_net = LoRANetwork(condition_model=condition_model,
-                                  unet=unet,
-                                  lora_dim=args.network_dim,
-                                  alpha=args.network_alpha,
-                                  dropout=args.network_dropout,
-                                  condition_modality=condition_modality,)
+        student_net = create_network(1.0,
+                                     args.network_dim,
+                                     args.network_alpha,
+                                     vae,
+                                     condition_model=condition_model,
+                                     unet=unet,
+                                     neuron_dropout=args.network_dropout,
+                                     condition_modality=condition_modality,)
         student_net.load_state_dict(net_weight)
         student_nets.append(student_net)
 
