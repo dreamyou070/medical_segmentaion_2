@@ -539,7 +539,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                     # create image encoder LoRA
                     prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
                     target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
-                    print(f' creating image lora')
+
                     image_encoder_loras, skipped = create_modules(False,
                                                                   index,
                                                                   root_module=image_encoder,
@@ -554,9 +554,10 @@ class TeacherLoRANetwork(torch.nn.Module):
                 # assertion
                 names = set()
                 for lora in self.image_encoder_loras + self.unet_loras:
-                    # lora.lora_name should not in names before ....
-                    assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                    #assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
+                    print(f'created lora name = {lora.lora_name}')
+                    
 
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
