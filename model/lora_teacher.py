@@ -826,7 +826,10 @@ class TeacherLoRANetwork(torch.nn.Module):
         def enumerate_params(loras):
             params = []
             for lora in loras:
-                params.extend(lora.parameters())
+                for name, param in lora.named_parameters():
+                    print(f'parameter name = {name}')
+                    #if 'alpha' in name :
+                        #params.extend(param)
             return params
 
         if condition_modality == 'text':
@@ -836,6 +839,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                 if text_encoder_lr is not None:
                     param_data["lr"] = text_encoder_lr
                 all_params.append(param_data) # len 2 (unet, image_encoder)
+
         elif condition_modality == 'image':
             if self.image_encoder_loras:
                 param_data = {"params": enumerate_params(self.image_encoder_loras)}

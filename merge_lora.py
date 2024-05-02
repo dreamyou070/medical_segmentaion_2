@@ -160,6 +160,10 @@ def main(args):
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
+
+    # teacher network optimizer
+
+
     trainable_params = teacher_network.prepare_optimizer_params(args.text_encoder_lr,
                                                                 args.unet_lr,
                                                                 args.learning_rate,
