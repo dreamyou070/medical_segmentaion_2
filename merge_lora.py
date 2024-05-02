@@ -639,11 +639,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                 # assertion
                 names = set()
                 for lora in self.image_encoder_loras + self.unet_loras:
-                    #assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                    assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
-                    if accelerator.is_main_process :
-                        print(f'created lora name = {lora.lora_name}')
-
 
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
