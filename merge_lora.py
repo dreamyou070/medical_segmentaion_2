@@ -1002,16 +1002,16 @@ def main(args):
         from model.lora import LoRANetwork
         student_net = LoRANetwork(condition_model=condition_model,
                                   unet=unet,
-                                  network_dim=args.network_dim,
-                                  network_alpha=args.network_alpha,
+                                  lora_dim=args.network_dim,
+                                  alpha=args.network_alpha,
                                   neuron_dropout=args.network_dropout,
                                   condition_modality=condition_modality,)
         student_net.load_state_dict(net_weight)
         student_nets.append(student_net)
 
     print(f' (3) make teacher networks')
-    teacher_network = TeacherLoRANetwork(network_dim=args.network_dim,
-                                         network_alpha=args.network_alpha,
+    teacher_network = TeacherLoRANetwork(lora_dim=args.network_dim,
+                                         alpha=args.network_alpha,
                                          condition_model=condition_model,
                                          unet=unet,
                                          neuron_dropout=args.network_dropout,
