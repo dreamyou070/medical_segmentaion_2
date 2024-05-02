@@ -393,7 +393,6 @@ class TeacherLoRANetwork(torch.nn.Module):
                            target_replace_modules : List[torch.nn.Module],
                            prefix,
                            student_loras) -> List[LoRAModule]:
-
             loras = []
             skipped = []
             # prefix ...
@@ -410,9 +409,10 @@ class TeacherLoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name # fc1, ...
                             lora_name = lora_name.replace(".", "_")
+                            print(f'generate teacher lora, {lora_name}')
 
                             # ------------------------------------------------------------------------------------------
-                            # get student name #
+                            # [1] get student name #
                             student_modules = []
                             for student_lora in student_loras :
                                 loras = student_lora.unet_loras + student_lora.image_encoder_loras
@@ -420,6 +420,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                     if lora.lora_name == lora_name :
                                         student_modules.append(lora)
                             # ------------------------------------------------------------------------------------------
+                            # [2] make module
                             dim = None
                             alpha = None
                             if modules_dim is not None:
@@ -446,7 +447,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
                                 continue
-
+                            # ------------------------------------------------------------------------------------------
+                            # [3] make module
                             if block_wise == None :
                                 lora = module_class(lora_name,
                                                     child_module,
@@ -458,7 +460,6 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     module_dropout=module_dropout,
                                                     student_modules = student_modules)
                                 loras.append(lora)
-
                             else :
                                 for i, block in enumerate(BLOCKS) :
                                     if block in lora_name and block_wise[i] == 1:
@@ -538,7 +539,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                     # create image encoder LoRA
                     prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
                     target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
-
+                    print(f' creating image lora')
                     image_encoder_loras, skipped = create_modules(False,
                                                                   index,
                                                                   root_module=image_encoder,
@@ -553,6 +554,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                 # assertion
                 names = set()
                 for lora in self.image_encoder_loras + self.unet_loras:
+                    # lora.lora_name should not in names before ....
                     assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
 
@@ -892,11 +894,6 @@ def main(args):
     network_2_state_dict_dir = os.path.join(class_2_base, 'up_16_32_64_20240501/3_class_2_pvt_image_encoder/model/lora-000001.safetensors')
     network_3_state_dict_dir = os.path.join(class_3_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000001.safetensors')
     network_4_state_dict_dir = os.path.join(class_4_base, 'up_16_32_64_20240501/3_class_4_pvt_image_encoder/model/lora-000001.safetensors')
-    #network_0_weights_sd = load_file(network_0_state_dict_dir)
-    #network_1_weights_sd = load_file(network_1_state_dict_dir)
-    #network_2_weights_sd = load_file(network_2_state_dict_dir)
-    #network_3_weights_sd = load_file(network_3_state_dict_dir)
-    #network_4_weights_sd = load_file(network_4_state_dict_dir)
     network_weights = [network_0_state_dict_dir, network_1_state_dict_dir, network_2_state_dict_dir, network_3_state_dict_dir, network_4_state_dict_dir]
 
     print(f' (2) make student networks')
@@ -929,9 +926,8 @@ def main(args):
                                      neuron_dropout=args.network_dropout,
                                      condition_modality=condition_modality,)
         student_net.load_weights(net_weight_dir)
+        student_net.requires_grad_(False)
         student_nets.append(student_net)
-
-
 
     print(f' (3) make teacher networks')
     teacher_network = TeacherLoRANetwork(lora_dim=args.network_dim,
@@ -942,6 +938,7 @@ def main(args):
                                          condition_modality=condition_modality,
                                          student_loras = student_nets,
                                          **net_kwargs, )
+
 
 
 
