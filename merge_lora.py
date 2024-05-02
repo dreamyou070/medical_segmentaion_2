@@ -73,6 +73,7 @@ def main(args):
     network_3_state_dict_dir = os.path.join(class_3_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000047.safetensors')
     network_4_state_dict_dir = os.path.join(class_4_base, 'up_16_32_64_20240501/3_class_4_pvt_image_encoder/model/lora-000095.safetensors')
     network_weights = [network_0_state_dict_dir, network_1_state_dict_dir, network_2_state_dict_dir, network_3_state_dict_dir, network_4_state_dict_dir]
+
     print(f' (2) make student networks')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
@@ -128,13 +129,16 @@ def main(args):
     if args.use_segmentation_model:
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
         if args.use_simple_segmodel:
-            segmentation_head = SemanticModel(n_classes=args.n_classes, mask_res=args.mask_res,
-                                              use_layer_norm=args.use_layer_norm, double=args.double)
+            segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                              mask_res=args.mask_res,
+                                              use_layer_norm=args.use_layer_norm,
+                                              double=args.double)
         else:
             segmentation_head = PFNet(n_classes=args.n_classes, mask_res=args.mask_res,
                                       use_layer_norm=args.use_layer_norm, double=args.double)
         if args.segmentation_model_weights is not None:
             segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
+
     vision_head = None
     if args.image_processor == 'pvt':
         vision_head = vision_condition_head(reverse=args.reverse, use_one=args.use_one)
@@ -165,8 +169,7 @@ def main(args):
     trainable_params = teacher_network.prepare_optimizer_params(args.text_encoder_lr,
                                                                 args.unet_lr,
                                                                 args.learning_rate,
-                                                                condition_modality=condition_modality,
-                                                                )
+                                                                condition_modality=condition_modality,)
     if args.use_position_embedder:
         trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
     if args.image_processor == 'pvt':
@@ -244,9 +247,7 @@ def main(args):
             loss_dict = {}
             encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
             if not args.without_condition:
-
                 if args.use_image_condition:
-
                     with torch.set_grad_enabled(True):
                         if args.image_processor == 'pvt':
                             output = condition_model(batch["image_condition"])
