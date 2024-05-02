@@ -833,9 +833,8 @@ class TeacherLoRANetwork(torch.nn.Module):
             params = []
             for lora in loras:
                 for name, param in lora.named_parameters():
-                    print(f'parameter name = {name}')
-                    #if 'alpha' in name :
-                        #params.extend(param)
+                    if 'lora' not in name :
+                        params.extend(param)
             return params
 
         if condition_modality == 'text':
