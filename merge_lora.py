@@ -316,6 +316,89 @@ def get_block_index(lora_name: str) -> int:
 
     return block_idx
 
+def create_teacher_network(multiplier: float,
+                   network_dim: Optional[int],
+                   network_alpha: Optional[float],
+                   vae: AutoencoderKL,
+                   condition_model: Union[CLIPTextModel, List[CLIPTextModel]],
+                   unet,
+                   neuron_dropout: Optional[float] = None,
+                   condition_modality = 'text',
+                   student_loras = None,
+                   **kwargs,):
+
+    if network_dim is None:
+        network_dim = 4  # default
+    if network_alpha is None:
+        network_alpha = 1.0
+
+    # extract dim/alpha for conv2d, and block dim
+    conv_dim = kwargs.get("conv_dim", None)
+    conv_alpha = kwargs.get("conv_alpha", None)
+    if conv_dim is not None:
+        conv_dim = int(conv_dim)
+        if conv_alpha is None:
+            conv_alpha = 1.0
+        else:
+            conv_alpha = float(conv_alpha)
+
+    # block dim/alpha/lr
+    block_dims = kwargs.get("block_dims", None)
+    down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
+
+    # 以上のいずれかに指定があればblockごとのdim(rank)を有効にする
+    if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
+        block_alphas = kwargs.get("block_alphas", None)
+        conv_block_dims = kwargs.get("conv_block_dims", None)
+        conv_block_alphas = kwargs.get("conv_block_alphas", None)
+
+        block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(
+            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
+        )
+
+        # remove block dim/alpha without learning rate
+        block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(
+            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
+        )
+
+    else:
+        block_alphas = None
+        conv_block_dims = None
+        conv_block_alphas = None
+
+    # rank/module dropout
+    rank_dropout = kwargs.get("rank_dropout", None)
+    if rank_dropout is not None:
+        rank_dropout = float(rank_dropout)
+    module_dropout = kwargs.get("module_dropout", None)
+    if module_dropout is not None:
+        module_dropout = float(module_dropout)
+
+    net_key_names = kwargs.get('key_layers', None)
+    # すごく引数が多いな ( ^ω^)･･･
+    network = TeacherLoRANetwork(condition_model=condition_model,
+                          unet=unet,
+                          multiplier=multiplier,
+                          lora_dim=network_dim,
+                          alpha=network_alpha,
+                          dropout=neuron_dropout,
+                          rank_dropout=rank_dropout,
+                          module_dropout=module_dropout,
+                          conv_lora_dim=conv_dim,
+                          conv_alpha=conv_alpha,
+                          block_dims=block_dims,
+                          block_alphas=block_alphas,
+                          conv_block_dims=conv_block_dims,
+                          conv_block_alphas=conv_block_alphas,
+                          varbose=True,
+                          net_key_names=net_key_names,
+                          condition_modality=condition_modality,
+                                 student_loras=None,)
+
+    if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
+        network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
+
+    return network
 class TeacherLoRANetwork(torch.nn.Module):
     #
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
@@ -409,7 +492,6 @@ class TeacherLoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name # fc1, ...
                             lora_name = lora_name.replace(".", "_")
-                            print(f'generate teacher lora, {lora_name}')
 
                             # ------------------------------------------------------------------------------------------
                             # [1] get student name #
@@ -528,6 +610,9 @@ class TeacherLoRANetwork(torch.nn.Module):
             image_encoders = image_condition if type(image_condition) == list else [image_condition]
             self.image_encoder_loras = []
             skipped_ie = []  # 1 model
+
+            print(f'len of image_encoders = {len(image_encoders)}')
+
             if image_condition is not None:
                 for i, image_encoder in enumerate(image_encoders):
                     if len(image_encoders) > 1:
@@ -557,7 +642,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                     #assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
                     print(f'created lora name = {lora.lora_name}')
-                    
+
 
         # ------------------------------------------------------------------------------------------------------------------------
         if varbose and len(skipped) > 0:
@@ -931,19 +1016,15 @@ def main(args):
         student_nets.append(student_net)
 
     print(f' (3) make teacher networks')
-    teacher_network = TeacherLoRANetwork(lora_dim=args.network_dim,
-                                         alpha=args.network_alpha,
-                                         condition_model=condition_model,
-                                         unet=unet,
-                                         dropout=args.network_dropout,
-                                         condition_modality=condition_modality,
-                                         student_loras = student_nets,
-                                         **net_kwargs, )
-
-
-
-
-
+    teacher_network = create_teacher_network(multiplier = 1.0,
+                                       network_dim = args.network_dim,
+                                       network_alpha =args.network_alpha,
+                                       vae = vae,
+                                       condition_model = condition_model,
+                                       unet=unet,
+                                       neuron_dropout=args.network_dropout,
+                                       condition_modality=condition_modality,
+                                       student_loras=[student_nets[0]],)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
