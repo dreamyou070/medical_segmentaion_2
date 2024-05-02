@@ -64,7 +64,8 @@ class TeacherLoRAModule(torch.nn.Module):
     replaces forward method of the original Linear, instead of replacing the original Linear module.
     """
 
-    def __init__(self,lora_name,
+    def __init__(self,
+                 lora_name,
                  org_module: torch.nn.Module,
                  multiplier=1.0,
                  lora_dim=4,
@@ -126,9 +127,10 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
-        self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-        self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-        self.student_modules = student_modules
+        if len(student_modules) > 0:
+            self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+            self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        self.student_modules = student_modules #
 
     def apply_to(self):
         self.org_forward = self.org_module.forward
@@ -500,11 +502,11 @@ class TeacherLoRANetwork(torch.nn.Module):
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
                            prefix,
-                           student_networks) -> List[TeacherLoRAModule]:
+                           student_networks : List[TeacherLoRAModule] ) :
 
             loras = []
             skipped = []
-            # prefix ...
+
             for name, module in root_module.named_modules():
 
                 if module.__class__.__name__ in target_replace_modules:
@@ -516,15 +518,13 @@ class TeacherLoRANetwork(torch.nn.Module):
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
                         if is_linear or is_conv2d:
+
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
 
-                            student_modules = []
-                            for student_lora in student_networks:
-                                loras = student_lora.image_encoder_loras + student_lora.unet_loras
-                                for lora in loras:
-                                    if lora.lora_name == lora_name:
-                                        student_modules.append(lora)
+
+                            # --------------------------------------------------------------------------------------------------
+                            # [2] set dim and alpha
                             dim = None
                             alpha = None
                             if modules_dim is not None:
@@ -532,7 +532,6 @@ class TeacherLoRANetwork(torch.nn.Module):
                                     dim = modules_dim[lora_name]
                                     alpha = modules_alpha[lora_name]
                             elif is_unet and block_dims is not None:
-                                # U-Netでblock_dims指定あり
                                 block_idx = get_block_index(lora_name) # block
                                 if is_linear or is_conv2d_1x1:
                                     dim = block_dims[block_idx]
@@ -551,7 +550,15 @@ class TeacherLoRANetwork(torch.nn.Module):
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
                                 continue
-                            # [2]
+
+                            # --------------------------------------------------------------------------------------------------
+                            # [3] make lora module
+                            print(f'generating lora_name = {lora_name}')
+                            student_modules = []
+                            for student_lora in student_networks:
+                                for student_lora in (student_lora.image_encoder_loras + student_lora.unet_loras):
+                                    if student_lora.lora_name == lora_name:
+                                        student_modules.append(lora)
                             if block_wise == None :
                                 lora = module_class(lora_name,
                                                     child_module,
@@ -561,9 +568,9 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
                                                     module_dropout=module_dropout,
-                                                    student_modules=student_modules)
+                                                    #student_modules=student_modules
+                                                    )
                                 loras.append(lora)
-
                             else :
                                 for i, block in enumerate(BLOCKS) :
                                     if block in lora_name and block_wise[i] == 1:
@@ -575,7 +582,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                             dropout=dropout,
                                                             rank_dropout=rank_dropout,
                                                             module_dropout=module_dropout,
-                                                            student_modules=student_modules)
+                                                            #student_modules=student_modules
+                                                            )
                                         loras.append(lora)
             return loras, skipped
 
@@ -657,7 +665,9 @@ class TeacherLoRANetwork(torch.nn.Module):
 
                 # assertion
                 names = set()
-                for lora in self.image_encoder_loras + self.unet_loras:
+                total_loras = self.image_encoder_loras + self.unet_loras
+                print(f'len of total_loras : {len(total_loras)}')
+                for lora in total_loras :
                     assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
                     names.add(lora.lora_name)
 
