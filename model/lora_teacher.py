@@ -127,13 +127,12 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
+        self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
 
-        if student_modules is not None :
-            print(f'len of student_modules : {len(student_modules)}')
-            if len(student_modules) > 0:
-                self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-                self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-        self.student_modules = student_modules #
+        for i, student_module in enumerate(student_modules):
+            student_module.requires_grad = False
+        self.student_modules = student_modules
 
     def apply_to(self):
         self.org_forward = self.org_module.forward
