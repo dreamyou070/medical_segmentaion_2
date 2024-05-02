@@ -128,7 +128,7 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_module_ref = [org_module]  ########################################################################
 
         self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
-        self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        # self.betas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
 
         for i, student_module in enumerate(student_modules):
             student_module.requires_grad = False
@@ -143,7 +143,10 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_module.forward = self.org_forward
 
     def forward(self, x):
+
+
         org_forwarded = self.org_forward(x)
+        print(f'org_forwarded : {org_forwarded.shape}')
 
         # module dropout
         if self.module_dropout is not None and self.training:
@@ -151,14 +154,15 @@ class TeacherLoRAModule(torch.nn.Module):
                 return org_forwarded
         value = 0
         for alpha, module in zip(self.alphas, self.student_modules) :
-
-            value += alpha.to(x.device) * module.lora_down.to(x.device)(x)
+            lora_value = module.lora_up.to(x.device)(module.lora_down.to(x.device)(x))
+            value += alpha.to(x.device) * lora_value
 
         lx = value
-        # normal dropout
+
         if self.dropout is not None and self.training:
             lx = torch.nn.functional.dropout(lx, p=self.dropout)
-        # rank dropout
+            # rank dropout
+
         if self.rank_dropout is not None and self.training:
             mask = torch.rand((lx.size(0), self.lora_dim), device=lx.device) > self.rank_dropout
             if len(lx.size()) == 3:
@@ -172,8 +176,13 @@ class TeacherLoRAModule(torch.nn.Module):
         else:
             scale = self.scale
 
+        """
+        # normal dropout
+        
+
         for beta, module in zip(self.betas, self.student_modules) :
             lx += beta.to(x.device) * module.lora_up.to(x.device)(lx)
+        """
 
         return org_forwarded + lx * self.multiplier * scale
 
