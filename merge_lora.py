@@ -393,7 +393,7 @@ def create_teacher_network(multiplier: float,
                           varbose=True,
                           net_key_names=net_key_names,
                           condition_modality=condition_modality,
-                                 student_loras=None,)
+                          student_loras=student_loras)
 
     if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
