@@ -8,7 +8,7 @@ from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
 from data import call_test_dataset
 from utils import torch_to_pil
-from utils.evaluate import generate_Iou, generate_Dice
+from utils.metrics import generate_Iou, generate_Dice
 
 def eval_step(engine, batch):
     return batch
