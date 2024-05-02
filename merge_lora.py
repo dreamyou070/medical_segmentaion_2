@@ -762,8 +762,17 @@ class TeacherLoRANetwork(torch.nn.Module):
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
                         if is_linear or is_conv2d:
-                            lora_name = prefix + "." + name + "." + child_name
+                            lora_name = prefix + "." + name + "." + child_name # fc1, ...
                             lora_name = lora_name.replace(".", "_")
+
+                            # get student name #
+                            student_modules = []
+                            for student_lora in student_loras :
+                                loras = student_lora.unet_loras + student_lora.image_encoder_loras
+                                for lora in loras :
+                                    if lora.lora_name == lora_name :
+                                        student_modules.append(lora)
+
                             dim = None
                             alpha = None
                             if modules_dim is not None:
@@ -800,7 +809,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
                                                     module_dropout=module_dropout,
-                                                    student_loras = student_loras)
+                                                    student_loras = student_modules)
                                 loras.append(lora)
 
                             else :
@@ -1207,7 +1216,7 @@ class TeacherLoRANetwork(torch.nn.Module):
 
 def main(args):
 
-    print(f' (1) call student lora')
+    print(f' (1) call student lora weight dict')
 
     base = r'/share0/dreamyou070/dreamyou070/MultiSegmentation/result/medical/leader_polyp'
     class_0_base = os.path.join(base, 'Pranet_Sub0')
@@ -1226,10 +1235,18 @@ def main(args):
     network_2_weights_sd = load_file(network_2_state_dict_dir) ##########################################################
     network_3_weights_sd = load_file(network_3_state_dict_dir)
     network_4_weights_sd = load_file(network_4_state_dict_dir)
+    network_weights = [network_0_weights_sd, network_1_weights_sd, network_2_weights_sd, network_3_weights_sd, network_4_weights_sd]
 
-    for k in network_0_weights_sd.keys():
-        print(f'key in network_0_weights_sd: {k}')
+    print(f' (2) make student networks')
 
+    accelerator = prepare_accelerator(args)
+    weight_dtype, save_dtype = prepare_dtype(args)
+    text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
+    net_kwargs = {}
+    if args.network_args is not None:
+        for net_arg in args.network_args:
+            key, value = net_arg.split("=")
+            net_kwargs[key] = value
     if args.image_processor == 'vit': # ViTModel
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
     elif args.image_processor == 'pvt':
@@ -1241,18 +1258,18 @@ def main(args):
     condition_model = image_model # image model is a condition
     condition_modality = 'image'
 
+    student_nets = []
+    for net_weight in network_weights:
+        from model.lora import LoRANetwork
+        student_net = LoRANetwork(condition_model=condition_model,
+                                  unet=unet,
+                                  network_dim=args.network_dim,
+                                  network_alpha=args.network_alpha,
+                                  neuron_dropout=args.network_dropout,
+                                  condition_modality=condition_modality,)
+        student_net.load_state_dict(net_weight)
+        student_nets.append(student_net)
 
-    print(f'\n step 2. preparing accelerator')
-    accelerator = prepare_accelerator(args)
-    weight_dtype, save_dtype = prepare_dtype(args)
-    text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
-    net_kwargs = {}
-    if args.network_args is not None:
-        for net_arg in args.network_args:
-            key, value = net_arg.split("=")
-            net_kwargs[key] = value
-
-    """
             
     teacher_network = TeacherLoRANetwork(network_dim=args.network_dim,
                                          network_alpha=args.network_alpha,
@@ -1260,9 +1277,9 @@ def main(args):
                                          unet=unet,
                                          neuron_dropout=args.network_dropout,
                                          condition_modality=condition_modality,
-                                         student_loras = [network_0_weights_sd, network_1_weights_sd, network_2_weights_sd, network_3_weights_sd, network_4_weights_sd],
+                                         student_loras = student_nets,
                                          **net_kwargs, )
-    """
+
 
 
 
