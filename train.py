@@ -19,7 +19,7 @@ from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
-from utils.loss import FocalLoss, Multiclass_FocalLoss
+from utils.losses import FocalLoss, Multiclass_FocalLoss
 from utils.evaluate import evaluation_check
 from monai.losses import DiceLoss, DiceCELoss
 from model.focus_net import PFNet
