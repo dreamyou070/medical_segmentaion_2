@@ -7,21 +7,12 @@ from PIL import Image
 from ignite.metrics.confusion_matrix import ConfusionMatrix
 from ignite.engine import *
 from data import call_test_dataset
+from utils import torch_to_pil
+from utils.evaluate import generate_Iou, generate_Dice
 
 def eval_step(engine, batch):
     return batch
 
-def torch_to_pil(torch_img):
-    # torch_img = [3, H, W], from -1 to 1
-    if torch_img.dim() == 3:
-        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
-    else:
-        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8)
-    pil = Image.fromarray(np_img).convert("RGB")
-    return pil
-
-def eval_step(engine, batch):
-    return batch
 
 @torch.inference_mode()
 def evaluation_check(segmentation_head,
@@ -45,7 +36,7 @@ def evaluation_check(segmentation_head,
         os.makedirs(epoch_dir, exist_ok=True)
 
         DSC = 0.0
-        IOU = 0.0
+
         for _data_name in folders:
 
             # [1] data_path here
@@ -119,9 +110,7 @@ def evaluation_check(segmentation_head,
                     intersection = (input_flat * target_flat)  # only both are class 1
                     dice = (2 * intersection.sum() + smooth) / (input.sum() + target.sum() + smooth)  # dice = every pixel by pixel
                     dice = float(dice)
-                    iou =  (intersection.sum() + smooth) / (input.sum() + target.sum() - intersection.sum() + smooth)
                     DSC = DSC + dice
-                    IOU = IOU + iou
                     # [2] saving image (all in 256 X 256)
                     if args.save_image :
                         original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
@@ -138,55 +127,47 @@ def evaluation_check(segmentation_head,
 
                         total_img.save(os.path.join(save_base_dir, f'{pure_path}'))
 
-                #######################################################################################################################
-                #######################################################################################################################
-                #######################################################################################################################
-                # [1] pred
-                y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
-                y_pred = F.one_hot(y_pred, num_classes=class_num)  # [pixel_num, C]
-                y_true = torch.cat(y_true_list).detach().cpu().long()  # [pixel_num]
-                # [2] make confusion engine
-                default_evaluator = Engine(eval_step)
-                cm = ConfusionMatrix(num_classes=class_num)
-                cm.attach(default_evaluator, 'confusion_matrix')
-                state = default_evaluator.run([[y_pred, y_true]])
-                confusion_matrix = state.metrics['confusion_matrix']
-                actual_axis, pred_axis = confusion_matrix.shape
-                IOU_dict = {}
-                eps = 1e-15
-                for actual_idx in range(actual_axis):
-                    total_actual_num = sum(confusion_matrix[actual_idx])
-                    total_predict_num = sum(confusion_matrix[:, actual_idx])
-                    dice_coeff = 2 * confusion_matrix[actual_idx, actual_idx] / (
-                                total_actual_num + total_predict_num + eps)
-                    IOU_dict[actual_idx] = round(dice_coeff.item(), 3)
-                # [1] WC Score
-                if accelerator.is_main_process:
-                    dataset_dice = DSC / len(folders)
-                    print(f' {_data_name} finished !')
-                    print(f'  - precision dictionary = {IOU_dict}')
-                    print(f'  - confusion_matrix = {confusion_matrix}')
-                    confusion_matrix = confusion_matrix.tolist()
-                    confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
-                    with open(confusion_save_dir, 'a') as f:
-                        f.write(f' data_name = {_data_name} \n')
-                        for i in range(len(confusion_matrix)):
-                            for j in range(len(confusion_matrix[i])):
-                                f.write(' ' + str(confusion_matrix[i][j]) + ' ')
-                            f.write('\n')
-                        f.write('\n')
+            #######################################################################################################################
 
-                    score_save_dir = os.path.join(save_base_dir, 'score.txt')
-                    with open(score_save_dir, 'a') as f:
-                        dices = []
-                        f.write(f' data_name = {_data_name} | ')
-                        for k in IOU_dict:
-                            dice = float(IOU_dict[k])
-                            f.write(f'class {k} = {dice} ')
-                            dices.append(dice)
-                        dice_coeff = sum(dices) / len(dices)
-                        f.write(f'| dice_coeff = {dice_coeff}')
-                        f.write(f'\n')
-                        f.write(f' dice score = {dataset_dice} \n')
-                        f.write(f' IOU score = {IOU} \n')
-                segmentation_head.train()
+            # [1] pred
+            y_pred = torch.cat(y_pred_list).detach().cpu()  # [pixel_num]
+            y_pred = F.one_hot(y_pred, num_classes=class_num)  # [pixel_num, C]
+            y_true = torch.cat(y_true_list).detach().cpu().long()  # [pixel_num]
+
+            # [2] make confusion engine
+            default_evaluator = Engine(eval_step)
+            cm = ConfusionMatrix(num_classes=class_num)
+            cm.attach(default_evaluator, 'confusion_matrix')
+            state = default_evaluator.run([[y_pred, y_true]])
+
+            # [1] making confusion matrix
+            confusion_matrix = state.metrics['confusion_matrix']
+            Iou = generate_Iou(confusion_matrix)
+            mean_Iou = np.mean(Iou)
+            Dice = generate_Dice(confusion_matrix)
+            mean_Dice = np.mean(Dice)
+
+            # [2] saving
+            if accelerator.is_main_process:
+                print(f' {_data_name} finished !')
+                print(f'  - confusion_matrix = {confusion_matrix}')
+                confusion_matrix = confusion_matrix.tolist()
+                confusion_save_dir = os.path.join(save_base_dir, 'confusion.txt')
+                with open(confusion_save_dir, 'a') as f:
+                    f.write(f' data_name = {_data_name} \n')
+                    for i in range(len(confusion_matrix)):
+                        for j in range(len(confusion_matrix[i])):
+                            f.write(' ' + str(confusion_matrix[i][j]) + ' ')
+                        f.write('\n')
+                    f.write('\n')
+                score_save_dir = os.path.join(save_base_dir, 'score.txt')
+                with open(score_save_dir, 'a') as f:
+                    # [1] Iou score
+                    for i, score in enumerate(Iou):
+                        f.write(f'class {i} IoU Score = {score} ')
+                    f.write(f'| mean IoU Score = {mean_Iou} \n')
+                    # [2] Dice score
+                    for i, score in enumerate(Dice):
+                        f.write(f'class {i} Dice Score = {score} ')
+                    f.write(f'| mean Dice Score = {mean_Dice} \n')
+            segmentation_head.train()

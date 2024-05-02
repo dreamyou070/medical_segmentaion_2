@@ -2,7 +2,8 @@ import torch
 import os
 import ast
 import argparse
-
+import numpy as np
+from PIL import Image
 def arg_as_list(arg):
     v = ast.literal_eval(arg)
     if type(v) is not list:
@@ -62,5 +63,14 @@ def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents, noise 
     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
     return noise, noisy_latents, timesteps
+
+def torch_to_pil(torch_img):
+    # torch_img = [3, H, W], from -1 to 1
+    if torch_img.dim() == 3:
+        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8).transpose(1, 2, 0)
+    else:
+        np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8)
+    pil = Image.fromarray(np_img).convert("RGB")
+    return pil
 
 

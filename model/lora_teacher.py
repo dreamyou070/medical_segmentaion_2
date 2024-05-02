@@ -99,7 +99,8 @@ class TeacherLoRAModule(torch.nn.Module):
         #     print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
         # else:
         self.lora_dim = lora_dim
-
+        """
+        
         if org_module.__class__.__name__ == "Conv2d":
             kernel_size = org_module.kernel_size
             stride = org_module.stride
@@ -113,6 +114,7 @@ class TeacherLoRAModule(torch.nn.Module):
         if type(alpha) == torch.Tensor:
             alpha = alpha.detach().float().numpy()  # without casting, bf16 causes error
         alpha = self.lora_dim if alpha is None else alpha
+        """
         self.scale = alpha / self.lora_dim
         self.register_buffer("alpha", torch.tensor(alpha))  # 定数として扱える
 
