@@ -890,12 +890,12 @@ def main(args):
     network_2_state_dict_dir = os.path.join(class_2_base, 'up_16_32_64_20240501/3_class_2_pvt_image_encoder/model/lora-000001.safetensors')
     network_3_state_dict_dir = os.path.join(class_3_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000001.safetensors')
     network_4_state_dict_dir = os.path.join(class_4_base, 'up_16_32_64_20240501/3_class_4_pvt_image_encoder/model/lora-000001.safetensors')
-    network_0_weights_sd = load_file(network_0_state_dict_dir)
-    network_1_weights_sd = load_file(network_1_state_dict_dir)
-    network_2_weights_sd = load_file(network_2_state_dict_dir)
-    network_3_weights_sd = load_file(network_3_state_dict_dir)
-    network_4_weights_sd = load_file(network_4_state_dict_dir)
-    network_weights = [network_0_weights_sd, network_1_weights_sd, network_2_weights_sd, network_3_weights_sd, network_4_weights_sd]
+    #network_0_weights_sd = load_file(network_0_state_dict_dir)
+    #network_1_weights_sd = load_file(network_1_state_dict_dir)
+    #network_2_weights_sd = load_file(network_2_state_dict_dir)
+    #network_3_weights_sd = load_file(network_3_state_dict_dir)
+    #network_4_weights_sd = load_file(network_4_state_dict_dir)
+    network_weights = [network_0_state_dict_dir, network_1_state_dict_dir, network_2_state_dict_dir, network_3_state_dict_dir, network_4_state_dict_dir]
 
     print(f' (2) make student networks')
     weight_dtype, save_dtype = prepare_dtype(args)
@@ -917,7 +917,7 @@ def main(args):
     condition_modality = 'image'
 
     student_nets = []
-    for net_weight in network_weights:
+    for net_weight_dir in network_weights:
         student_net = create_network(1.0,
                                      args.network_dim,
                                      args.network_alpha,
@@ -926,7 +926,7 @@ def main(args):
                                      unet=unet,
                                      neuron_dropout=args.network_dropout,
                                      condition_modality=condition_modality,)
-        student_net.load_state_dict(net_weight)
+        student_net.load_weights(net_weight_dir)
         student_nets.append(student_net)
 
 
