@@ -107,8 +107,8 @@ class TeacherLoRAModule(torch.nn.Module):
             self.lora_down = torch.nn.Conv2d(in_dim, self.lora_dim, kernel_size, stride, padding, bias=False)
             self.lora_up = torch.nn.Conv2d(self.lora_dim, out_dim, (1, 1), (1, 1), bias=False)
         else:
-            self.lora_down = torch.nn.Linear(in_dim, self.lora_dim, bias=False)
-            self.lora_up = torch.nn.Linear(self.lora_dim, out_dim, bias=False)
+            self.lora_down = torch.nn.Linear(in_dim, self.lora_dim, bias=False) # necessary value
+            self.lora_up = torch.nn.Linear(self.lora_dim, out_dim, bias=False)  #
 
         if type(alpha) == torch.Tensor:
             alpha = alpha.detach().float().numpy()  # without casting, bf16 causes error
@@ -127,7 +127,13 @@ class TeacherLoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
-        self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        self.alpha_1 = nn.Parameter(torch.tensor(1.0))
+        self.alpha_2 = nn.Parameter(torch.tensor(1.0))
+        self.alpha_3 = nn.Parameter(torch.tensor(1.0))
+        self.alpha_4 = nn.Parameter(torch.tensor(1.0))
+        self.alpha_5 = nn.Parameter(torch.tensor(1.0))
+        
+        self.alphas = [self.alpha_1, self.alpha_2, self.alpha_3, self.alpha_4, self.alpha_5]
         # self.betas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
 
         for i, student_module in enumerate(student_modules):
