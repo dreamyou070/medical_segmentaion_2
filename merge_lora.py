@@ -40,7 +40,7 @@ from diffusers import AutoencoderKL
 from transformers import CLIPTextModel
 import torch
 import re
-
+from model.lora import LoRANetwork
 
 RE_UPDOWN = re.compile(r"(up|down)_blocks_(\d+)_(resnets|upsamplers|downsamplers|attentions)_(\d+)_")
 
@@ -290,7 +290,7 @@ def parse_block_lr_kwargs(nw_kwargs):
 
 
 # 外部から呼び出す可能性を考慮しておく
-from model.lora import LoRANetwork
+
 def get_block_index(lora_name: str) -> int:
     block_idx = -1  # invalid lora name
 
@@ -397,7 +397,6 @@ def create_teacher_network(multiplier: float,
 
     if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
         network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
-
     return network
 class TeacherLoRANetwork(torch.nn.Module):
     #
@@ -475,16 +474,14 @@ class TeacherLoRANetwork(torch.nn.Module):
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
                            prefix,
-                           student_loras) -> List[LoRAModule]:
+                           student_loras
+                           ) -> List[LoRAModule]:
             loras = []
             skipped = []
             # prefix ...
             for name, module in root_module.named_modules():
-
                 if module.__class__.__name__ in target_replace_modules:
-
                     for child_name, child_module in module.named_modules():
-
                         is_linear = child_module.__class__.__name__ == "Linear"
                         is_conv2d = child_module.__class__.__name__ == "Conv2d"
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
@@ -598,9 +595,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                 self.text_encoder_loras.extend(text_encoder_loras)
                 skipped_te += skipped
             print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.")  # Here (61 modules)
-            skipped = skipped_te + skipped_un
-
-            # assertion
+            skipped = skipped_te + skipped_un            # assertion
             names = set()
             for lora in self.text_encoder_loras + self.unet_loras:
                 assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
@@ -616,24 +611,17 @@ class TeacherLoRANetwork(torch.nn.Module):
                     if len(image_encoders) > 1:
                         index = i + 1
                         print(f"create LoRA for Image Encoder {index}:")
-                    else:
-                        index = None
-                    # ---------------------------------------------------------------------------------------------------------------------
-                    # create image encoder LoRA
-                    prefix_ = LoRANetwork.LORA_PREFIX_IMAGE_ENCODER
-                    target_replace_module_condition = LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE
-
+                    else: index = None
                     image_encoder_loras, skipped = create_modules(False,
                                                                   index,
                                                                   root_module=image_encoder,
-                                                                  target_replace_modules=target_replace_module_condition,
-                                                                  prefix=prefix_,
+                                                                  target_replace_modules=LoRANetwork.IMAGE_ENCODER_TARGET_REPLACE_MODULE,
+                                                                  prefix=LoRANetwork.LORA_PREFIX_IMAGE_ENCODER,
                                                                   student_loras = student_loras)
                     self.image_encoder_loras.extend(image_encoder_loras)
                     skipped_ie += skipped
                 print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
                 skipped = skipped_ie + skipped_un
-
                 # assertion
                 names = set()
                 for lora in self.image_encoder_loras + self.unet_loras:
@@ -1014,15 +1002,23 @@ def main(args):
         student_nets.append(student_net)
 
     print(f' (3) make teacher networks')
-    teacher_network = create_teacher_network(multiplier = 1.0,
-                                       network_dim = args.network_dim,
-                                       network_alpha =args.network_alpha,
-                                       vae = vae,
-                                       condition_model = condition_model,
-                                       unet=unet,
-                                       neuron_dropout=args.network_dropout,
-                                       condition_modality=condition_modality,
-                                       student_loras=student_nets,)
+    #teacher_network = create_teacher_network(multiplier = 1.0,
+    #                                       network_dim = args.network_dim,
+    #                                       network_alpha =args.network_alpha,
+    #                                       vae = vae,
+    #                                       condition_model = condition_model,
+    #                                       unet=unet,
+    ##                                       neuron_dropout=args.network_dropout,
+    #                                       condition_modality=condition_modality,
+    #                                       student_loras=student_nets,)
+    teacher_network = create_network(multiplier = 1.0,
+                                           network_dim = args.network_dim,
+                                           network_alpha =args.network_alpha,
+                                           vae = vae,
+                                           condition_model = condition_model,
+                                           unet=unet,
+                                           neuron_dropout=args.network_dropout,
+                                           condition_modality=condition_modality,)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
