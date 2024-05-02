@@ -146,7 +146,6 @@ class TeacherLoRAModule(torch.nn.Module):
 
 
         org_forwarded = self.org_forward(x)
-        print(f'org_forwarded : {org_forwarded.shape}')
 
         # module dropout
         if self.module_dropout is not None and self.training:

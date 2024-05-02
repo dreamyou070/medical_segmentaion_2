@@ -76,6 +76,10 @@ def main(args):
     print(f' (2) make student networks')
     weight_dtype, save_dtype = prepare_dtype(args)
     text_encoder, vae, unet, _ = load_target_model(args, weight_dtype, accelerator)
+    vae.requires_grad_(False)
+    vae = vae.to(accelerator.device, dtype=weight_dtype)
+    vae.eval()
+
     net_kwargs = {}
     if args.network_args is not None:
         for net_arg in args.network_args:
