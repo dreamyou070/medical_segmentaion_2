@@ -108,7 +108,6 @@ def main(args):
         student_nets.append(student_net)
 
     print(f' (3) make teacher networks')
-
     teacher_network = create_teacher_network(multiplier = 1.0,
                                              network_dim = args.network_dim,
                                              network_alpha =args.network_alpha,
@@ -117,7 +116,7 @@ def main(args):
                                              unet=unet,
                                              neuron_dropout=args.network_dropout,
                                              condition_modality=condition_modality,
-                                             student_loras=student_nets,)
+                                             student_networks=student_nets,)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

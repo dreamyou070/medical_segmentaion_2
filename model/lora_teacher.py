@@ -563,7 +563,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                      unet,
                                                      target_replace_modules=target_modules,
                                                      prefix=LoRANetwork.LORA_PREFIX_UNET,
-                                                     student_networks=student_networks,)
+                                                     student_networks=student_networks)
         # ------------------------------------------------------------------------------------------------------------------------
         # [1] text encoder
         if condition_modality == 'text':
@@ -589,7 +589,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                              text_encoder,
                                                              target_replace_modules=target_replace_module_condition,
                                                              prefix=prefix_,
-                                                             student_networks=student_networks,)
+                                                             student_networks=student_networks)
                 self.text_encoder_loras.extend(text_encoder_loras)
                 skipped_te += skipped
             print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.")  # Here (61 modules)
@@ -623,7 +623,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                                   root_module=image_encoder,
                                                                   target_replace_modules=target_replace_module_condition,
                                                                   prefix=prefix_,
-                                                                  student_networks=student_networks,)
+                                                                  student_networks=student_networks)
                     self.image_encoder_loras.extend(image_encoder_loras)
                     skipped_ie += skipped
                 print(f"create LoRA for Image Encoder : {len(self.image_encoder_loras)} modules.")
