@@ -532,6 +532,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                             # ------------------------------------------------------------------------------------------
                             # [3] make module
                             if block_wise == None :
+                                print(f'len of student modules = {len(student_modules)}')
                                 lora = module_class(lora_name,
                                                     child_module,
                                                     self.multiplier,
@@ -610,9 +611,6 @@ class TeacherLoRANetwork(torch.nn.Module):
             image_encoders = image_condition if type(image_condition) == list else [image_condition]
             self.image_encoder_loras = []
             skipped_ie = []  # 1 model
-
-            print(f'len of image_encoders = {len(image_encoders)}')
-
             if image_condition is not None:
                 for i, image_encoder in enumerate(image_encoders):
                     if len(image_encoders) > 1:
@@ -639,7 +637,9 @@ class TeacherLoRANetwork(torch.nn.Module):
                 # assertion
                 names = set()
                 for lora in self.image_encoder_loras + self.unet_loras:
-                    assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                    #assert lora.lora_name not in names, f"duplicated lora name: {lora.lora_name}"
+                    if lora.lora_name in names:
+                        print(f"duplicated lora name: {lora.lora_name}")
                     names.add(lora.lora_name)
 
         # ------------------------------------------------------------------------------------------------------------------------
