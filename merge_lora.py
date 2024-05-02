@@ -1217,13 +1217,13 @@ def main(args):
     class_4_base = os.path.join(base, 'Pranet_Sub4')
     network_0_state_dict_dir = os.path.join(class_0_base, 'up_16_32_64_20240501/3_class_0_pvt_image_encoder/model/lora-000086.safetensors')
     network_1_state_dict_dir = os.path.join(class_1_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000001.safetensors')
-    network_2_state_dict_dir = os.path.join(class_1_base, 'up_16_32_64_20240501/3_class_2_pvt_image_encoder/model/lora-000001.safetensors')
-    network_3_state_dict_dir = os.path.join(class_1_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000001.safetensors')
-    network_4_state_dict_dir = os.path.join(class_1_base, 'up_16_32_64_20240501/3_class_4_pvt_image_encoder/model/lora-000001.safetensors')
+    network_2_state_dict_dir = os.path.join(class_2_base, 'up_16_32_64_20240501/3_class_2_pvt_image_encoder/model/lora-000001.safetensors')
+    network_3_state_dict_dir = os.path.join(class_3_base, 'up_16_32_64_20240501/3_class_3_pvt_image_encoder/model/lora-000001.safetensors')
+    network_4_state_dict_dir = os.path.join(class_4_base, 'up_16_32_64_20240501/3_class_4_pvt_image_encoder/model/lora-000001.safetensors')
 
     network_0_weights_sd = load_file(network_0_state_dict_dir)
     network_1_weights_sd = load_file(network_1_state_dict_dir)
-    network_2_weights_sd = load_file(network_2_state_dict_dir)
+    network_2_weights_sd = load_file(network_2_state_dict_dir) ##########################################################
     network_3_weights_sd = load_file(network_3_state_dict_dir)
     network_4_weights_sd = load_file(network_4_state_dict_dir)
 
