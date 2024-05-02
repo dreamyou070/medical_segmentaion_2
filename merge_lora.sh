@@ -11,7 +11,7 @@ sub_folder="up_16_32_64_20240501"
 file_name="lora_merging_test" #
 
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
- --main_process_port $port_number train.py --log_with wandb \
+ --main_process_port $port_number merge_lora.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/${benchmark}/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \

@@ -70,7 +70,9 @@ class LoRAModule(torch.nn.Module):
                  lora_dim=4,
                  alpha=1,
                  dropout=None,
-                 rank_dropout=None,module_dropout=None,):
+                 rank_dropout=None,
+                 module_dropout=None,
+                 student_loras=None,):
         """if alpha == 0 or None, alpha is rank (no scaling)."""
         super().__init__()
         self.lora_name = lora_name
@@ -91,11 +93,6 @@ class LoRAModule(torch.nn.Module):
         down_dim = int(in_dim // common_dim)
         up_dim = int(out_dim // common_dim)
 
-        # if limit_rank:
-        #   self.lora_dim = min(lora_dim, in_dim, out_dim)
-        #   if self.lora_dim != lora_dim:
-        #     print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
-        # else:
         self.lora_dim = lora_dim
 
         if org_module.__class__.__name__ == "Conv2d":
@@ -125,6 +122,12 @@ class LoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
+        self.alphas = [nn.Parameters(1) for student_lora in student_loras] # alpha for lora_up
+        self.betas = [nn.Parameters(1) for student_lora in student_loras]  # beta for lora_down
+
+        self.student_loras = student_loras
+
+
     def apply_to(self):
         self.org_forward = self.org_module.forward
         self.org_module.forward = self.forward
@@ -134,35 +137,15 @@ class LoRAModule(torch.nn.Module):
         self.org_module.forward = self.org_forward
 
     def forward(self, x):
+
         org_forwarded = self.org_forward(x)
-
-        # module dropout
-        if self.module_dropout is not None and self.training:
-            if torch.rand(1) < self.module_dropout:
-                return org_forwarded
-
-        lx = self.lora_down(x)
-
-        # normal dropout
-        if self.dropout is not None and self.training:
-            lx = torch.nn.functional.dropout(lx, p=self.dropout)
-
-        # rank dropout
-        if self.rank_dropout is not None and self.training:
-            mask = torch.rand((lx.size(0), self.lora_dim), device=lx.device) > self.rank_dropout
-            if len(lx.size()) == 3:
-                mask = mask.unsqueeze(1)  # for Text Encoder
-            elif len(lx.size()) == 4:
-                mask = mask.unsqueeze(-1).unsqueeze(-1)  # for Conv2d
-            lx = lx * mask
-
-            # scaling for rank dropout: treat as if the rank is changed
-            # maskから計算することも考えられるが、augmentation的な効果を期待してrank_dropoutを用いる
-            scale = self.scale * (1.0 / (1.0 - self.rank_dropout))  # redundant for readability
-        else:
-            scale = self.scale
-
+        lx = 0
+        for alpha, student_lora in zip(self.alphas, self.student_loras) :
+            lx += alpha * student_lora.lora_down(x)
+        for beta, student_lora in zip(self.betas, self.student_loras) :
+            lx += beta * student_lora.lora_up(x)
         lx = self.lora_up(lx)
+        scale = self.scale
 
         return org_forwarded + lx * self.multiplier * scale
 
@@ -658,261 +641,10 @@ def create_network(multiplier: float,
 
     return network
 
-def create_network_blockwise(
-    multiplier: float,
-    network_dim: Optional[int],
-    network_alpha: Optional[float],
-    vae: AutoencoderKL,
-    text_encoder: Union[CLIPTextModel, List[CLIPTextModel]],
-    unet,
-    block_wise = None,
-    neuron_dropout: Optional[float] = None,
-    **kwargs,
-):
-    if network_dim is None:
-        network_dim = 4  # default
-    if network_alpha is None:
-        network_alpha = 1.0
-
-    # extract dim/alpha for conv2d, and block dim
-    conv_dim = kwargs.get("conv_dim", None)
-    conv_alpha = kwargs.get("conv_alpha", None)
-    if conv_dim is not None:
-        conv_dim = int(conv_dim)
-        if conv_alpha is None:
-            conv_alpha = 1.0
-        else:
-            conv_alpha = float(conv_alpha)
-
-    # block dim/alpha/lr
-    block_dims = kwargs.get("block_dims", None)
-    down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
-
-    # 以上のいずれかに指定があればblockごとのdim(rank)を有効にする
-    if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
-        block_alphas = kwargs.get("block_alphas", None)
-        conv_block_dims = kwargs.get("conv_block_dims", None)
-        conv_block_alphas = kwargs.get("conv_block_alphas", None)
-
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(
-            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
-        )
-
-        # remove block dim/alpha without learning rate
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(
-            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
-        )
-
-    else:
-        block_alphas = None
-        conv_block_dims = None
-        conv_block_alphas = None
-
-    # rank/module dropout
-    rank_dropout = kwargs.get("rank_dropout", None)
-    if rank_dropout is not None:
-        rank_dropout = float(rank_dropout)
-    module_dropout = kwargs.get("module_dropout", None)
-    if module_dropout is not None:
-        module_dropout = float(module_dropout)
-
-    # すごく引数が多いな ( ^ω^)･･･
-    network = LoRANetwork(
-        text_encoder,
-        unet,
-        block_wise=block_wise,
-        multiplier=multiplier,
-        lora_dim=network_dim,
-        alpha=network_alpha,
-        dropout=neuron_dropout,
-        rank_dropout=rank_dropout,
-        module_dropout=module_dropout,
-        conv_lora_dim=conv_dim,
-        conv_alpha=conv_alpha,
-        block_dims=block_dims,
-        block_alphas=block_alphas,
-        conv_block_dims=conv_block_dims,
-        conv_block_alphas=conv_block_alphas,
-        varbose=True,**kwargs
-    )
-
-    if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
-        network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
-
-    return network
-
-
-# このメソッドは外部から呼び出される可能性を考慮しておく
-# network_dim, network_alpha にはデフォルト値が入っている。
-# block_dims, block_alphas は両方ともNoneまたは両方とも値が入っている
-# conv_dim, conv_alpha は両方ともNoneまたは両方とも値が入っている
-def get_block_dims_and_alphas(
-    block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
-):
-    num_total_blocks = LoRANetwork.NUM_OF_BLOCKS * 2 + 1
-
-    def parse_ints(s):
-        return [int(i) for i in s.split(",")]
-
-    def parse_floats(s):
-        return [float(i) for i in s.split(",")]
-
-    # block_dimsとblock_alphasをパースする。必ず値が入る
-    if block_dims is not None:
-        block_dims = parse_ints(block_dims)
-        assert (
-            len(block_dims) == num_total_blocks
-        ), f"block_dims must have {num_total_blocks} elements / block_dimsは{num_total_blocks}個指定してください"
-    else:
-        print(f"block_dims is not specified. all dims are set to {network_dim} / block_dimsが指定されていません。すべてのdimは{network_dim}になります")
-        block_dims = [network_dim] * num_total_blocks
-
-    if block_alphas is not None:
-        block_alphas = parse_floats(block_alphas)
-        assert (
-            len(block_alphas) == num_total_blocks
-        ), f"block_alphas must have {num_total_blocks} elements / block_alphasは{num_total_blocks}個指定してください"
-    else:
-        print(
-            f"block_alphas is not specified. all alphas are set to {network_alpha} / block_alphasが指定されていません。すべてのalphaは{network_alpha}になります"
-        )
-        block_alphas = [network_alpha] * num_total_blocks
-
-    # conv_block_dimsとconv_block_alphasを、指定がある場合のみパースする。指定がなければconv_dimとconv_alphaを使う
-    if conv_block_dims is not None:
-        conv_block_dims = parse_ints(conv_block_dims)
-        assert (
-            len(conv_block_dims) == num_total_blocks
-        ), f"conv_block_dims must have {num_total_blocks} elements / conv_block_dimsは{num_total_blocks}個指定してください"
-
-        if conv_block_alphas is not None:
-            conv_block_alphas = parse_floats(conv_block_alphas)
-            assert (
-                len(conv_block_alphas) == num_total_blocks
-            ), f"conv_block_alphas must have {num_total_blocks} elements / conv_block_alphasは{num_total_blocks}個指定してください"
-        else:
-            if conv_alpha is None:
-                conv_alpha = 1.0
-            print(
-                f"conv_block_alphas is not specified. all alphas are set to {conv_alpha} / conv_block_alphasが指定されていません。すべてのalphaは{conv_alpha}になります"
-            )
-            conv_block_alphas = [conv_alpha] * num_total_blocks
-    else:
-        if conv_dim is not None:
-            print(
-                f"conv_dim/alpha for all blocks are set to {conv_dim} and {conv_alpha} / すべてのブロックのconv_dimとalphaは{conv_dim}および{conv_alpha}になります"
-            )
-            conv_block_dims = [conv_dim] * num_total_blocks
-            conv_block_alphas = [conv_alpha] * num_total_blocks
-        else:
-            conv_block_dims = None
-            conv_block_alphas = None
-
-    return block_dims, block_alphas, conv_block_dims, conv_block_alphas
-
-
-# 層別学習率用に層ごとの学習率に対する倍率を定義する、外部から呼び出される可能性を考慮しておく
-def get_block_lr_weight(
-    down_lr_weight, mid_lr_weight, up_lr_weight, zero_threshold
-) -> Tuple[List[float], List[float], List[float]]:
-    # パラメータ未指定時は何もせず、今までと同じ動作とする
-    if up_lr_weight is None and mid_lr_weight is None and down_lr_weight is None:
-        return None, None, None
-
-    max_len = LoRANetwork.NUM_OF_BLOCKS  # フルモデル相当でのup,downの層の数
-
-    def get_list(name_with_suffix) -> List[float]:
-        import math
-
-        tokens = name_with_suffix.split("+")
-        name = tokens[0]
-        base_lr = float(tokens[1]) if len(tokens) > 1 else 0.0
-
-        if name == "cosine":
-            return [math.sin(math.pi * (i / (max_len - 1)) / 2) + base_lr for i in reversed(range(max_len))]
-        elif name == "sine":
-            return [math.sin(math.pi * (i / (max_len - 1)) / 2) + base_lr for i in range(max_len)]
-        elif name == "linear":
-            return [i / (max_len - 1) + base_lr for i in range(max_len)]
-        elif name == "reverse_linear":
-            return [i / (max_len - 1) + base_lr for i in reversed(range(max_len))]
-        elif name == "zeros":
-            return [0.0 + base_lr] * max_len
-        else:
-            print(
-                "Unknown lr_weight argument %s is used. Valid arguments:  / 不明なlr_weightの引数 %s が使われました。有効な引数:\n\tcosine, sine, linear, reverse_linear, zeros"
-                % (name)
-            )
-            return None
-
-    if type(down_lr_weight) == str:
-        down_lr_weight = get_list(down_lr_weight)
-    if type(up_lr_weight) == str:
-        up_lr_weight = get_list(up_lr_weight)
-
-    if (up_lr_weight != None and len(up_lr_weight) > max_len) or (down_lr_weight != None and len(down_lr_weight) > max_len):
-        print("down_weight or up_weight is too long. Parameters after %d-th are ignored." % max_len)
-        print("down_weightもしくはup_weightが長すぎます。%d個目以降のパラメータは無視されます。" % max_len)
-        up_lr_weight = up_lr_weight[:max_len]
-        down_lr_weight = down_lr_weight[:max_len]
-
-    if (up_lr_weight != None and len(up_lr_weight) < max_len) or (down_lr_weight != None and len(down_lr_weight) < max_len):
-        print("down_weight or up_weight is too short. Parameters after %d-th are filled with 1." % max_len)
-        print("down_weightもしくはup_weightが短すぎます。%d個目までの不足したパラメータは1で補われます。" % max_len)
-
-        if down_lr_weight != None and len(down_lr_weight) < max_len:
-            down_lr_weight = down_lr_weight + [1.0] * (max_len - len(down_lr_weight))
-        if up_lr_weight != None and len(up_lr_weight) < max_len:
-            up_lr_weight = up_lr_weight + [1.0] * (max_len - len(up_lr_weight))
-
-    if (up_lr_weight != None) or (mid_lr_weight != None) or (down_lr_weight != None):
-        print("apply block learning rate / 階層別学習率を適用します。")
-        if down_lr_weight != None:
-            down_lr_weight = [w if w > zero_threshold else 0 for w in down_lr_weight]
-            print("down_lr_weight (shallower -> deeper, 浅い層->深い層):", down_lr_weight)
-        else:
-            print("down_lr_weight: all 1.0, すべて1.0")
-
-        if mid_lr_weight != None:
-            mid_lr_weight = mid_lr_weight if mid_lr_weight > zero_threshold else 0
-            print("mid_lr_weight:", mid_lr_weight)
-        else:
-            print("mid_lr_weight: 1.0")
-
-        if up_lr_weight != None:
-            up_lr_weight = [w if w > zero_threshold else 0 for w in up_lr_weight]
-            print("up_lr_weight (deeper -> shallower, 深い層->浅い層):", up_lr_weight)
-        else:
-            print("up_lr_weight: all 1.0, すべて1.0")
-
-    return down_lr_weight, mid_lr_weight, up_lr_weight
-
-
-# lr_weightが0のblockをblock_dimsから除外する、外部から呼び出す可能性を考慮しておく
-def remove_block_dims_and_alphas( block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight):
-    # set 0 to block dim without learning rate to remove the block
-    if down_lr_weight != None:
-        for i, lr in enumerate(down_lr_weight):
-            if lr == 0:
-                block_dims[i] = 0
-                if conv_block_dims is not None:
-                    conv_block_dims[i] = 0
-    if mid_lr_weight != None:
-        if mid_lr_weight == 0:
-            block_dims[LoRANetwork.NUM_OF_BLOCKS] = 0
-            if conv_block_dims is not None:
-                conv_block_dims[LoRANetwork.NUM_OF_BLOCKS] = 0
-    if up_lr_weight != None:
-        for i, lr in enumerate(up_lr_weight):
-            if lr == 0:
-                block_dims[LoRANetwork.NUM_OF_BLOCKS + 1 + i] = 0
-                if conv_block_dims is not None:
-                    conv_block_dims[LoRANetwork.NUM_OF_BLOCKS + 1 + i] = 0
-
-    return block_dims, block_alphas, conv_block_dims, conv_block_alphas
 
 
 # 外部から呼び出す可能性を考慮しておく
+from model.lora import LoRANetwork
 def get_block_index(lora_name: str) -> int:
     block_idx = -1  # invalid lora name
 
@@ -938,57 +670,7 @@ def get_block_index(lora_name: str) -> int:
 
     return block_idx
 
-
-# Create network from weights for inference, weights are not loaded here (because can be merged)
-def create_network_from_weights(multiplier, file, block_wise,
-                                vae, text_encoder, unet, weights_sd=None,
-                                for_inference=False, **kwargs):
-    if weights_sd is None:
-        if os.path.splitext(file)[1] == ".safetensors":
-            from safetensors.torch import load_file, safe_open
-
-            weights_sd = load_file(file)
-        else:
-            weights_sd = torch.load(file, map_location="cpu")
-
-    # get dim/alpha mapping
-    modules_dim = {}
-    modules_alpha = {}
-    for key, value in weights_sd.items():
-        if "." not in key:
-            continue
-        lora_name = key.split(".")[0]
-        if "alpha" in key:
-            modules_alpha[lora_name] = value
-        elif "lora_down" in key:
-            dim = value.size()[0]
-            modules_dim[lora_name] = dim
-
-    # support old LoRA without alpha
-    for key in modules_dim.keys():
-        if key not in modules_alpha:
-            modules_alpha[key] = modules_dim[key]
-
-    # LoRAInfModule for inference, LoRAModule for training
-    module_class = LoRAInfModule if for_inference else LoRAModule
-    network = LoRANetwork(text_encoder, unet,
-                          block_wise=block_wise,
-                          multiplier=multiplier,
-                          modules_dim=modules_dim,
-                          modules_alpha=modules_alpha,
-                          # module_class = LoRAInfModule
-                          module_class=module_class,
-                          **kwargs )
-
-    # block lr
-    down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
-    if up_lr_weight is not None or mid_lr_weight is not None or down_lr_weight is not None:
-        network.set_block_lr_weight(up_lr_weight, mid_lr_weight, down_lr_weight)
-
-    return network, weights_sd
-
-
-class LoRANetwork(torch.nn.Module):
+class TeacherLoRANetwork(torch.nn.Module):
     #
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
 
@@ -1031,7 +713,7 @@ class LoRANetwork(torch.nn.Module):
         varbose: Optional[bool] = False,
         net_key_names: Optional[bool] = False,
         condition_modality='text',
-    ) -> None:
+        student_loras : Optional[List] = None, ) -> None:
 
         super().__init__()
         self.multiplier = multiplier
@@ -1063,7 +745,8 @@ class LoRANetwork(torch.nn.Module):
                            text_encoder_idx: Optional[int],  # None, 1, 2
                            root_module: torch.nn.Module,
                            target_replace_modules : List[torch.nn.Module],
-                           prefix) -> List[LoRAModule]:
+                           prefix,
+                           student_loras) -> List[LoRAModule]:
 
             loras = []
             skipped = []
@@ -1116,7 +799,8 @@ class LoRANetwork(torch.nn.Module):
                                                     alpha,
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
-                                                    module_dropout=module_dropout,)
+                                                    module_dropout=module_dropout,
+                                                    student_loras = student_loras)
                                 loras.append(lora)
 
                             else :
@@ -1142,7 +826,8 @@ class LoRANetwork(torch.nn.Module):
                                                      None,
                                                      unet,
                                                      target_replace_modules=target_modules,
-                                                     prefix=LoRANetwork.LORA_PREFIX_UNET)
+                                                     prefix=LoRANetwork.LORA_PREFIX_UNET,
+                                                     student_loras = student_loras)
         # ------------------------------------------------------------------------------------------------------------------------
         # [1] text encoder
         if condition_modality == 'text':
@@ -1167,7 +852,8 @@ class LoRANetwork(torch.nn.Module):
                                                              index,
                                                              text_encoder,
                                                              target_replace_modules=target_replace_module_condition,
-                                                             prefix=prefix_)
+                                                             prefix=prefix_,
+                                                             student_loras = student_loras)
                 self.text_encoder_loras.extend(text_encoder_loras)
                 skipped_te += skipped
             print(f"create LoRA for Text Encoder : {len(self.text_encoder_loras)} modules.")  # Here (61 modules)
@@ -1243,11 +929,7 @@ class LoRANetwork(torch.nn.Module):
         for lora in loras:
             lora.restore()
 
-
     def apply_to(self, text_encoder, unet, apply_condition_model=True, apply_unet=True, condition_modality = 'text'):
-
-
-
         if apply_unet:
             print("enable LoRA for U-Net")
         else:
@@ -1545,9 +1227,8 @@ def main(args):
     network_3_weights_sd = load_file(network_3_state_dict_dir)
     network_4_weights_sd = load_file(network_4_state_dict_dir)
 
-
-
-
+    for k in network_0_weights_sd.keys():
+        print(f'key in network_0_weights_sd: {k}')
 
     if args.image_processor == 'vit': # ViTModel
         image_model = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
@@ -1570,16 +1251,20 @@ def main(args):
         for net_arg in args.network_args:
             key, value = net_arg.split("=")
             net_kwargs[key] = value
-    teacher_network = create_network(1.0,
-                                     args.network_dim,
-                                     args.network_alpha,
-                                     vae,
-                                     condition_model=condition_model,
-                                     unet=unet,
-                                     neuron_dropout=args.network_dropout,
-                                     condition_modality=condition_modality,
-                                     **net_kwargs, )
 
+    """
+            
+    teacher_network = TeacherLoRANetwork(1.0,
+                                         args.network_dim,
+                                         args.network_alpha,
+                                         vae,
+                                         condition_model=condition_model,
+                                         unet=unet,
+                                         neuron_dropout=args.network_dropout,
+                                         condition_modality=condition_modality,
+                                         student_loras = [network_0_weights_sd, network_1_weights_sd, network_2_weights_sd, network_3_weights_sd, network_4_weights_sd],
+                                         **net_kwargs, )
+    """
 
 
 
