@@ -132,7 +132,7 @@ class TeacherLoRAModule(torch.nn.Module):
         self.alpha_3 = nn.Parameter(torch.tensor(1.0))
         self.alpha_4 = nn.Parameter(torch.tensor(1.0))
         self.alpha_5 = nn.Parameter(torch.tensor(1.0))
-        
+
         self.alphas = [self.alpha_1, self.alpha_2, self.alpha_3, self.alpha_4, self.alpha_5]
         # self.betas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
 

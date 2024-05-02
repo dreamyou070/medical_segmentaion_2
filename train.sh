@@ -1,7 +1,7 @@
 # !/bin/bash
 # 기존 논문들에서는 loss 를 2가지 이상을 사용하고 있구나 ?
 #
-port_number=58866
+port_number=58877
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
@@ -10,7 +10,7 @@ layer_name='layer_3'
 sub_folder="up_16_32_64_20240501"
 file_name="3_class_6_pvt_image_encoder" #
 
-accelerate launch --config_file ../../gpu_config/gpu_0_1_config \
+accelerate launch --config_file ../../gpu_config/gpu_0_1_2_config \
  --main_process_port $port_number train.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
