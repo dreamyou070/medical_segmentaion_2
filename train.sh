@@ -9,7 +9,6 @@ benchmark="Pranet_Sub5"
 layer_name='layer_3'
 sub_folder="up_16_32_64_20240501"
 file_name="3_class_5_pvt_image_encoder" #
-
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number train.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}" \
