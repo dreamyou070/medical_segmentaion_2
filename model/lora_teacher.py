@@ -59,7 +59,7 @@ def gcd(a, b):
             return i
 
 
-class LoRAModule(torch.nn.Module):
+class TeacherLoRAModule(torch.nn.Module):
     """
     replaces forward method of the original Linear, instead of replacing the original Linear module.
     """
@@ -70,9 +70,8 @@ class LoRAModule(torch.nn.Module):
                  lora_dim=4,
                  alpha=1,
                  dropout=None,
-                 rank_dropout=None,
-                 module_dropout=None,
-                 student_modules=None,):
+                 rank_dropout=None,module_dropout=None,
+                 student_modules=None):
         """if alpha == 0 or None, alpha is rank (no scaling)."""
         super().__init__()
         self.lora_name = lora_name
@@ -93,6 +92,11 @@ class LoRAModule(torch.nn.Module):
         down_dim = int(in_dim // common_dim)
         up_dim = int(out_dim // common_dim)
 
+        # if limit_rank:
+        #   self.lora_dim = min(lora_dim, in_dim, out_dim)
+        #   if self.lora_dim != lora_dim:
+        #     print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
+        # else:
         self.lora_dim = lora_dim
 
         if org_module.__class__.__name__ == "Conv2d":
@@ -122,9 +126,9 @@ class LoRAModule(torch.nn.Module):
         self.org_weight = org_module.weight.detach().clone() #####################################################
         self.org_module_ref = [org_module]  ########################################################################
 
-        self.alphas = [nn.parameter.Parameter(data=torch.tensor([1.0]), requires_grad=True) for student_lora in student_modules] # alpha for lora_up
-        self.betas = [nn.parameter.Parameter(data=torch.tensor([1.0]), requires_grad=True) for student_lora in student_modules] # alpha for lora_up
-        self.student_loras = student_modules
+        self.alphas = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        self.betas  = [nn.Parameter(torch.tensor(1.0)) for _ in range(len(student_modules))]
+        self.student_modules = student_modules
 
     def apply_to(self):
         self.org_forward = self.org_module.forward
@@ -135,18 +139,38 @@ class LoRAModule(torch.nn.Module):
         self.org_module.forward = self.org_forward
 
     def forward(self, x):
-
         org_forwarded = self.org_forward(x)
-        lx = 0
-        for alpha, student_lora in zip(self.alphas, self.student_loras) :
-            lx += alpha * student_lora.lora_down(x)
-        for beta, student_lora in zip(self.betas, self.student_loras) :
-            lx += beta * student_lora.lora_up(x)
-        lx = self.lora_up(lx)
-        scale = self.scale
+
+        # module dropout
+        if self.module_dropout is not None and self.training:
+            if torch.rand(1) < self.module_dropout:
+                return org_forwarded
+        value = 0
+        for alpha, module in zip(self.alphas, self.student_modules) :
+            value += alpha * module.lora_down(x)
+
+        lx = value
+        # normal dropout
+        if self.dropout is not None and self.training:
+            lx = torch.nn.functional.dropout(lx, p=self.dropout)
+        # rank dropout
+        if self.rank_dropout is not None and self.training:
+            mask = torch.rand((lx.size(0), self.lora_dim), device=lx.device) > self.rank_dropout
+            if len(lx.size()) == 3:
+                mask = mask.unsqueeze(1)  # for Text Encoder
+            elif len(lx.size()) == 4:
+                mask = mask.unsqueeze(-1).unsqueeze(-1)  # for Conv2d
+            lx = lx * mask
+            # scaling for rank dropout: treat as if the rank is changed
+            # maskから計算することも考えられるが、augmentation的な効果を期待してrank_dropoutを用いる
+            scale = self.scale * (1.0 / (1.0 - self.rank_dropout))  # redundant for readability
+        else:
+            scale = self.scale
+
+        for beta, module in zip(self.betas, self.student_modules) :
+            lx += beta * module.lora_up(lx)
 
         return org_forwarded + lx * self.multiplier * scale
-
 
 
 class LoRAInfModule(torch.nn.Module):
@@ -439,7 +463,7 @@ class TeacherLoRANetwork(torch.nn.Module):
         modules_dim: Optional[Dict[str, int]] = None,
         modules_alpha: Optional[Dict[str, int]] = None,
         # LoRAInfModule
-        module_class: Type[object] = LoRAModule,
+        module_class: Type[object] = TeacherLoRAModule,
         varbose: Optional[bool] = False,
         net_key_names: Optional[bool] = False,
         condition_modality='text',
@@ -527,7 +551,7 @@ class TeacherLoRANetwork(torch.nn.Module):
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
                                 continue
-
+                            # [2]
                             if block_wise == None :
                                 lora = module_class(lora_name,
                                                     child_module,
@@ -536,7 +560,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                     alpha,
                                                     dropout=dropout,
                                                     rank_dropout=rank_dropout,
-                                                    module_dropout=module_dropout,)
+                                                    module_dropout=module_dropout,
+                                                    student_modules=student_modules)
                                 loras.append(lora)
 
                             else :
@@ -549,7 +574,8 @@ class TeacherLoRANetwork(torch.nn.Module):
                                                             alpha,
                                                             dropout=dropout,
                                                             rank_dropout=rank_dropout,
-                                                            module_dropout=module_dropout,)
+                                                            module_dropout=module_dropout,
+                                                            student_modules=student_modules)
                                         loras.append(lora)
             return loras, skipped
 
