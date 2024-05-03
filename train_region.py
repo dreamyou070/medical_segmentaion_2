@@ -20,7 +20,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.losses import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
+from utils.evaluate_region import evaluation_check
 from monai.losses import DiceLoss, DiceCELoss
 from model.focus_net import PFNet
 from model.vision_condition_head import vision_condition_head
@@ -360,7 +360,7 @@ def main(args):
                          epoch,
                          position_embedder,
                          vision_head,
-                         positioning_module,
+                         boundary_sensitive,
                          accelerator,
                          args)
 
