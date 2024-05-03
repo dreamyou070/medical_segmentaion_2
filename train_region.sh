@@ -20,7 +20,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
- --n_classes 2 --mask_res 256 --batch_size 1 \
+ --n_classes 2 --mask_res 64 --batch_size 1 \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
  --use_image_condition --image_model_training --image_processor 'pvt' --reverse \
  --use_simple_segmodel --use_segmentation_model

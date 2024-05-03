@@ -70,7 +70,7 @@ class BoundarySensitive(nn.Module):
         out_64 = out_64_edge_ + out_64_region_ + origin_features[2]
 
         out = torch.cat([out_16, out_32, out_64], dim=1)
-        logits = self.outc(out)  # 1, 4, 128,128
+        logits = self.outc(out)  # 1,2,64,64
         return logits
 
 

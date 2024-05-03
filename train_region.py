@@ -269,11 +269,14 @@ def main(args):
 
             masks_pred = boundary_sensitive([x16_out_edge, x32_out_edge, x64_out_edge],
                                             [x16_out_region, x32_out_region, x64_out_region],
-                                            [x16_out, x32_out, x64_out])
-
+                                            [x16_out, x32_out, x64_out]) # 1,2,64,64
             # [2] segmentation head
             #masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+
+            print(f'masks_pred = {masks_pred.shape}')
+            gt = batch['gt']
+            print(f'gt = {gt}')
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                                    target=batch['gt'].to(dtype=weight_dtype))  # [class, 256,256]
