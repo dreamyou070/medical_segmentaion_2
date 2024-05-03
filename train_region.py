@@ -224,7 +224,7 @@ def main(args):
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
-            print(f'gt = {gt.shape}')
+
 
             with torch.no_grad():
                 latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
@@ -275,11 +275,9 @@ def main(args):
             # [2] segmentation head
             #masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
-
-            print(f'masks_pred = {masks_pred.shape}')
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
-                                   target=batch['gt'].to(dtype=weight_dtype))  # [class, 256,256]
+                                   target=gt)  # [class, 256,256]
             else:
                 loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
                 loss_dict['cross_entropy_loss'] = loss.item()
