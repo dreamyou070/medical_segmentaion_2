@@ -26,6 +26,8 @@ def evaluation_check(segmentation_head,
                      vision_head,
                      boundary_sensitive,
                      accelerator,
+                     g_filter_torch,
+                     h_filter_torch,
                      args):
 
         folders = ['CVC-300', 'CVC-ClinicDB', 'Kvasir', 'CVC-ColonDB', 'ETIS-LaribPolypDB']
@@ -102,8 +104,7 @@ def evaluation_check(segmentation_head,
                     # [3] region separation
                     edge_feature = torch.nn.functional.conv2d(out_prev, g_filter_torch, padding=1)  # [batch,1,64,64]
                     region_feature = torch.nn.functional.conv2d(out_prev, h_filter_torch, padding=1)  # [batch,1,64,64]
-                    x16_out, x32_out, x64_out = x[:, :320], x[:, 320:640], x[:,
-                                                                           640:]  # [batch,320,64,64], [batch,320,64,64], [batch,320,64,64]
+                    x16_out, x32_out, x64_out = x[:, :320], x[:, 320:640], x[:,640:]  # [batch,320,64,64], [batch,320,64,64], [batch,320,64,64]
                     # ----------------------------------------------------------------------------------------------------------- #
                     # [4] boundary sensitive refinement
                     batch, dim = x16_out.shape[0], x16_out.shape[1]

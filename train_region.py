@@ -367,6 +367,8 @@ def main(args):
                          vision_head,
                          boundary_sensitive,
                          accelerator,
+                         g_filter_torch,
+                         h_filter_torch,
                          args)
 
     accelerator.end_training()
