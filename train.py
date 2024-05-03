@@ -74,8 +74,9 @@ def main(args):
 
     vision_head = None
     if args.image_processor == 'pvt' :
-        vision_head = vision_condition_head(reverse = args.reverse,
-                                            use_one = args.use_one)
+        vision_head = vision_condition_head(reverse = args.reverse, use_one = args.use_one)
+        if args.vision_head_weights is not None:
+            vision_head.load_state_dict(torch.load(args.vision_head_weights))
     position_embedder = None
     if args.use_position_embedder :
         position_embedder = AllPositionalEmbedding()
