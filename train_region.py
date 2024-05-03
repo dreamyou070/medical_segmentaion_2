@@ -256,12 +256,13 @@ def main(args):
             x16_out, x32_out, x64_out = x[:, :320], x[:, 320:640], x[:, 640:]  # [batch,320,64,64], [batch,320,64,64], [batch,320,64,64]
             # ----------------------------------------------------------------------------------------------------------- #
             # [4] boundary sensitive refinement
-            x16_out_edge = edge_feature * x16_out
-            x16_out_region = region_feature * x16_out
-            x32_out_edge = edge_feature * x32_out
-            x32_out_region = region_feature * x32_out
-            x64_out_edge = edge_feature * x64_out
-            x64_out_region = region_feature * x64_out
+            batch, dim = x16_out.shape[0], x16_out.shape[2]
+            x16_out_edge = (edge_feature * x16_out).view(batch, dim, -1).permute(0,2,1).contiguous()      # [batch,320,64,64]
+            x16_out_region = (region_feature * x16_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+            x32_out_edge = (edge_feature * x32_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+            x32_out_region = (region_feature * x32_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+            x64_out_edge = (edge_feature * x64_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+            x64_out_region = (region_feature * x64_out).view(batch, dim, -1).permute(0,2,1).contiguous()
             masks_pred = boundary_sensitive([x16_out_edge, x32_out_edge, x64_out_edge],
                                             [x16_out_region, x32_out_region, x64_out_region],
                                             [x16_out, x32_out, x64_out])
