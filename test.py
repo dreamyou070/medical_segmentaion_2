@@ -51,6 +51,8 @@ def main(args):
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
+    unet.to(dtype=weight_dtype, device=accelerator.device)
+    
 
     segmentation_head = None
     if args.use_segmentation_model:
