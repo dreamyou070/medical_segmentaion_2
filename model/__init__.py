@@ -61,7 +61,7 @@ def call_model_package(args, weight_dtype, accelerator, text_encoder_lora = True
     if args.network_weights is not None :
         print(f' * loading network weights')
         info = network.load_weights(args.network_weights)
-    network.to(weight_dtype, device=accelerator.device)
+    network.to(dtype = weight_dtype, device = accelerator.device)
 
     # [1.2] unet
     #unet = unet.to(accelerator.device, dtype=weight_dtype)

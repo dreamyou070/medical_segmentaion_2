@@ -1,5 +1,6 @@
 # !/bin/bash
-# 기존 논문들에서는 loss 를 2가지 이상을 사용하고 있구나 ?
+# [1] image conditioned
+# [2]
 #
 port_number=58887
 category="medical"
