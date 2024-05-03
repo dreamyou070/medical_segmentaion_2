@@ -72,7 +72,7 @@ def torch_to_pil(torch_img, binary=False):
         np_img = np.array(((torch_img + 1) / 2) * 255).astype(np.uint8)
 
     if binary :
-        np_img = np.where(np_img > 127, 255, 0)
+        np_img = np.where(np_img > 127, 255, 0).astype(np.uint8)
         pil = Image.fromarray(np_img).convert("L").convert('RGB')
     else :
         pil = Image.fromarray(np_img).convert("RGB")
