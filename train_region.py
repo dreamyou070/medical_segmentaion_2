@@ -318,8 +318,13 @@ def main(args):
             save_model(args,
                        saving_folder='model',
                        saving_name=f'lora-{saving_epoch}.safetensors',
-                       unwrapped_nw=accelerator.unwrap_model(network),
+                       unwrapped_nw=accelerator.unwrap_model(network), # network
                        save_dtype=save_dtype)
+            save_model(args,
+                          saving_folder='boundary_sensitive',
+                          saving_name=f'boundary_sensitive-{saving_epoch}.pt',
+                          unwrapped_nw=accelerator.unwrap_model(boundary_sensitive),
+                          save_dtype=save_dtype)
 
             if args.use_segmentation_model:
                 save_model(args,
