@@ -220,9 +220,12 @@ def main(args):
                 res = int(query.shape[1] ** 0.5)
                 q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-            _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
+            masks_pred, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [batch,2,64,64], [batch,960,64,64]
             # [2] segmentation head
-            masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+
+
+
+            #masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
             masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
             if args.use_dice_ce_loss:
                 loss = loss_dicece(input=masks_pred,                           # [class, 256,256]
