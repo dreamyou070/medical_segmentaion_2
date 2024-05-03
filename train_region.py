@@ -190,6 +190,8 @@ def main(args):
     gausssian_filter, g_filter_torch = gaussian_filter(3, 3)
     g_filter_torch = g_filter_torch.expand(-1, args.n_classes, -1, -1)  # 1,2,3,3
     h_filter_torch = 1 - g_filter_torch
+    g_filter_torch = g_filter_torch.to(weight_dtype, device=accelerator.device)
+    h_filter_torch = h_filter_torch.to(weight_dtype, device=accelerator.device)
 
     print(f'\n step 11. Training !')
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
