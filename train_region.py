@@ -248,7 +248,8 @@ def main(args):
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             # ----------------------------------------------------------------------------------------------------------- #
             # [2] concat feature generating
-            out_prev, x, feature = segmentation_head.gen_feature(x16_out, x32_out, x64_out) # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
+            #out_prev, x, feature = segmentation_head.gen_feature(x16_out, x32_out, x64_out) # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
+            out_prev, x = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
             # ----------------------------------------------------------------------------------------------------------- #
             # [3] region separation
             edge_feature = torch.nn.functional.conv2d(out_prev, g_filter_torch, padding=1)   # [batch,1,64,64]
