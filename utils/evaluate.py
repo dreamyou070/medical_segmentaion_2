@@ -123,9 +123,8 @@ def evaluation_check(segmentation_head,
                     # [2] saving image (all in 256 X 256)
                     if args.save_image :
                         original_pil = torch_to_pil(image.squeeze().detach().cpu()).resize((r, r))
-                        gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r))
-
-                        predict_pil = torch_to_pil(mask_pred_argmax.reshape((r, r)).contiguous().detach().cpu())
+                        gt_pil = torch_to_pil(gt.squeeze().detach().cpu()).resize((r, r), binary=True)
+                        predict_pil = torch_to_pil(mask_pred_argmax.reshape((r, r)).contiguous().detach().cpu(), binary=True)
                         merged_pil = Image.blend(original_pil, predict_pil, 0.4)
                         total_img = Image.new('RGB', (r * 4, r))
                         total_img.paste(original_pil, (0, 0))
