@@ -85,7 +85,7 @@ def main(args):
             segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
 
 
-    boundary_sensitive = BoundarySensitive(args.num_classes)
+    boundary_sensitive = BoundarySensitive(args.n_classes)
 
     vision_head = None
     if args.image_processor == 'pvt':
