@@ -145,6 +145,8 @@ class SemanticModel(nn.Module):
                 self.segmentation_head = nn.Sequential(Up_conv(in_channels=320*3*factor, out_channels=160*3, kernel_size=2),
                                                        Up_conv(in_channels=160*3, out_channels=160*2, kernel_size=2),
                                                        Up_conv(in_channels=160*2, out_channels=160, kernel_size=2),)
+
+        self.outc_prev = OutConv(960, n_classes)
         self.outc = OutConv(160, n_classes)
 
     def dim_and_res_up(self, mlp_layer, upsample_layer, x):
@@ -166,9 +168,10 @@ class SemanticModel(nn.Module):
                                       x16_out)        # upscale 4 times
         x32_out = self.dim_and_res_up(self.mlp_layer_2, self.upsample_layer_2, x32_out)  # [batch, 320, 64,64]
         x64_out = self.dim_and_res_up(self.mlp_layer_3, self.upsample_layer_3, x64_out)  # [batch, 320, 64,64]
-        x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, res,res]
+        x = torch.cat([x16_out, x32_out, x64_out], dim=1)  # [batch, 960, 64,64]
+        out_prev = self.outc_prev(x)    # [batch,2,64,64]
         x_ = self.segmentation_head(x)  # [batch 960, res,res] -> [batch, 160, 256,256]
-        return x, x_
+        return out_prev, x, x_ # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
 
     def segment_feature(self, feature):
         # feature = [batch, 160, 256,256]
