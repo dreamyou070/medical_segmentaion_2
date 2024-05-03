@@ -52,23 +52,29 @@ def evaluation_check(segmentation_head,
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
-                    focus_map = None
-                    if args.image_processor == 'pvt':
-                        output = condition_model(batch["image_condition"])
-                        encoder_hidden_states = vision_head(output)
-                    elif args.image_processor == 'vit':
-                        with torch.no_grad():
-                            output, pix_embedding = condition_model(**batch["image_condition"])
-                            encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-                            if args.not_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 1:, :]
-                            if args.only_use_cls_token:
-                                encoder_hidden_states = encoder_hidden_states[:, 0, :]
+                    total_loss = 0
+
+                    loss_dict = {}
+                    encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+                    if not args.without_condition:
+
+                        if args.use_image_condition:
+
+                            with torch.set_grad_enabled(True):
+                                if args.image_processor == 'pvt':
+                                    output = condition_model(batch["image_condition"])
+                                    encoder_hidden_states = vision_head(output)
+                                elif args.image_processor == 'vit':
+                                    output, pix_embedding = condition_model(**batch["image_condition"])
+                                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+
                     image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
                     gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
                     gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
+
                     with torch.no_grad():
                         latents = vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
                     # ----------------------------------------------------------------------------------------------------------- #
                     with torch.set_grad_enabled(True):
                         if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
@@ -81,17 +87,20 @@ def evaluation_check(segmentation_head,
                     query_dict, key_dict = controller.query_dict, controller.key_dict
                     controller.reset()
                     q_dict = {}
+
                     for layer in args.trg_layer_list:
                         query = query_dict[layer][0]
                         res = int(query.shape[1] ** 0.5)
                         q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
                     x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
-                    if args.use_simple_segmodel:
-                        _, features = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [1,160,256,256]
-                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
-                    else:
-                        features = segmentation_head.gen_feature(x16_out, x32_out, x64_out, global_feat)  # [1,160,256,256]
-                        masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]
+                    masks_pred, features = segmentation_head.gen_feature(x16_out, x32_out,
+                                                                         x64_out)  # [batch,2,64,64], [batch,960,64,64]
+                    # [2] segmentation head
+
+                    # masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+                    masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1,
+                                                                                   masks_pred.shape[-1]).contiguous()
+
 
                     # [1] pred
                     class_num = masks_pred.shape[1]  # 4
