@@ -249,8 +249,8 @@ def main(args):
             out_prev, x, feature = segmentation_head.gen_feature(x16_out, x32_out, x64_out) # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
             # ----------------------------------------------------------------------------------------------------------- #
             # [3] region separation
-            edge_feature = torch.nn.functional.conv2d(feature, g_filter_torch, padding=1)   # [batch,1,64,64]
-            region_feature = torch.nn.functional.conv2d(feature, h_filter_torch, padding=1) # [batch,1,64,64]
+            edge_feature = torch.nn.functional.conv2d(out_prev, g_filter_torch, padding=1)   # [batch,1,64,64]
+            region_feature = torch.nn.functional.conv2d(out_prev, h_filter_torch, padding=1) # [batch,1,64,64]
             x16_out, x32_out, x64_out = x[:, :320], x[:, 320:640], x[:, 640:]  # [batch,320,64,64], [batch,320,64,64], [batch,320,64,64]
             # ----------------------------------------------------------------------------------------------------------- #
             # [4] boundary sensitive refinement
