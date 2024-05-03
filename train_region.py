@@ -84,13 +84,20 @@ def main(args):
         if args.segmentation_model_weights is not None:
             segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
 
-
-    boundary_sensitive = BoundarySensitive(args.n_classes)
+    boundary_sensitive = None
+    if args.use_boundary_sensitive:
+        boundary_sensitive = BoundarySensitive(args.n_classes)
+        if args.boundary_sensitive_weights is not None:
+            boundary_sensitive.load_state_dict(torch.load(args.boundary_sensitive_weights))
+            boundary_sensitive.to(dtype=weight_dtype, device=accelerator.device)
 
     vision_head = None
     if args.image_processor == 'pvt':
         vision_head = vision_condition_head(reverse=args.reverse,
                                             use_one=args.use_one)
+        if args.vision_head_weights is not None:
+            vision_head.load_state_dict(torch.load(args.vision_head_weights))
+
     position_embedder = None
     if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding()
@@ -523,6 +530,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_one", action='store_true')
     parser.add_argument("--channel_spatial_cascaded", action='store_true')
     parser.add_argument("--base_path", type=str)
+    parser.add_argument("--use_boundary_sensitive", action='store_true')
+    parser.add_argument("--boundary_sensitive_weights", type=str, default=None)
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
