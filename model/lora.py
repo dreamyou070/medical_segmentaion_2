@@ -69,6 +69,7 @@ class LoRAModule(torch.nn.Module):
             padding = org_module.padding
             print(f'conv model, in_dim = {in_dim}')
             print(f'stride = {stride}')
+            print(f'conv model, self.lora_dim = {self.lora_dim}')
             self.lora_down = torch.nn.Conv2d(in_dim,
                                              self.lora_dim,
                                              kernel_size, stride, padding, bias=False)
