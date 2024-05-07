@@ -1039,69 +1039,68 @@ class LoRANetwork(torch.nn.Module):
                 if module.__class__.__name__ in target_replace_modules:
 
                     for child_name, child_module in module.named_modules() :
-                        if child_module.__class__.__name__ not in target_replace_modules :
 
+                        is_linear = child_module.__class__.__name__ == "Linear"
+                        is_linear_lora = child_module.__class__.__name__ == 'LoRACompatibleLinear'
+                        is_conv2d = child_module.__class__.__name__ == "Conv2d"
+                        is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
-                            is_linear = child_module.__class__.__name__ == "Linear" or 'LoRACompatibleLinear'
-                            is_conv2d = child_module.__class__.__name__ == "Conv2d"
-                            is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
+                        if is_linear or is_conv2d or is_linear_lora :
 
-                            if is_linear or is_conv2d:
+                            print(f'child_module = {child_module.__class__.__name__}')
 
-                                print(f'child_module = {child_module.__class__.__name__}')
-                                
-                                lora_name = prefix + "." + name + "." + child_name
-                                lora_name = lora_name.replace(".", "_")
-                                dim = None
-                                alpha = None
-                                if modules_dim is not None:
-                                    if lora_name in modules_dim:
-                                        dim = modules_dim[lora_name]
-                                        alpha = modules_alpha[lora_name]
-                                elif is_unet and block_dims is not None:
-                                    # U-Netでblock_dims指定あり
-                                    block_idx = get_block_index(lora_name) # block
-                                    if is_linear or is_conv2d_1x1:
-                                        dim = block_dims[block_idx]
-                                        alpha = block_alphas[block_idx]
-                                    elif conv_block_dims is not None:
-                                        dim = conv_block_dims[block_idx]
-                                        alpha = conv_block_alphas[block_idx]
-                                else:
-                                    if is_linear or is_conv2d_1x1:
-                                        dim = self.lora_dim
-                                        alpha = self.alpha
-                                    elif self.conv_lora_dim is not None:
-                                        dim = self.conv_lora_dim
-                                        alpha = self.conv_alpha
-                                if dim is None or dim == 0:
-                                    if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
-                                        skipped.append(lora_name)
-                                    continue
+                            lora_name = prefix + "." + name + "." + child_name
+                            lora_name = lora_name.replace(".", "_")
+                            dim = None
+                            alpha = None
+                            if modules_dim is not None:
+                                if lora_name in modules_dim:
+                                    dim = modules_dim[lora_name]
+                                    alpha = modules_alpha[lora_name]
+                            elif is_unet and block_dims is not None:
+                                # U-Netでblock_dims指定あり
+                                block_idx = get_block_index(lora_name) # block
+                                if is_linear or is_conv2d_1x1:
+                                    dim = block_dims[block_idx]
+                                    alpha = block_alphas[block_idx]
+                                elif conv_block_dims is not None:
+                                    dim = conv_block_dims[block_idx]
+                                    alpha = conv_block_alphas[block_idx]
+                            else:
+                                if is_linear or is_conv2d_1x1:
+                                    dim = self.lora_dim
+                                    alpha = self.alpha
+                                elif self.conv_lora_dim is not None:
+                                    dim = self.conv_lora_dim
+                                    alpha = self.conv_alpha
+                            if dim is None or dim == 0:
+                                if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
+                                    skipped.append(lora_name)
+                                continue
 
-                                if block_wise == None :
-                                    lora = module_class(lora_name,
-                                                        child_module,
-                                                        self.multiplier,
-                                                        dim,
-                                                        alpha,
-                                                        dropout=dropout,
-                                                        rank_dropout=rank_dropout,
-                                                        module_dropout=module_dropout,)
-                                    loras.append(lora)
+                            if block_wise == None :
+                                lora = module_class(lora_name,
+                                                    child_module,
+                                                    self.multiplier,
+                                                    dim,
+                                                    alpha,
+                                                    dropout=dropout,
+                                                    rank_dropout=rank_dropout,
+                                                    module_dropout=module_dropout,)
+                                loras.append(lora)
 
-                                else :
-                                    for i, block in enumerate(BLOCKS) :
-                                        if block in lora_name and block_wise[i] == 1:
-                                            lora = module_class(lora_name,
-                                                                child_module,
-                                                                self.multiplier,
-                                                                dim,
-                                                                alpha,
-                                                                dropout=dropout,
-                                                                rank_dropout=rank_dropout,
-                                                                module_dropout=module_dropout,)
-                                            loras.append(lora)
+                            else :
+                                for i, block in enumerate(BLOCKS) :
+                                    if block in lora_name and block_wise[i] == 1:
+                                        lora = module_class(lora_name,
+                                                            child_module,
+                                                            self.multiplier,
+                                                            dim,
+                                                            alpha,
+                                                            dropout=dropout,
+                                                            rank_dropout=rank_dropout,
+                                                            module_dropout=module_dropout,)
+                                        loras.append(lora)
             return loras, skipped
 
         # ------------------------------------------------------------------------------------------------------------------------
