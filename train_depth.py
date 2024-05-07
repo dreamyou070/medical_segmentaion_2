@@ -56,14 +56,83 @@ def main(args):
     weight_dtype, save_dtype = prepare_dtype(args)
     from diffusers import StableDiffusionDepth2ImgPipeline
 
-    pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-2-depth",
-        torch_dtype=torch.float16,).to("cuda")
-    unet = pipe.unet
+    pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
+                                                            torch_dtype=torch.float16,).to("cuda")
+    #unet = pipe.unet
     depth_model = pipe.depth_estimator
 
-    """
-    condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
+    name_or_path = args.pretrained_model_name_or_path
+    name_or_path = os.path.realpath(name_or_path) if os.path.islink(name_or_path) else name_or_path
+    load_stable_diffusion_format = os.path.isfile(name_or_path)  # determine SD or Diffusers
+    print(f"load StableDiffusion checkpoint: {name_or_path}")
+
+    checkpoint = torch.load(name_or_path, map_location='cpu')
+    if "state_dict" in checkpoint:
+        state_dict = checkpoint["state_dict"]
+
+    # [1] unet
+    from model.diffusion_model_config import (create_unet_diffusers_config, create_vae_diffusers_config)
+    from model.diffusion_model_conversion import (load_checkpoint_with_text_encoder_conversion,
+                                                  convert_ldm_unet_checkpoint, convert_ldm_vae_checkpoint,
+                                                  convert_ldm_clip_checkpoint)
+    from model.unet import UNet2DConditionModel
+
+    unet_config = create_unet_diffusers_config(False)
+    converted_unet_checkpoint = convert_ldm_unet_checkpoint(state_dict, unet_config)
+    unet = UNet2DConditionModel(**unet_config)
+    info = unet.load_state_dict(converted_unet_checkpoint)
+
+    # [2] vae
+    from diffusers import StableDiffusionPipeline, AutoencoderKL
+    vae_config = create_vae_diffusers_config()
+    converted_vae_checkpoint = convert_ldm_vae_checkpoint(state_dict, vae_config)
+    vae = AutoencoderKL(**vae_config)
+    info = vae.load_state_dict(converted_vae_checkpoint)
+    print("loading vae:", info)
+
+    # [3] depth model
+    depth_model = pipe.depth_estimator
+    depth_feature_extractor = pipe.feature_extractor
+
+    # [4] image condition model
+    from polyppvt.lib.pvt import PolypPVT
+    net_kwargs = {}
+    if args.network_args is not None:
+        for net_arg in args.network_args:
+            key, value = net_arg.split("=")
+            net_kwargs[key] = value
+    model = PolypPVT()
+    pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
+    model.load_state_dict(torch.load(pretrained_pth_path))
+    image_model = model.backbone  # pvtv2_b2 model
+    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
+    image_model.requires_grad_(False)
+
+    # [1.4]
+    condition_model = image_model  # image model is a condition
+    condition_modality = 'image'
+
+    """ see well how the model is trained """
+    from model.lora import create_network
+    network = create_network(1.0,
+                             args.network_dim,
+                             args.network_alpha,
+                             vae,
+                             condition_model=condition_model,
+                             unet=unet,
+                             neuron_dropout=args.network_dropout,
+                             condition_modality=condition_modality,
+                             **net_kwargs, )
+    network.apply_to(condition_model,
+                     unet,
+                     True,
+                     True,
+                     condition_modality=condition_modality)
+
+    if args.network_weights is not None:
+        print(f' * loading network weights')
+        info = network.load_weights(args.network_weights)
+    network.to(dtype=weight_dtype, device=accelerator.device)
 
     segmentation_head = None
     if args.use_segmentation_model:
@@ -99,7 +168,9 @@ def main(args):
                                             n_classes=args.n_classes, )
         if args.positioning_module_weights is not None:
             positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
+    """
 
+    
     print(f'\n step 4. dataset and dataloader')
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 32)

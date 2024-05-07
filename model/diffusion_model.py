@@ -49,7 +49,7 @@ def _load_target_model(args: argparse.Namespace, weight_dtype,
     load_stable_diffusion_format = os.path.isfile(name_or_path)  # determine SD or Diffusers
     print(f"load StableDiffusion checkpoint: {name_or_path}")
     text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(name_or_path, device,
-                                                     unet_use_linear_projection_in_v2=unet_use_linear_projection_in_v2)
+                                                                           unet_use_linear_projection_in_v2=unet_use_linear_projection_in_v2)
     return text_encoder, vae, unet, load_stable_diffusion_format
 
 def transform_if_model_is_DDP(text_encoder, unet, network=None):
