@@ -78,12 +78,14 @@ def main(args):
     from model.unet import UNet2DConditionModel
     from safetensors.torch import load_file, save_file
     unet_config = create_unet_diffusers_config(False)
-    unet_state_dict_dir = os.path.join(args.pretrained_model_name_or_path, 'unet/diffusion_pytorch_model.safetensors')
+
+    unet_state_dict_dir = os.path.join(r'/share0/dreamyou070/dreamyou070/pretrained_stable_diffusion/stable-diffusion-depth/unet',
+                                       'diffusion_pytorch_model.safetensors')
     unet_state_dict = load_file(unet_state_dict_dir)
     converted_unet_checkpoint = convert_ldm_unet_checkpoint(unet_state_dict, unet_config)
     unet = UNet2DConditionModel(**unet_config)
     info = unet.load_state_dict(converted_unet_checkpoint)
-    
+
     """
     # [2] vae
     from diffusers import StableDiffusionPipeline, AutoencoderKL
