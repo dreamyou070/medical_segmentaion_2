@@ -1040,7 +1040,7 @@ class LoRANetwork(torch.nn.Module):
                     for child_name, child_module in module.named_modules():
                         print(f'child_module = {child_module.__class__.__name__}')
 
-                        is_linear = child_module.__class__.__name__ == "Linear"
+                        is_linear = child_module.__class__.__name__ == "Linear" or 'LoRACompatibleLinear'
                         is_conv2d = child_module.__class__.__name__ == "Conv2d"
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
