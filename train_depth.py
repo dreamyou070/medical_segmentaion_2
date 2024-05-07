@@ -79,7 +79,7 @@ def main(args):
     from safetensors.torch import load_file, save_file
     unet_config = create_unet_diffusers_config(False)
 
-    unet_state_dict_dir = os.path.join(r'/share0/dreamyou070/dreamyou070/pretrained_stable_diffusion/stable-diffusion-depth/unet',
+    unet_state_dict_dir = os.path.join(r'/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet',
                                        'diffusion_pytorch_model.safetensors')
     unet_state_dict = load_file(unet_state_dict_dir)
     converted_unet_checkpoint = convert_ldm_unet_checkpoint(unet_state_dict, unet_config)
