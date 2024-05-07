@@ -112,10 +112,12 @@ def convert_ldm_unet_checkpoint(checkpoint, config):
             unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
 
     new_checkpoint = {}
+
     new_checkpoint["time_embedding.linear_1.weight"] = unet_state_dict["time_embed.0.weight"]
     new_checkpoint["time_embedding.linear_1.bias"] = unet_state_dict["time_embed.0.bias"]
     new_checkpoint["time_embedding.linear_2.weight"] = unet_state_dict["time_embed.2.weight"]
     new_checkpoint["time_embedding.linear_2.bias"] = unet_state_dict["time_embed.2.bias"]
+
     new_checkpoint["conv_in.weight"] = unet_state_dict["input_blocks.0.0.weight"]
     new_checkpoint["conv_in.bias"] = unet_state_dict["input_blocks.0.0.bias"]
     new_checkpoint["conv_norm_out.weight"] = unet_state_dict["out.0.weight"]

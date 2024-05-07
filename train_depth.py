@@ -71,29 +71,23 @@ def main(args):
     #    state_dict = checkpoint["state_dict"]
 
     # [1] unet
-    from model.diffusion_model_config import (create_unet_diffusers_config, create_vae_diffusers_config)
-    from model.diffusion_model_conversion import (load_checkpoint_with_text_encoder_conversion,
-                                                  convert_ldm_unet_checkpoint, convert_ldm_vae_checkpoint,
-                                                  convert_ldm_clip_checkpoint)
-    from model.unet import UNet2DConditionModel
-    from safetensors.torch import load_file, save_file
-    unet_config = create_unet_diffusers_config(False)
+    #from model.diffusion_model_config import (create_unet_diffusers_config, create_vae_diffusers_config)
+    #from model.diffusion_model_conversion import (load_checkpoint_with_text_encoder_conversion,
+    #                                              convert_ldm_unet_checkpoint, convert_ldm_vae_checkpoint,
+    #                                              convert_ldm_clip_checkpoint)
+    #from model.unet import UNet2DConditionModel
+    #from safetensors.torch import load_file, save_file
+    #unet_config = create_unet_diffusers_config(False)
+    unet = pipe.unet
 
-    unet_state_dict_dir = os.path.join(r'/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet',
-                                       'diffusion_pytorch_model.safetensors')
-    unet_state_dict = load_file(unet_state_dict_dir)
-    converted_unet_checkpoint = convert_ldm_unet_checkpoint(unet_state_dict, unet_config)
-    unet = UNet2DConditionModel(**unet_config)
-    info = unet.load_state_dict(converted_unet_checkpoint)
-
-    """
     # [2] vae
-    from diffusers import StableDiffusionPipeline, AutoencoderKL
-    vae_config = create_vae_diffusers_config()
-    converted_vae_checkpoint = convert_ldm_vae_checkpoint(state_dict, vae_config)
-    vae = AutoencoderKL(**vae_config)
-    info = vae.load_state_dict(converted_vae_checkpoint)
-    print("loading vae:", info)
+    #from diffusers import StableDiffusionPipeline, AutoencoderKL
+    #vae_config = create_vae_diffusers_config()
+    #converted_vae_checkpoint = convert_ldm_vae_checkpoint(state_dict, vae_config)
+    #vae = AutoencoderKL(**vae_config)
+    vae = pipe.vae
+    #info = vae.load_state_dict(converted_vae_checkpoint)
+    #print("loading vae:", info)
 
     # [3] depth model
     depth_model = pipe.depth_estimator
@@ -117,7 +111,7 @@ def main(args):
     condition_model = image_model  # image model is a condition
     condition_modality = 'image'
 
-    # see well how the model is trained 
+    # see well how the model is trained
     from model.lora import create_network
     network = create_network(1.0,
                              args.network_dim,
@@ -139,6 +133,12 @@ def main(args):
         info = network.load_weights(args.network_weights)
     network.to(dtype=weight_dtype, device=accelerator.device)
 
+    """
+    
+
+    
+
+    
     segmentation_head = None
     if args.use_segmentation_model:
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
