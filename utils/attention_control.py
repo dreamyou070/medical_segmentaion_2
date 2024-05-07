@@ -53,7 +53,11 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
             hidden_states = torch.bmm(attention_probs, value) # [8, pix_num, dim]
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states) # 1, pix_num, dim
 
-            if trg_layer_list is not None and layer_name in trg_layer_list:
+            if trg_layer_list is not None and layer_name in trg_layer_list and not is_cross_attention:
+                # self attention
+                controller.save_attention(attention_probs, layer_name)
+
+            if trg_layer_list is not None and layer_name in trg_layer_list and is_cross_attention :
                 # [2] after channel attn [Batch, pix_num, dim]
                 controller.save_query(hidden_states, layer_name)
             hidden_states = self.to_out[0](hidden_states)

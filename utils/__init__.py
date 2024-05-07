@@ -78,4 +78,6 @@ def torch_to_pil(torch_img, binary=False):
         pil = Image.fromarray(np_img).convert("RGB")
     return pil
 
-
+def make_dir(dir) :
+    os.makedirs(dir, exist_ok=True)
+    return dir

@@ -14,7 +14,7 @@ from data import call_dataset
 from model import call_model_package
 from model.segmentation_unet import SemanticModel
 from model.diffusion_model import transform_models_if_DDP
-from utils import prepare_dtype, arg_as_list, reshape_batch_dim_to_heads_3D_4D
+from utils import prepare_dtype, arg_as_list, make_dir
 from utils.attention_control import passing_argument, register_attention_control
 from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
@@ -46,15 +46,30 @@ def bce_iou_loss(pred, target):
     loss = bce_out + iou_out
     return loss
 
+def structure_loss(pred, mask # gt
+                   ):
+
+    from torch.nn import functional as F
+    # [0] weight
+    weit = 1 + 5*torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
+    # [1] bce loss
+    wbce = F.binary_cross_entropy_with_logits(pred, mask, reduce='none')
+    wbce = (weit*wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
+    # [2] pred and mask
+    pred = torch.sigmoid(pred)
+    inter = ((pred * mask)*weit).sum(dim=(2, 3))
+    union = ((pred + mask)*weit).sum(dim=(2, 3))
+    wiou = 1 - (inter + 1)/(union - inter+1)
+
+    return (wbce + wiou).mean()
 
 # image conditioned segmentation mask generating
 
 def main(args):
+
     print(f'\n step 1. setting')
-    output_dir = args.output_dir
-    os.makedirs(output_dir, exist_ok=True)
-    args.logging_dir = os.path.join(output_dir, 'log')
-    os.makedirs(args.logging_dir, exist_ok=True)
+    output_dir = make_dir(args.output_dir)
+    args.logging_dir = os.makedirs(os.path.join(output_dir, 'log'), exist_ok=True)
     record_save_dir = os.path.join(output_dir, 'record')
     os.makedirs(record_save_dir, exist_ok=True)
     with open(os.path.join(record_save_dir, 'config.json'), 'w') as f:
@@ -207,7 +222,6 @@ def main(args):
     global_step = 0
     loss_list = []
 
-
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
@@ -247,27 +261,67 @@ def main(args):
                 unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
                      noise_type=position_embedder).sample
             query_dict, key_dict = controller.query_dict, controller.key_dict
+            attention_dict = controller.attention_dict
             controller.reset()
             q_dict = {}
+            attn_dict = {}
+            for layer in args.trg_layer_list:
+                if 'attn1' in layer :
+                    self_attn_map = attention_dict[layer][0] # batch, pix_num, pix_num
+                    res = int(self_attn_map.shape[1] ** 0.5)
+                    sigmoid_layer = torch.nn.Sigmoid()
+                    self_attn_map = sigmoid_layer(self_attn_map)
+                    attn_dict[res] = self_attn_map
 
             for layer in args.trg_layer_list:
+
+                # get positino from unet self attention
+                # get feature from unet cross attention
                 query = query_dict[layer][0]
                 res = int(query.shape[1] ** 0.5)
+                weight = attn_dict[res]  # batch, pix_num, pix_num
+                query = weight * query  # [batch, pix_num, pix_num] [batch, pix_num, dim]
+                # batch, res*res, dim
+                # self attention query
+                # batch, res*res, re*res
                 q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
             x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
             out_prev, x = segmentation_head.gen_feature(x16_out, x32_out, x64_out)  # [batch,2,64,64], [batch,960,64,64], [batch,160,256,256]
+
             # ----------------------------------------------------------------------------------------------------------- #
             # ----------------------------------------------------------------------------------------------------------- #
             edge_feature = torch.nn.functional.conv2d(out_prev, g_filter_torch, padding=1)   # [batch,1,64,64]
             region_feature = torch.nn.functional.conv2d(out_prev, h_filter_torch, padding=1) # [batch,1,64,64]
+            # background_features = 1 - region_feature - edge_feature
+
             x16_out, x32_out, x64_out = x[:, :320], x[:, 320:640], x[:, 640:]  # [batch,320,64,64], [batch,320,64,64], [batch,320,64,64]
+
+            # ----------------------------------------------------------------------------------------------------------- #
+            # intermedicate feature loss
+            if args.use_dice_ce_loss:
+                intermediate_loss = loss_dicece(input=out_prev, target=gt)  # [class, 256,256]
+            else :
+                intermediate_loss = structure_loss(pred=out_prev, mask=gt)  # [class, 256,256]
+
+
+
+
+
+
+
+
+
             batch, dim = x16_out.shape[0], x16_out.shape[1]
+
             x16_out_edge = (edge_feature * x16_out).view(batch, dim, -1).permute(0,2,1).contiguous()      # [batch,len, 320,64,64]
             x16_out_region = (region_feature * x16_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+
             x32_out_edge = (edge_feature * x32_out).view(batch, dim, -1).permute(0,2,1).contiguous()
             x32_out_region = (region_feature * x32_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+
             x64_out_edge = (edge_feature * x64_out).view(batch, dim, -1).permute(0,2,1).contiguous()
             x64_out_region = (region_feature * x64_out).view(batch, dim, -1).permute(0,2,1).contiguous()
+
             masks_pred = boundary_sensitive([x16_out_edge, x32_out_edge, x64_out_edge],
                                             [x16_out_region, x32_out_region, x64_out_region],
                                             [x16_out, x32_out, x64_out]) # 1,2,64,64
@@ -282,15 +336,17 @@ def main(args):
                 loss = loss_dicece(input=masks_pred,  # [class, 256,256]
                                    target=gt)  # [class, 256,256]
             else:
-                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
-                loss_dict['cross_entropy_loss'] = loss.item()
+                loss = structure_loss(pred=masks_pred_, mask=gt_flat)
+                #loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
+                #loss_dict['cross_entropy_loss'] = loss.item()
                 # [5.2] Focal Loss
-                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
-                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
-                loss += focal_loss
-                loss_dict['focal_loss'] = focal_loss.item()
-                loss = loss.mean()
-
+               # focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                #if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
+                #loss += focal_loss
+                #loss_dict['focal_loss'] = focal_loss.item()
+                #loss = loss.mean()
+            if args.use_intermediate_loss :
+                loss = loss + intermediate_loss
             total_loss += loss.mean()
             current_loss = total_loss.detach().item()
 
@@ -533,6 +589,7 @@ if __name__ == "__main__":
     parser.add_argument("--base_path", type=str)
     parser.add_argument("--use_boundary_sensitive", action='store_true')
     parser.add_argument("--boundary_sensitive_weights", type=str, default=None)
+    parser.add_argument("--use_intermediate_loss", action='store_true')
     args = parser.parse_args()
     passing_argument(args)
     from data.dataset import passing_mvtec_argument
