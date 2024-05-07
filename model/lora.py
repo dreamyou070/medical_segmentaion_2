@@ -957,7 +957,7 @@ class LoRANetwork(torch.nn.Module):
     #
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
 
-    UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"] #################
+    UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"] #################
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
     UNET_TEXT_PART = 'attentions_0'
 
