@@ -16,7 +16,7 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number train_depth.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}" \
  --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
- --pretrained_model_name_or_path stabilityai/stable-diffusion-2-depth \
+ --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-depth \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train/res_256" \
  --base_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/Pranet" \
  --network_dim 64 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
