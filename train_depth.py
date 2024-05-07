@@ -54,6 +54,15 @@ def main(args):
 
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
+    from diffusers import StableDiffusionDepth2ImgPipeline
+
+    pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-2-depth",
+        torch_dtype=torch.float16,).to("cuda")
+    unet = pipe.unet
+    depth_model = pipe.depth_estimator
+
+    """
     condition_model, vae, unet, network, condition_modality = call_model_package(args, weight_dtype, accelerator)
 
     segmentation_head = None
@@ -138,6 +147,15 @@ def main(args):
                                                                                                       optimizer,
                                                                                                       train_dataloader,
                                                                                                       lr_scheduler)
+
+    from transformers import DPTForDepthEstimation
+    depth_estimator = DPTForDepthEstimation.from_pretrained(args.pretrained_model_name_or_path,
+                                                            sub_folder = '')
+
+    #unet = UNet2DConditionModel(**unet_config).to(device)
+    #info = unet.load_state_dict(converted_unet_checkpoint)
+
+
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
 
@@ -174,7 +192,7 @@ def main(args):
                         disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
     loss_list = []
-    """
+    
     for epoch in range(args.start_epoch, args.max_train_epochs):
 
         accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
