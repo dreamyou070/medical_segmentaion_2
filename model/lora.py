@@ -1073,9 +1073,11 @@ class LoRANetwork(torch.nn.Module):
                                 elif self.conv_lora_dim is not None:
                                     dim = self.conv_lora_dim
                                     alpha = self.conv_alpha
+
                             if dim is None or dim == 0:
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
+
                                 continue
 
                             if block_wise == None :
@@ -1116,6 +1118,7 @@ class LoRANetwork(torch.nn.Module):
                                                      target_replace_modules=target_modules,
                                                      prefix=LoRANetwork.LORA_PREFIX_UNET)
         print(f"create LoRA for Unet : {len(self.unet_loras)} modules.")  # Here (61 modules)
+        print(f"skipped LoRA for Unet : {len(skipped_un)} modules.")  # Here (61 modules)
         # ------------------------------------------------------------------------------------------------------------------------
         # [1] text encoder
         if condition_modality == 'text':
