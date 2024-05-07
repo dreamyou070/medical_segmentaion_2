@@ -1108,6 +1108,7 @@ class LoRANetwork(torch.nn.Module):
                                                      unet,
                                                      target_replace_modules=target_modules,
                                                      prefix=LoRANetwork.LORA_PREFIX_UNET)
+        print(f"create LoRA for Unet : {len(self.unet_loras)} modules.")  # Here (61 modules)
         # ------------------------------------------------------------------------------------------------------------------------
         # [1] text encoder
         if condition_modality == 'text':
