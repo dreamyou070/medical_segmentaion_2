@@ -58,17 +58,17 @@ def main(args):
 
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
                                                             torch_dtype=torch.float16,).to("cuda")
-    #unet = pipe.unet
+
     depth_model = pipe.depth_estimator
 
-    name_or_path = args.pretrained_model_name_or_path
-    name_or_path = os.path.realpath(name_or_path) if os.path.islink(name_or_path) else name_or_path
-    load_stable_diffusion_format = os.path.isfile(name_or_path)  # determine SD or Diffusers
-    print(f"load StableDiffusion checkpoint: {name_or_path}")
+    #name_or_path = args.pretrained_model_name_or_path
+    #name_or_path = os.path.realpath(name_or_path) if os.path.islink(name_or_path) else name_or_path
+    #load_stable_diffusion_format = os.path.isfile(name_or_path)  # determine SD or Diffusers
+    #print(f"load StableDiffusion checkpoint: {name_or_path}")
 
-    checkpoint = torch.load(name_or_path, map_location='cpu')
-    if "state_dict" in checkpoint:
-        state_dict = checkpoint["state_dict"]
+    #checkpoint = torch.load(name_or_path, map_location='cpu')
+    #if "state_dict" in checkpoint:
+    #    state_dict = checkpoint["state_dict"]
 
     # [1] unet
     from model.diffusion_model_config import (create_unet_diffusers_config, create_vae_diffusers_config)
@@ -76,12 +76,15 @@ def main(args):
                                                   convert_ldm_unet_checkpoint, convert_ldm_vae_checkpoint,
                                                   convert_ldm_clip_checkpoint)
     from model.unet import UNet2DConditionModel
-
+    from safetensors.torch import load_file, save_file
     unet_config = create_unet_diffusers_config(False)
-    converted_unet_checkpoint = convert_ldm_unet_checkpoint(state_dict, unet_config)
+    unet_state_dict_dir = os.path.join(args.pretrained_model_name_or_path, 'unet/diffusion_pytorch_model.safetensors')
+    unet_state_dict = load_file(unet_state_dict_dir)
+    converted_unet_checkpoint = convert_ldm_unet_checkpoint(unet_state_dict, unet_config)
     unet = UNet2DConditionModel(**unet_config)
     info = unet.load_state_dict(converted_unet_checkpoint)
-
+    
+    """
     # [2] vae
     from diffusers import StableDiffusionPipeline, AutoencoderKL
     vae_config = create_vae_diffusers_config()
@@ -112,7 +115,7 @@ def main(args):
     condition_model = image_model  # image model is a condition
     condition_modality = 'image'
 
-    """ see well how the model is trained """
+    # see well how the model is trained 
     from model.lora import create_network
     network = create_network(1.0,
                              args.network_dim,
@@ -168,6 +171,7 @@ def main(args):
                                             n_classes=args.n_classes, )
         if args.positioning_module_weights is not None:
             positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
+    """
     """
 
     
