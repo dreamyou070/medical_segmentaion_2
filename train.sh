@@ -1,14 +1,14 @@
 # !/bin/bash
 # 기존 논문들에서는 loss 를 2가지 이상을 사용하고 있구나 ?
 #
-port_number=58800
+port_number=58801
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="Pranet_Sub0"
+benchmark="Pranet_Sub1"
 layer_name='layer_3'
 sub_folder="up_16_32_64_20240501"
-file_name="5_base_class_0" #
+file_name="5_base_class_1" #
 #--network_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/model/lora-000008.safetensors" \
  #--segmentation_model_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/segmentation/segmentation-000008.pt" \
  #--vision_head_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/vision_head/vision-000008.pt" \
