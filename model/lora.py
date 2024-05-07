@@ -1104,6 +1104,8 @@ class LoRANetwork(torch.nn.Module):
         target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE
         if modules_dim is not None or self.conv_lora_dim is not None or conv_block_dims is not None:
             target_modules += LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
+
+        print(f'unet target replacement module = {target_modules}')
         self.unet_loras, skipped_un = create_modules(True,
                                                      None,
                                                      unet,
