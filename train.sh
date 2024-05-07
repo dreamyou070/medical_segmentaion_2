@@ -15,7 +15,7 @@ file_name="5_base_class_0" #
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number train.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}" \
- --train_unet --train_text_encoder --start_epoch 8 --max_train_epochs 200 \
+ --train_unet --train_text_encoder --start_epoch 0 --max_train_epochs 200 \
  --pretrained_model_name_or_path ../../pretrained_stable_diffusion/stable-diffusion-v1-5/v1-5-pruned.safetensors \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train/res_256" \
  --base_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/Pranet" \
