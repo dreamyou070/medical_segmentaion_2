@@ -69,7 +69,7 @@ class LoRAModule(torch.nn.Module):
             padding = org_module.padding
             print(f'conv model, in_dim = {in_dim}')
             print(f'stride = {stride}')
-            print(f'conv model, self.lora_dim = {self.lora_dim}')
+            print(f'conv model, self.lora_dim = {self.lora_dim}') # 64 isn't it ?
             self.lora_down = torch.nn.Conv2d(in_dim,
                                              self.lora_dim,
                                              kernel_size, stride, padding, bias=False)
@@ -995,7 +995,7 @@ class LoRANetwork(torch.nn.Module):
         block_alphas: Optional[List[float]] = None,
         conv_block_dims: Optional[List[int]] = None,
         conv_block_alphas: Optional[List[float]] = None,
-        modules_dim: Optional[Dict[str, int]] = None,
+        modules_dim: Optional[Dict[str, int]] = None, # None
         modules_alpha: Optional[Dict[str, int]] = None,
         # LoRAInfModule
         module_class: Type[object] = LoRAModule,
@@ -1058,10 +1058,12 @@ class LoRANetwork(torch.nn.Module):
                             lora_name = lora_name.replace(".", "_")
                             dim = None
                             alpha = None
+
                             if modules_dim is not None:
                                 if lora_name in modules_dim:
                                     dim = modules_dim[lora_name]
                                     alpha = modules_alpha[lora_name]
+
                             elif is_unet and block_dims is not None:
                                 # U-Netでblock_dims指定あり
                                 block_idx = get_block_index(lora_name) # block
@@ -1072,11 +1074,14 @@ class LoRANetwork(torch.nn.Module):
                                     dim = conv_block_dims[block_idx]
                                     alpha = conv_block_alphas[block_idx]
                             else:
+
+                                # what is conv_lora_dim ?
                                 if is_linear or is_conv2d_1x1:
                                     dim = self.lora_dim
                                     alpha = self.alpha
                                 elif self.conv_lora_dim is not None:
-                                    dim = self.conv_lora_dim
+                                    #dim = self.conv_lora_dim
+                                    dim = self.lora_dim
                                     alpha = self.conv_alpha
 
                             #if dim is None or dim == 0:
