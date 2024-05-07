@@ -107,6 +107,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config):
     unet_key = "model.diffusion_model."
     keys = list(checkpoint.keys())
     for key in keys:
+        print(f'original key name = {key}')
         if key.startswith(unet_key):
             unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
 
