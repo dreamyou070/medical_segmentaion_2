@@ -1076,15 +1076,17 @@ class LoRANetwork(torch.nn.Module):
                             else:
 
                                 # what is conv_lora_dim ?
-                                if is_linear or is_conv2d_1x1:
-                                    dim = self.lora_dim
-                                    alpha = self.alpha
-                                elif self.conv_lora_dim is not None:
+                                #if is_linear or is_conv2d_1x1:
+                                #    dim = self.lora_dim
+                                #   alpha = self.alpha
+                                #elif self.conv_lora_dim is not None:
                                     #dim = self.conv_lora_dim
-                                    dim = self.lora_dim
-                                    alpha = self.conv_alpha
+                                    #dim = self.lora_dim
+                                    #alpha = self.conv_alpha
+                                dim = self.lora_dim
+                                alpha = self.alpha
 
-                            print(f'dim = {dim}')
+                                print(f'dim = {dim}')
 
                             #if dim is None or dim == 0:
                             #    if is_linear or is_linear_lora or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
