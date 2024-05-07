@@ -957,8 +957,8 @@ class LoRANetwork(torch.nn.Module):
     #
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
 
-    UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"] #################
-    #UNET_TARGET_REPLACE_MODULE = [ "Attention"]  #################
+    #UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"] #################
+    UNET_TARGET_REPLACE_MODULE = [ "Attention"]  #################
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
     UNET_TEXT_PART = 'attentions_0'
 
@@ -1042,13 +1042,14 @@ class LoRANetwork(torch.nn.Module):
                         if child_module.__class__.__name__ not in target_replace_modules :
 
 
-                            print(f'child_module = {child_module.__class__.__name__}')
-
                             is_linear = child_module.__class__.__name__ == "Linear" or 'LoRACompatibleLinear'
                             is_conv2d = child_module.__class__.__name__ == "Conv2d"
                             is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
                             if is_linear or is_conv2d:
+
+                                print(f'child_module = {child_module.__class__.__name__}')
+                                
                                 lora_name = prefix + "." + name + "." + child_name
                                 lora_name = lora_name.replace(".", "_")
                                 dim = None
