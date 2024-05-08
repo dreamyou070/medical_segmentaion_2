@@ -345,7 +345,7 @@ def main(args):
                  trg_layer_list=args.trg_layer_list,
                  noise_type=position_embedder).sample
 
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
