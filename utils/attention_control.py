@@ -33,9 +33,10 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
                 p = query.shape[1]
                 res = int(p ** 0.5)
                 context = context[res]
+                print(f'attention control module, layer_name = {layer_name}')
+                print(f'context (final dim should be 1024) = {context.shape}')
             #
-            print(f'attention control module, layer_name = {layer_name}')
-            print(f'context = {context.shape}')
+
             print(f'self.to_k = {self.to_k}')
 
             key_ = self.to_k(context)
