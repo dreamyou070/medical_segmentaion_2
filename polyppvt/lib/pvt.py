@@ -225,7 +225,7 @@ class PolypPVT(nn.Module):
         sam_feature = self.SAM(cfm_feature, T2)
         prediction2 = self.out_SAM(sam_feature)
         prediction2_8 = F.interpolate(prediction2, scale_factor=8, mode='bilinear')
-
+        # two output
         return prediction1_8, prediction2_8
 """
 if __name__ == '__main__':
