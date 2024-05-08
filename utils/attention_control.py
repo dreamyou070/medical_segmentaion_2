@@ -28,6 +28,7 @@ def register_attention_control(unet: nn.Module,controller: AttentionStore):
 
             query = self.to_q(hidden_states)
             context = context if context is not None else hidden_states
+            print(f'type of context = {type(context)}')
             if type(context) == dict :
                 # pvt condition
                 p = query.shape[1]
