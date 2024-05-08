@@ -25,6 +25,6 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
                     'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 2 --mask_res 64 --batch_size 1 \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
- --use_image_condition --image_m_d_l_training \
- --image_processor 'pvt' --rever_e_\
- --use_simple_segmodel --use_seg_e_tation_model
+ --use_image_condition --image_model_training \
+ --image_processor 'pvt' --reverse \
+ --use_simple_segmodel --use_segmentation_model
