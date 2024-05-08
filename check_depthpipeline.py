@@ -29,13 +29,14 @@ from model.pe import AllPositionalEmbedding
 from model.lora_depth import create_network
 from diffusers import StableDiffusionDepth2ImgPipeline
 from data.dataset_depth import call_dataset_depth, passing_mvtec_argument
+from diffusers import StableDiffusionDepth2ImgPipeline
+from model.unet_depth import UNet2DConditionModel
 
 def bce_iou_loss(pred, target):
     bce_out = bce_loss(pred, target)
     iou_out = iou_loss(pred, target)
     loss = bce_out + iou_out
     return loss
-
 
 # image conditioned segmentation mask generating
 
@@ -57,20 +58,11 @@ def main(args):
 
     print(f'\n step 3. model')
     weight_dtype, save_dtype = prepare_dtype(args)
-    from diffusers import StableDiffusionDepth2ImgPipeline
-
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
-                                                            torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
-    from model.unet_depth import UNet2DConditionModel
-    #unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-2-depth",
-    #                                            sub_folder = 'unet',
-    #                                            torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
+                                                            torch_dtype=torch.float16,).to(accelerator.device).to(dtype = weight_dtype)
     unet_config_dir = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/config.json'
     with open(unet_config_dir) as f_in:
         unet_config = json.load(f_in)
-
-    print(f'scratch model = {unet_config}')
-
     """    
     def create_unet_diffusers_config(use_linear_projection_in_v2=False):
         
