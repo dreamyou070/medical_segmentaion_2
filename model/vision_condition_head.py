@@ -60,7 +60,6 @@ class vision_condition_head(nn.Module):
             condition_dict[32] = y2
             condition_dict[16] = y1
             condition_dict[8] = y1
-        print(f' condition dict 64 shape = {condition_dict[64].shape}')
         return condition_dict
 
 """
