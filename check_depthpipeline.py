@@ -235,9 +235,16 @@ def main(args):
         print(f'depth_mask = {depth_mask.shape}')
 
         # here problem --------------------------------------------------------------------------------------------------------------------------------------------
-        depth_map = depth_estimator(depth_mask).predicted_depth
+        depth_map = depth_estimator(depth_mask).predicted_depth # make depth map
+        # --------------------------------------------------------------------------------------------------------------------------------------------
+        # how to interpolate size ?
+        scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)
+        # scale_factor = 8 = len = 4
+        # therefore, 512 / 8 = 64
+        print(f'scale_factor = {scale_factor}')
         depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
-                                                    size=(args.resize_shape // args.vae_scale_factor, args.resize_shape // args.vae_scale_factor),
+                                                    size=(args.resize_shape // scale_factor,
+                                                          args.resize_shape // scale_factor),
                                                     mode="bicubic",
                                                     align_corners=False, )
         depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
