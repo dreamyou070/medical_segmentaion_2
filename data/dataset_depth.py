@@ -432,7 +432,7 @@ class TestDataset(Dataset):
                 'depth_map' : depth_map}  # [197,1]
 
 
-def call_test_dataset(args, _data_name, depth_processor) :
+def call_test_dataset_depth(args, _data_name, depth_processor) :
 
     # [1] data_path here
 
