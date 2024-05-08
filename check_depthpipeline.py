@@ -68,6 +68,10 @@ def main(args):
     unet_config_dir = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/config.json'
     with open(unet_config_dir) as f_in:
         unet_config = json.load(f_in)
+
+    in_channels = unet_config.in_channels
+    print(f'scratch model in_channels = {in_channels}')
+
     """    
     def create_unet_diffusers_config(use_linear_projection_in_v2=False):
         
@@ -101,9 +105,11 @@ def main(args):
     unet_config =
     """
     unet = UNet2DConditionModel(**unet_config)
+    unet.in_channels = 5
+
     from safetensors.torch import load_file, save_file
     ckpt_path = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/diffusion_pytorch_model.safetensors'
-    unet_checkpoint = load_file(ckpt_path)
+    unet_checkpoint = load_file(ckpt_path) # channel = 5
     info = unet.load_state_dict(unet_checkpoint)
 
     """
