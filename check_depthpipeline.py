@@ -106,10 +106,19 @@ def main(args):
 
     for name, module in unet.named_modules() :
         # named_modules means all layer
-        print(f'named module = {name}')
-        print(f'module.__class__.__name__ = {module.__class__.__name__}')
-        
-        # if module.__class__.__name__ == "Transformer2DModel"
+
+        if module.__class__.__name__ == "Transformer2DModel" :
+
+            for child_name, child_module in module.named_modules():
+
+                is_linear = child_module.__class__.__name__ == "Linear"
+                is_conv2d = child_module.__class__.__name__ == "Conv2d"
+                is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
+
+                if is_linear or is_conv2d :
+                    print(f'module.__class__.__name__ = {module.__class__.__name__}')
+
+
 
 
 
