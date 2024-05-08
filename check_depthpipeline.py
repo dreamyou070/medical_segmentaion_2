@@ -110,7 +110,8 @@ def main(args):
     ckpt_path = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/diffusion_pytorch_model.safetensors'
 
     unet_checkpoint = load_file(ckpt_path) # channel = 5
-    original_in_weight_shape = unet_checkpoint['conv_in']
+    original_in_weight_shape = unet_checkpoint
+    print(f'original_in_weight_shape = {type(original_in_weight_shape)}')
     print(f'original_in_weight_shape = {original_in_weight_shape}')
     #info = unet.load_state_dict(unet_checkpoint)
 
