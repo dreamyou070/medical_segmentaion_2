@@ -69,6 +69,8 @@ def main(args):
 
     # [3] depth model
     depth_model = pipe.depth_estimator
+
+    # DPTImageProcessor
     depth_feature_extractor = pipe.feature_extractor
 
     # [4] image condition model
@@ -131,6 +133,9 @@ def main(args):
 
         # [1] Prepare depth mask
         depth_mask = batch['depth_map'] #  should be, [batch, 1, 512, 512]
+        print(f'depth_mask = {depth_mask.shape}')
+
+        # here problem --------------------------------------------------------------------------------------------------------------------------------------------
         depth_map = depth_estimator(depth_mask).predicted_depth
         depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
                                                     size=(args.resize_shape // args.vae_scale_factor, args.resize_shape // args.vae_scale_factor),
