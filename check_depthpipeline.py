@@ -101,7 +101,10 @@ def main(args):
     unet_config =
     """
     unet = UNet2DConditionModel(**unet_config)
-    #info = unet.load_state_dict(converted_unet_checkpoint)
+    from safetensors.torch import load_file, save_file
+    ckpt_path = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/diffusion_pytorch_model.safetensors'
+    unet_checkpoint = load_file(ckpt_path)
+    info = unet.load_state_dict(unet_checkpoint)
 
     """
 
