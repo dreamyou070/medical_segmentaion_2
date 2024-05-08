@@ -314,16 +314,15 @@ def main(args):
         depth_map = 2.0 * (depth_map - depth_min) / (depth_max - depth_min) - 1.0
 
         # [2] feature extractor
-        if not args.without_condition:
-            if args.use_image_condition:
-                with torch.set_grad_enabled(True):
-                    if args.image_processor == 'pvt':
-                        output = condition_model(batch["image_condition"])
-                        encoder_hidden_states = vision_head(output) # final dim = 1024
-                    elif args.image_processor == 'vit':
-                        output, pix_embedding = condition_model(**batch["image_condition"])
-                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-
+        if args.use_image_condition:
+            with torch.set_grad_enabled(True):
+                if args.image_processor == 'pvt':
+                    output = condition_model(batch["image_condition"])
+                    encoder_hidden_states = vision_head(output) # final dim = 1024
+                elif args.image_processor == 'vit':
+                    output, pix_embedding = condition_model(**batch["image_condition"])
+                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+        print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
         image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
         gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
         gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
@@ -341,7 +340,6 @@ def main(args):
 
             latent_model_input = torch.cat([latents, depth_map], dim=1) # [1,4,64,64] -> [1,8,64,64]
 
-            print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
 
             unet(latent_model_input,
                  0,
