@@ -188,7 +188,6 @@ def main(args):
     # [7] vision head
     vision_head = None
     if args.image_processor == 'pvt':
-        print(f'as making vision_head ...')
         vision_head = vision_condition_head(reverse=args.reverse,
                                             use_one=args.use_one,
                                             condition_dim=1024)

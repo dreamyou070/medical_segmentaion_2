@@ -51,10 +51,6 @@ class LoRAModule(torch.nn.Module):
         self.in_dim = in_dim
         self.out_dim = out_dim
 
-        if 'down_blocks_0_attentions_0_transformer_blocks_0_attn2' in lora_name :
-            print(f'down_blocks_0_attentions_0_transformer_blocks_0_attn2 in_dim = {in_dim}')
-            print(f'down_blocks_0_attentions_0_transformer_blocks_0_attn2 out_dim = {out_dim}')
-
         common_dim = gcd(in_dim, out_dim)
         self.common_dim = common_dim
         down_dim = int(in_dim // common_dim)
