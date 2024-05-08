@@ -61,7 +61,7 @@ def main(args):
 
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
                                                             torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
-    from model.unet import UNet2DConditionModel
+    from model.unet_depth import UNet2DConditionModel
     #unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-2-depth",
     #                                            sub_folder = 'unet',
     #                                            torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
@@ -111,8 +111,7 @@ def main(args):
 
     unet_checkpoint = load_file(ckpt_path) # channel = 5
     original_in_weight_shape = unet_checkpoint['conv_in.weight'].shape
-    print(f'original_in_weight_shape = {original_in_weight_shape}')
-    #info = unet.load_state_dict(unet_checkpoint)
+    info = unet.load_state_dict(unet_checkpoint)
 
     """
 
