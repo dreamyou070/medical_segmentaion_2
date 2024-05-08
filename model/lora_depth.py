@@ -67,7 +67,12 @@ class LoRAModule(torch.nn.Module):
             kernel_size = org_module.kernel_size
             stride = org_module.stride
             padding = org_module.padding
-            self.lora_down = torch.nn.Conv2d(in_dim, self.lora_dim, kernel_size, stride, padding, bias=False)
+            print(f'conv model, in_dim = {in_dim}')
+            print(f'stride = {stride}')
+            print(f'conv model, self.lora_dim = {self.lora_dim}') # 64 isn't it ?
+            self.lora_down = torch.nn.Conv2d(in_dim,
+                                             self.lora_dim,
+                                             kernel_size, stride, padding, bias=False)
             self.lora_up = torch.nn.Conv2d(self.lora_dim, out_dim, (1, 1), (1, 1), bias=False)
         else:
             self.lora_down = torch.nn.Linear(in_dim, self.lora_dim, bias=False)
@@ -958,6 +963,7 @@ class LoRANetwork(torch.nn.Module):
     NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
 
     #UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"] #################
+    UNET_TARGET_REPLACE_MODULE = [ "Attention"]  #################
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
     UNET_TEXT_PART = 'attentions_0'
 
@@ -989,7 +995,7 @@ class LoRANetwork(torch.nn.Module):
         block_alphas: Optional[List[float]] = None,
         conv_block_dims: Optional[List[int]] = None,
         conv_block_alphas: Optional[List[float]] = None,
-        modules_dim: Optional[Dict[str, int]] = None,
+        modules_dim: Optional[Dict[str, int]] = None, # None
         modules_alpha: Optional[Dict[str, int]] = None,
         # LoRAInfModule
         module_class: Type[object] = LoRAModule,
@@ -1037,22 +1043,27 @@ class LoRANetwork(torch.nn.Module):
 
                 if module.__class__.__name__ in target_replace_modules:
 
-                    for child_name, child_module in module.named_modules():
-                        print(f'child_module = {child_module.__class__.__name__}')
+                    for child_name, child_module in module.named_modules() :
 
-                        is_linear = child_module.__class__.__name__ == "Linear" or 'LoRACompatibleLinear'
+                        is_linear = child_module.__class__.__name__ == "Linear"
+                        #is_linear_lora = child_module.__class__.__name__ == 'LoRACompatibleLinear'
                         is_conv2d = child_module.__class__.__name__ == "Conv2d"
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
-                        if is_linear or is_conv2d:
+                        if is_linear or is_conv2d : #or is_linear_lora :
+
+                            print(f'child_module = {child_module.__class__.__name__}')
+
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
                             dim = None
                             alpha = None
+
                             if modules_dim is not None:
                                 if lora_name in modules_dim:
                                     dim = modules_dim[lora_name]
                                     alpha = modules_alpha[lora_name]
+
                             elif is_unet and block_dims is not None:
                                 # U-Netでblock_dims指定あり
                                 block_idx = get_block_index(lora_name) # block
@@ -1063,16 +1074,25 @@ class LoRANetwork(torch.nn.Module):
                                     dim = conv_block_dims[block_idx]
                                     alpha = conv_block_alphas[block_idx]
                             else:
-                                if is_linear or is_conv2d_1x1:
-                                    dim = self.lora_dim
-                                    alpha = self.alpha
-                                elif self.conv_lora_dim is not None:
-                                    dim = self.conv_lora_dim
-                                    alpha = self.conv_alpha
-                            if dim is None or dim == 0:
-                                if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
-                                    skipped.append(lora_name)
-                                continue
+
+                                # what is conv_lora_dim ?
+                                #if is_linear or is_conv2d_1x1:
+                                #    dim = self.lora_dim
+                                #   alpha = self.alpha
+                                #elif self.conv_lora_dim is not None:
+                                    #dim = self.conv_lora_dim
+                                    #dim = self.lora_dim
+                                    #alpha = self.conv_alpha
+                                dim = self.lora_dim
+                                alpha = self.alpha
+
+                                print(f'dim = {dim}')
+
+                            #if dim is None or dim == 0:
+                            #    if is_linear or is_linear_lora or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
+                            #        skipped.append(lora_name)
+
+                            #    continue
 
                             if block_wise == None :
                                 lora = module_class(lora_name,
@@ -1112,6 +1132,7 @@ class LoRANetwork(torch.nn.Module):
                                                      target_replace_modules=target_modules,
                                                      prefix=LoRANetwork.LORA_PREFIX_UNET)
         print(f"create LoRA for Unet : {len(self.unet_loras)} modules.")  # Here (61 modules)
+        print(f"skipped LoRA for Unet : {len(skipped_un)} modules.")  # Here (61 modules)
         # ------------------------------------------------------------------------------------------------------------------------
         # [1] text encoder
         if condition_modality == 'text':
