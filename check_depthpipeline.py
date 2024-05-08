@@ -113,7 +113,7 @@ def main(args):
     original_in_weight_shape = unet_checkpoint['conv_in.weight'].shape
     info = unet.load_state_dict(unet_checkpoint)
 
-    """
+
 
 
     # [2] vae
@@ -333,7 +333,6 @@ def main(args):
                       encoder_hidden_states,
                       trg_layer_list=args.trg_layer_list,
                       noise_type=position_embedder).sample
-    """
 
 
 
