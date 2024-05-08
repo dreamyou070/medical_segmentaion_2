@@ -103,7 +103,7 @@ def main(args):
 
     unet_checkpoint = load_file(ckpt_path) # channel = 5
     info = unet.load_state_dict(unet_checkpoint)
-
+    """
     for name, module in unet.named_modules() :
         # named_modules means all layer
 
@@ -118,6 +118,43 @@ def main(args):
                 if is_linear or is_conv2d :
 
                     print(f'child_module.__class__.__name__ = {child_module.__class__.__name__}')
+                    
+    """
+    # [2] vae
+    vae = pipe.vae
+
+    # [3] depth model
+    depth_feature_extractor = pipe.feature_extractor
+    depth_estimator = pipe.depth_estimator
+
+    # [4] image condition model
+    from polyppvt.lib.pvt import PolypPVT
+    net_kwargs = {}
+    if args.network_args is not None:
+        for net_arg in args.network_args:
+            key, value = net_arg.split("=")
+            net_kwargs[key] = value
+    model = PolypPVT()
+    pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
+    model.load_state_dict(torch.load(pretrained_pth_path))
+    image_model = model.backbone  # pvtv2_b2 model
+    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
+    image_model.requires_grad_(False)
+
+    # [1.4]
+    condition_model = image_model  # image model is a condition
+    condition_modality = 'image'
+
+    # see well how the model is trained
+    network = create_network(1.0,
+                             args.network_dim,
+                             args.network_alpha,
+                             vae,
+                             condition_model=condition_model,
+                             unet=unet,
+                             neuron_dropout=args.network_dropout,
+                             condition_modality=condition_modality,
+                             **net_kwargs, )
 
 
 
