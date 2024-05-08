@@ -61,8 +61,10 @@ def main(args):
 
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
                                                             torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
-
-    unet = pipe.unet
+    from model.unet import UNet2DConditionModel
+    unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-2-depth",
+                                                sub_folder = 'unet',
+                                                torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
 
     # [2] vae
     vae = pipe.vae
