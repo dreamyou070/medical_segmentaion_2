@@ -67,14 +67,15 @@ class LoRAModule(torch.nn.Module):
             kernel_size = org_module.kernel_size
             stride = org_module.stride
             padding = org_module.padding
-            print(f'conv model, in_dim = {in_dim}')
-            print(f'stride = {stride}')
-            print(f'conv model, self.lora_dim = {self.lora_dim}') # 64 isn't it ?
+            #print(f'conv model, in_dim = {in_dim}')
+            #print(f'stride = {stride}')
+            #print(f'conv model, self.lora_dim = {self.lora_dim}') # 64 isn't it ?
             self.lora_down = torch.nn.Conv2d(in_dim,
                                              self.lora_dim,
                                              kernel_size, stride, padding, bias=False)
             self.lora_up = torch.nn.Conv2d(self.lora_dim, out_dim, (1, 1), (1, 1), bias=False)
-        else:
+        else :
+            # lora applying only ff layer
             self.lora_down = torch.nn.Linear(in_dim, self.lora_dim, bias=False)
             self.lora_up = torch.nn.Linear(self.lora_dim, out_dim, bias=False)
 

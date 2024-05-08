@@ -140,56 +140,10 @@ def main(args):
     image_model = model.backbone  # pvtv2_b2 model
     image_model = image_model.to(accelerator.device, dtype=weight_dtype)
     image_model.requires_grad_(False)
-
-    # [1.4]
     condition_model = image_model  # image model is a condition
     condition_modality = 'image'
 
-    # see well how the model is trained
-    network = create_network(1.0,
-                             args.network_dim,
-                             args.network_alpha,
-                             vae,
-                             condition_model=condition_model,
-                             unet=unet,
-                             neuron_dropout=args.network_dropout,
-                             condition_modality=condition_modality,
-                             **net_kwargs, )
-
-
-
-
-
-
-
-
-    """
-    # [2] vae
-    vae = pipe.vae
-
-    # [3] depth model
-    depth_feature_extractor = pipe.feature_extractor
-    depth_estimator = pipe.depth_estimator
-
-    # [4] image condition model
-    from polyppvt.lib.pvt import PolypPVT
-    net_kwargs = {}
-    if args.network_args is not None:
-        for net_arg in args.network_args:
-            key, value = net_arg.split("=")
-            net_kwargs[key] = value
-    model = PolypPVT()
-    pretrained_pth_path = '/share0/dreamyou070/dreamyou070/PolypPVT/Polyp_PVT/model_pth/PolypPVT.pth'
-    model.load_state_dict(torch.load(pretrained_pth_path))
-    image_model = model.backbone  # pvtv2_b2 model
-    image_model = image_model.to(accelerator.device, dtype=weight_dtype)
-    image_model.requires_grad_(False)
-
-    # [1.4]
-    condition_model = image_model  # image model is a condition
-    condition_modality = 'image'
-
-    # see well how the model is trained
+    # [5] lora network
     network = create_network(1.0,
                              args.network_dim,
                              args.network_alpha,
@@ -209,7 +163,12 @@ def main(args):
         print(f' * loading network weights')
         info = network.load_weights(args.network_weights)
     network.to(dtype=weight_dtype, device=accelerator.device)
+    if args.network_weights is not None:
+        print(f' * loading network weights')
+        info = network.load_weights(args.network_weights)
+    network.to(dtype=weight_dtype, device=accelerator.device)
 
+    # [6] segmentation model
     segmentation_head = None
     if args.use_segmentation_model:
         args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
@@ -226,17 +185,21 @@ def main(args):
         if args.segmentation_model_weights is not None:
             segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
 
+    # [7] vision head
     vision_head = None
     if args.image_processor == 'pvt':
         vision_head = vision_condition_head(reverse=args.reverse, use_one=args.use_one)
         if args.vision_head_weights is not None:
             vision_head.load_state_dict(torch.load(args.vision_head_weights))
+
+    # [8]
     position_embedder = None
     if args.use_position_embedder:
         position_embedder = AllPositionalEmbedding()
         if args.position_embedder_weights is not None:
             position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
 
+    # [9]
     positioning_module = None
     if args.use_positioning_module:
         positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
@@ -245,8 +208,13 @@ def main(args):
         if args.positioning_module_weights is not None:
             positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
 
-
+    print(f' step 4. dataloader')
     train_dataloader = call_dataset_depth(args, depth_feature_extractor)
+    """
+    
+    
+
+    
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
