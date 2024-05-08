@@ -28,7 +28,7 @@ from model.positioning import AllPositioning
 from model.pe import AllPositionalEmbedding
 from model.lora_depth import create_network
 from diffusers import StableDiffusionDepth2ImgPipeline
-
+from data.dataset_depth import call_dataset_depth, passing_mvtec_argument
 
 def bce_iou_loss(pred, target):
     bce_out = bce_loss(pred, target)
@@ -118,7 +118,8 @@ def main(args):
     # what is depth model ?
     depth_estimator = pipe.depth_estimator
 
-    from data.dataset_depth import call_dataset_depth
+
+
     train_dataloader = call_dataset_depth(args, depth_feature_extractor)
 
 
@@ -333,7 +334,5 @@ if __name__ == "__main__":
     parser.add_argument("--base_path", type=str)
     args = parser.parse_args()
     passing_argument(args)
-    from data.dataset import passing_mvtec_argument
-
     passing_mvtec_argument(args)
     main(args)
