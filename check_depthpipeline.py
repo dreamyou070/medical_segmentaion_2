@@ -69,8 +69,7 @@ def main(args):
     with open(unet_config_dir) as f_in:
         unet_config = json.load(f_in)
 
-    in_channels = unet_config.in_channels
-    print(f'scratch model in_channels = {in_channels}')
+    print(f'scratch model = {unet_config}')
 
     """    
     def create_unet_diffusers_config(use_linear_projection_in_v2=False):
