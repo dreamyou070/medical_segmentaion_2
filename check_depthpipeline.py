@@ -274,7 +274,7 @@ def main(args):
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-            latent_model_input = torch.cat([latents, depth_mask], dim=1) # [1,4,64,64] -> [1,8,64,64]
+            latent_model_input = torch.cat([latents, depth_map], dim=1) # [1,4,64,64] -> [1,8,64,64]
 
             pipe.unet(latent_model_input,
                       0,
