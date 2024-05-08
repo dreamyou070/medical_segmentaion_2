@@ -188,7 +188,9 @@ def main(args):
     # [7] vision head
     vision_head = None
     if args.image_processor == 'pvt':
-        vision_head = vision_condition_head(reverse=args.reverse, use_one=args.use_one)
+        vision_head = vision_condition_head(reverse=args.reverse,
+                                            use_one=args.use_one,
+                                            condition_dim=1024)
         if args.vision_head_weights is not None:
             vision_head.load_state_dict(torch.load(args.vision_head_weights))
 
