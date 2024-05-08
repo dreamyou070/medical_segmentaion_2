@@ -62,9 +62,49 @@ def main(args):
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
                                                             torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
     from model.unet import UNet2DConditionModel
-    unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-2-depth",
-                                                sub_folder = 'unet',
-                                                torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
+    #unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-2-depth",
+    #                                            sub_folder = 'unet',
+    #                                            torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
+    unet_config_dir = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/config.json'
+    with open(unet_config_dir) as f_in:
+        unet_config = json.load(f_in)
+    """    
+    def create_unet_diffusers_config(use_linear_projection_in_v2=False):
+        
+        #Creates a config for the diffusers based on the config of the LDM model.
+        
+        # unet_params = original_config.model.params.unet_config.params
+        block_out_channels = [UNET_PARAMS_MODEL_CHANNELS * mult for mult in UNET_PARAMS_CHANNEL_MULT]
+        down_block_types = []
+        resolution = 1
+        for i in range(len(block_out_channels)):
+            block_type = "CrossAttnDownBlock2D" if resolution in UNET_PARAMS_ATTENTION_RESOLUTIONS else "DownBlock2D"
+            down_block_types.append(block_type)
+            if i != len(block_out_channels) - 1:
+                resolution *= 2
+        up_block_types = []
+        for i in range(len(block_out_channels)):
+            block_type = "CrossAttnUpBlock2D" if resolution in UNET_PARAMS_ATTENTION_RESOLUTIONS else "UpBlock2D"
+            up_block_types.append(block_type)
+            resolution //= 2
+        config = dict(
+            sample_size=UNET_PARAMS_IMAGE_SIZE,
+            in_channels=UNET_PARAMS_IN_CHANNELS,
+            out_channels=UNET_PARAMS_OUT_CHANNELS,
+            down_block_types=tuple(down_block_types),
+            up_block_types=tuple(up_block_types),
+            block_out_channels=tuple(block_out_channels),
+            layers_per_block=UNET_PARAMS_NUM_RES_BLOCKS,
+            cross_attention_dim=UNET_PARAMS_CONTEXT_DIM,
+            attention_head_dim=UNET_PARAMS_NUM_HEADS, )
+        return config
+    unet_config =
+    """
+    unet = UNet2DConditionModel(**unet_config)
+    #info = unet.load_state_dict(converted_unet_checkpoint)
+
+    """
+
 
     # [2] vae
     vae = pipe.vae
@@ -283,6 +323,7 @@ def main(args):
                       encoder_hidden_states,
                       trg_layer_list=args.trg_layer_list,
                       noise_type=position_embedder).sample
+    """
 
 
 
