@@ -116,7 +116,8 @@ def main(args):
                 is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
                 if is_linear or is_conv2d :
-                    print(f'module.__class__.__name__ = {module.__class__.__name__}')
+
+                    print(f'child_module.__class__.__name__ = {child_module.__class__.__name__}')
 
 
 
