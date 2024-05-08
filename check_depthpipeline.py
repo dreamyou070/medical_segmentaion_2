@@ -328,7 +328,7 @@ def main(args):
                     elif args.image_processor == 'vit':
                         output, pix_embedding = condition_model(**batch["image_condition"])
                         encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-            print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
+            #print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
             image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
             gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
             gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
