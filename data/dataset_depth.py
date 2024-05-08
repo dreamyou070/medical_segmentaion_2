@@ -106,8 +106,8 @@ class TrainDataset_Depth(Dataset):
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
 
         # [depth]
-        img = [img]
-        depth_map = self.depth_processor(images = [img], return_tensors="pt").pixel_values # 384 size
+        depth_map = self.depth_processor(images = img,
+                                         return_tensors="pt").pixel_values # 384 size
 
 
 
