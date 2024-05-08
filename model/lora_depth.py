@@ -1050,8 +1050,8 @@ class LoRANetwork(torch.nn.Module):
                         is_conv2d_1x1 = is_conv2d and child_module.kernel_size == (1, 1)
 
                         if is_linear or is_conv2d:
-                            if is_unet :
-                                print(f'child_name = {child_name} | child_module.__class__.__name__ = {child_module.__class__.__name__}')
+                            #if is_unet :
+                            #    print(f'child_name = {child_name} | child_module.__class__.__name__ = {child_module.__class__.__name__}')
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
                             dim = None

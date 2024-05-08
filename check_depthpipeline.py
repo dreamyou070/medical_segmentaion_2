@@ -210,11 +210,6 @@ def main(args):
 
     print(f' step 4. dataloader')
     train_dataloader = call_dataset_depth(args, depth_feature_extractor)
-    """
-    
-    
-
-    
 
     print(f'\n step 5. optimizer')
     args.max_train_steps = len(train_dataloader) * args.max_train_epochs
@@ -350,7 +345,7 @@ def main(args):
                  trg_layer_list=args.trg_layer_list,
                  noise_type=position_embedder).sample
 
-    """
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
