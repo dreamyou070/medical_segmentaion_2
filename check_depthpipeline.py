@@ -107,6 +107,9 @@ def main(args):
     for name, module in unet.named_modules() :
         # named_modules means all layer
         print(f'named module = {name}')
+        print(f'module.__class__.__name__ = {module.__class__.__name__}')
+        
+        # if module.__class__.__name__ == "Transformer2DModel"
 
 
 
