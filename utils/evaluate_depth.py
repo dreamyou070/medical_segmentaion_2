@@ -16,7 +16,7 @@ def eval_step(engine, batch):
 
 
 @torch.inference_mode()
-def evaluation_check(segmentation_head,
+def evaluation_check_depth(segmentation_head,
                      condition_model,
                      unet,
                      vae,
