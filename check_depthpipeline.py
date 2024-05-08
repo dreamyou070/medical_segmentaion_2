@@ -189,8 +189,8 @@ def main(args):
                                                                                                       optimizer,
                                                                                                       train_dataloader,
                                                                                                       lr_scheduler)
-
-    from transformers import DPTForDepthEstimation
+    depth_estimator = accelerator.prepare(depth_estimator)
+    depth_estimator = transform_models_if_DDP([depth_estimator])[0]
 
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
