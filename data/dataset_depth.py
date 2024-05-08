@@ -223,6 +223,7 @@ class TestDataset(Dataset):
                  root_dir,
                  resize_shape=(240, 240),
                  image_processor=None,
+                 depth_processor = None,
                  latent_res: int = 64,
                  n_classes: int = 4,
                  mask_res=128,
@@ -245,6 +246,7 @@ class TestDataset(Dataset):
 
         self.resize_shape = resize_shape
         self.image_processor = image_processor
+        self.depth_processor = depth_processor
         self.transform = transforms.Compose([transforms.ToTensor(),
                                              transforms.Normalize([0.5], [0.5]), ])
         self.image_paths = image_paths
@@ -288,6 +290,10 @@ class TestDataset(Dataset):
         img_path = self.image_paths[idx]
         pure_path = os.path.split(img_path)[-1]
         img = self.load_image(img_path, self.resize_shape[0], self.resize_shape[1], type='RGB')  # np.array,
+
+        depth_map = self.depth_processor(images=img,
+                                         return_tensors="pt").pixel_values.squeeze(
+            0)  # 384 size (1,3,384,384) -> (3,384,384)
 
         if self.use_data_aug:
             # rotating
@@ -422,4 +428,39 @@ class TestDataset(Dataset):
                 "image_condition": image_condition,
                 'res_array_gt': res_array_gt,
                 'gt_64_flat': gt_64_flat,
-                'pure_path' : pure_path}  # [197,1]
+                'pure_path' : pure_path,
+                'depth_map' : depth_map}  # [197,1]
+
+
+def call_test_dataset(args, _data_name, depth_processor) :
+
+    # [1] data_path here
+
+    base_path = args.base_path
+    test_base_path = os.path.join(base_path, 'test')
+    data_path = os.path.join(test_base_path, _data_name)
+
+    if args.image_processor == 'clip':
+        processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+    elif args.image_processor == 'vit':
+        processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
+
+    elif args.image_processor == 'pvt' :
+        processor = transforms.Compose([transforms.Resize((384,384)),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+    test_dataset = TestDataset(root_dir=data_path,
+                               resize_shape=[args.resize_shape, args.resize_shape],
+                               image_processor=processor,
+                               depth_processor=depth_processor,
+                               latent_res=args.latent_res,
+                               n_classes=args.n_classes,
+                               mask_res=args.mask_res,
+                               use_data_aug=False)
+    test_dataloader = torch.utils.data.DataLoader(test_dataset,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=True)
+
+    return test_dataloader

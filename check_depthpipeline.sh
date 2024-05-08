@@ -5,13 +5,14 @@ port_number=58801
 category="medical"
 obj_name="leader_polyp"
 trigger_word="leader_polyp"
-benchmark="Pranet_Sub1"
+benchmark="Pranet"
 layer_name='layer_3'
 sub_folder="up_16_32_64_20240501"
-file_name="5_base_class_1" #
+file_name="6_depth_train" #
 #--network_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/model/lora-000008.safetensors" \
- #--segmentation_model_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/segmentation/segmentation-000008.pt" \
- #--vision_head_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/vision_head/vision-000008.pt" \
+#--segmentation_model_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/segmentation/segmentation-000008.pt" \
+#--vision_head_weights "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}/vision_head/vision-000008.pt" \
+
 accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --main_process_port $port_number check_depthpipeline.py --log_with wandb \
  --output_dir "../result/${category}/${obj_name}/Pranet_Sub/${sub_folder}/${file_name}" \

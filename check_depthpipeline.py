@@ -20,7 +20,7 @@ from utils.accelerator_utils import prepare_accelerator
 from utils.optimizer import get_optimizer, get_scheduler_fix
 from utils.saving import save_model
 from utils.losses import FocalLoss, Multiclass_FocalLoss
-from utils.evaluate import evaluation_check
+from utils.evaluate_depth import evaluation_check_depth
 from monai.losses import DiceLoss, DiceCELoss
 from model.focus_net import PFNet
 from model.vision_condition_head import vision_condition_head
@@ -289,63 +289,172 @@ def main(args):
     controller = AttentionStore()
     register_attention_control(unet, controller)
 
-    for step, batch in enumerate(train_dataloader):
-        total_loss = 0
-        loss_dict = {}
-        encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+    print(f'\n step 10. Training !')
+    progress_bar = tqdm(range(args.max_train_steps), smoothing=0,
+                        disable=not accelerator.is_local_main_process, desc="steps")
+    global_step = 0
+    loss_list = []
+    for epoch in range(args.start_epoch, args.max_train_epochs):
 
+        accelerator.print(f"\nepoch {epoch + 1}/{args.start_epoch + args.max_train_epochs}")
+        epoch_loss_total =0
+        for step, batch in enumerate(train_dataloader):
+            total_loss = 0
+            loss_dict = {}
+            encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
+            # [1] Prepare depth mask
+            depth_mask = batch['depth_map'] #  should be, [1,3,384,384]
 
-        # [1] Prepare depth mask
-        depth_mask = batch['depth_map'] #  should be, [1,3,384,384]
-        print(f'depth_mask = {depth_mask.shape}')
+            # here problem --------------------------------------------------------------------------------------------------------------------------------------------
+            depth_map = depth_estimator(depth_mask).predicted_depth # make depth map
+            # --------------------------------------------------------------------------------------------------------------------------------------------
+            # how to interpolate size ?
+            scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1) # 8
+            depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
+                                                        size=(args.resize_shape // scale_factor,
+                                                              args.resize_shape // scale_factor),
+                                                        mode="bicubic",
+                                                        align_corners=False, )
+            depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
+            depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
+            depth_map = 2.0 * (depth_map - depth_min) / (depth_max - depth_min) - 1.0
 
-        # here problem --------------------------------------------------------------------------------------------------------------------------------------------
-        depth_map = depth_estimator(depth_mask).predicted_depth # make depth map
-        # --------------------------------------------------------------------------------------------------------------------------------------------
-        # how to interpolate size ?
-        scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1) # 8
-        depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
-                                                    size=(args.resize_shape // scale_factor,
-                                                          args.resize_shape // scale_factor),
-                                                    mode="bicubic",
-                                                    align_corners=False, )
-        depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
-        depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
-        depth_map = 2.0 * (depth_map - depth_min) / (depth_max - depth_min) - 1.0
+            # [2] feature extractor
+            if args.use_image_condition:
+                with torch.set_grad_enabled(True):
+                    if args.image_processor == 'pvt':
+                        output = condition_model(batch["image_condition"])
+                        encoder_hidden_states = vision_head(output) # final dim = 1024
+                    elif args.image_processor == 'vit':
+                        output, pix_embedding = condition_model(**batch["image_condition"])
+                        encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
+            print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
+            image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
+            gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
+            gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
 
-        # [2] feature extractor
-        if args.use_image_condition:
+            with torch.no_grad():
+                latents = pipe.vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+
+            # ----------------------------------------------------------------------------------------------------------- #
             with torch.set_grad_enabled(True):
-                if args.image_processor == 'pvt':
-                    output = condition_model(batch["image_condition"])
-                    encoder_hidden_states = vision_head(output) # final dim = 1024
-                elif args.image_processor == 'vit':
-                    output, pix_embedding = condition_model(**batch["image_condition"])
-                    encoder_hidden_states = output.last_hidden_state  # [batch, 197, 768]
-        print(f'in main script, encoder_hidden_states type = {type(encoder_hidden_states)}')
-        image = batch['image'].to(dtype=weight_dtype)  # 1,3,512,512
-        gt_flat = batch['gt_flat'].to(dtype=weight_dtype)  # 1,256*256
-        gt = batch['gt'].to(dtype=weight_dtype)  # 1,2,256,256
+                if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+                    if encoder_hidden_states.dim() != 3:
+                        encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-        with torch.no_grad():
-            latents = pipe.vae.encode(image).latent_dist.sample() * args.vae_scale_factor
+                latent_model_input = torch.cat([latents, depth_map], dim=1) # [1,4,64,64] -> [1,8,64,64]
+                unet(latent_model_input,
+                     0,
+                     encoder_hidden_states,
+                     trg_layer_list=args.trg_layer_list,
+                     noise_type=position_embedder).sample
+                # after unet
+            query_dict, key_dict = controller.query_dict, controller.key_dict
+            controller.reset()
+            q_dict = {}
 
+            for layer in args.trg_layer_list:
+                query = query_dict[layer][0]
+                res = int(query.shape[1] ** 0.5)
+                q_dict[res] = query.reshape(1, res, res, -1).permute(0, 3, 1, 2).contiguous()
+            x16_out, x32_out, x64_out = q_dict[16], q_dict[32], q_dict[64]
+            masks_pred, features = segmentation_head.gen_feature(x16_out, x32_out,
+                                                                 x64_out)  # [batch,2,64,64], [batch,960,64,64]
+            # [2] segmentation head
+
+            # masks_pred = segmentation_head.segment_feature(features)  # [1,2,  256,256]  # [1,160,256,256]
+            masks_pred_ = masks_pred.permute(0, 2, 3, 1).contiguous().view(-1, masks_pred.shape[-1]).contiguous()
+            if args.use_dice_ce_loss:
+                loss = loss_dicece(input=masks_pred,  # [class, 256,256]
+                                   target=batch['gt'].to(dtype=weight_dtype))  # [class, 256,256]
+            else:
+                loss = loss_CE(masks_pred_, gt_flat.squeeze().to(torch.long))  # 128*128
+                loss_dict['cross_entropy_loss'] = loss.item()
+                # [5.2] Focal Loss
+                focal_loss = loss_FC(masks_pred_, gt_flat.squeeze().to(masks_pred.device))  # N
+                if args.use_monai_focal_loss: focal_loss = focal_loss.mean()
+                loss += focal_loss
+                loss_dict['focal_loss'] = focal_loss.item()
+                loss = loss.mean()
+
+            total_loss += loss.mean()
+            current_loss = total_loss.detach().item()
+
+            if epoch == args.start_epoch:
+                loss_list.append(current_loss)
+            else:
+                epoch_loss_total -= loss_list[step]
+                loss_list[step] = current_loss
+            epoch_loss_total += current_loss
+            avr_loss = epoch_loss_total / len(loss_list)
+            loss_dict['avr_loss'] = avr_loss
+            accelerator.backward(loss)
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                global_step += 1
+            if is_main_process:
+                progress_bar.set_postfix(**loss_dict)
+            if global_step >= args.max_train_steps:
+                break
         # ----------------------------------------------------------------------------------------------------------- #
-        with torch.set_grad_enabled(True):
-            if encoder_hidden_states is not None and type(encoder_hidden_states) != dict:
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                if encoder_hidden_states.dim() != 3:
-                    encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
+        accelerator.wait_for_everyone()
+        if is_main_process:
+            saving_epoch = str(epoch + 1).zfill(6)
+            save_model(args,
+                       saving_folder='model',
+                       saving_name=f'lora-{saving_epoch}.safetensors',
+                       unwrapped_nw=accelerator.unwrap_model(network),
+                       save_dtype=save_dtype)
 
-            latent_model_input = torch.cat([latents, depth_map], dim=1) # [1,4,64,64] -> [1,8,64,64]
+            if args.use_segmentation_model:
+                save_model(args,
+                           saving_folder='segmentation',
+                           saving_name=f'segmentation-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(segmentation_head),
+                           save_dtype=save_dtype)
 
+            if args.use_position_embedder:
+                save_model(args,
+                           saving_folder='position_embedder',
+                           saving_name=f'position-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(position_embedder),
+                           save_dtype=save_dtype)
 
-            unet(latent_model_input,
-                 0,
-                 encoder_hidden_states,
-                 trg_layer_list=args.trg_layer_list,
-                 noise_type=position_embedder).sample
+            if args.image_processor == 'pvt':
+                save_model(args,
+                           saving_folder='vision_head',
+                           saving_name=f'vision-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(vision_head),
+                           save_dtype=save_dtype)
+
+            if args.use_positioning_module:
+                save_model(args,
+                           saving_folder='positioning_module',
+                           saving_name=f'positioning-{saving_epoch}.pt',
+                           unwrapped_nw=accelerator.unwrap_model(positioning_module),
+                           save_dtype=save_dtype)
+        # ----------------------------------------------------------------------------------------------------------- #
+        # evaluate
+        evaluation_check_depth(segmentation_head,
+                         condition_model,
+                         unet,
+                         vae,
+                         controller,
+                         weight_dtype,
+                         epoch,
+                         position_embedder,
+                         vision_head,
+                         positioning_module,
+                         accelerator,
+                         depth_feature_extractor,
+                         args)
+    accelerator.end_training()
+
 
 
 
