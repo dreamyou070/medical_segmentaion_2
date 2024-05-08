@@ -102,12 +102,18 @@ def main(args):
     ckpt_path = '/home/dreamyou070/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-depth/snapshots/d49bafe6f381b0fe37ccfc4c8f6a23424b09d6ef/unet/diffusion_pytorch_model.safetensors'
 
     unet_checkpoint = load_file(ckpt_path) # channel = 5
-    original_in_weight_shape = unet_checkpoint['conv_in.weight'].shape
     info = unet.load_state_dict(unet_checkpoint)
 
+    for name, module in unet.named_modules() :
+        # named_modules means all layer
+        print(f'named module = {name}')
 
 
 
+
+
+
+    """
     # [2] vae
     vae = pipe.vae
 
@@ -326,7 +332,7 @@ def main(args):
                  trg_layer_list=args.trg_layer_list,
                  noise_type=position_embedder).sample
 
-
+    """
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
