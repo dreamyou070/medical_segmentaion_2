@@ -238,10 +238,7 @@ def main(args):
         depth_map = depth_estimator(depth_mask).predicted_depth # make depth map
         # --------------------------------------------------------------------------------------------------------------------------------------------
         # how to interpolate size ?
-        scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)
-        # scale_factor = 8 = len = 4
-        # therefore, 512 / 8 = 64
-        print(f'scale_factor = {scale_factor}')
+        scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1) # 8
         depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
                                                     size=(args.resize_shape // scale_factor,
                                                           args.resize_shape // scale_factor),
@@ -277,7 +274,7 @@ def main(args):
                 if encoder_hidden_states.dim() != 3:
                     encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
 
-            latent_model_input = torch.cat([latent_model_input, depth_mask], dim=1)
+            latent_model_input = torch.cat([latents, depth_mask], dim=1) # [1,4,64,64] -> [1,8,64,64]
 
             pipe.unet(latent_model_input,
                       0,
