@@ -51,6 +51,8 @@ class LoRAModule(torch.nn.Module):
         self.in_dim = in_dim
         self.out_dim = out_dim
 
+        print(f'lora name in lora depth.py = {lora_name}')
+
         if lora_name == 'down_blocks_0_attentions_0_transformer_blocks_0_attn2' :
             print(f'down_blocks_0_attentions_0_transformer_blocks_0_attn2 in_dim = {in_dim}')
             print(f'down_blocks_0_attentions_0_transformer_blocks_0_attn2 out_dim = {out_dim}')
