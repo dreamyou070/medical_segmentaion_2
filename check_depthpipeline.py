@@ -328,11 +328,11 @@ def main(args):
 
             latent_model_input = torch.cat([latents, depth_map], dim=1) # [1,4,64,64] -> [1,8,64,64]
 
-            pipe.unet(latent_model_input,
-                      0,
-                      encoder_hidden_states,
-                      trg_layer_list=args.trg_layer_list,
-                      noise_type=position_embedder).sample
+            unet(latent_model_input,
+                 0,
+                 encoder_hidden_states,
+                 trg_layer_list=args.trg_layer_list,
+                 noise_type=position_embedder).sample
 
 
 
