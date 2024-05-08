@@ -68,8 +68,8 @@ def main(args):
     vae = pipe.vae
 
     # [3] depth model
-    depth_model = pipe.depth_estimator
     depth_feature_extractor = pipe.feature_extractor
+    depth_estimator = pipe.depth_estimator
 
     # [4] image condition model
     from polyppvt.lib.pvt import PolypPVT
@@ -191,11 +191,6 @@ def main(args):
                                                                                                       lr_scheduler)
 
     from transformers import DPTForDepthEstimation
-    depth_estimator = DPTForDepthEstimation.from_pretrained(args.pretrained_model_name_or_path,
-                                                            sub_folder='')
-
-    # unet = UNet2DConditionModel(**unet_config).to(device)
-    # info = unet.load_state_dict(converted_unet_checkpoint)
 
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
