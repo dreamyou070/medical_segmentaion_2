@@ -450,6 +450,7 @@ def main(args):
                          position_embedder,
                          vision_head,
                          positioning_module,
+                               depth_estimator, pipe,
                          accelerator,
                          depth_feature_extractor,
                          args)

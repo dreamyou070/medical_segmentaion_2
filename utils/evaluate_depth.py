@@ -26,6 +26,7 @@ def evaluation_check_depth(segmentation_head,
                      position_embedder,
                      vision_head,
                      positioning_module,
+                     depth_estimator,pipe,
                      accelerator,
                      depth_processor,
                      args):
@@ -54,9 +55,24 @@ def evaluation_check_depth(segmentation_head,
                 y_true_list, y_pred_list = [], []
 
                 for step, batch in enumerate(test_dataloader):
-                    total_loss = 0
 
-                    loss_dict = {}
+                    depth_mask = batch['depth_map']  # should be, [1,3,384,384]
+
+                    # here problem --------------------------------------------------------------------------------------------------------------------------------------------
+                    depth_map = depth_estimator(depth_mask).predicted_depth  # make depth map
+                    # --------------------------------------------------------------------------------------------------------------------------------------------
+                    # how to interpolate size ?
+                    scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)  # 8
+                    depth_map = torch.nn.functional.interpolate(depth_map.unsqueeze(1),
+                                                                size=(args.resize_shape // scale_factor,
+                                                                      args.resize_shape // scale_factor),
+                                                                mode="bicubic",
+                                                                align_corners=False, )
+                    depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
+                    depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
+                    depth_map = 2.0 * (depth_map - depth_min) / (depth_max - depth_min) - 1.0
+
+
                     encoder_hidden_states = None  # torch.tensor((1,1,768)).to(device)
                     if not args.without_condition:
 
@@ -84,7 +100,11 @@ def evaluation_check_depth(segmentation_head,
                                 encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
                             if encoder_hidden_states.dim() != 3:
                                 encoder_hidden_states = encoder_hidden_states.unsqueeze(0)
-                        unet(latents, 0, encoder_hidden_states, trg_layer_list=args.trg_layer_list,
+                        latent_model_input = torch.cat([latents, depth_map], dim=1)  # [1,4,64,64] -> [1,8,64,64]
+                        unet(latent_model_input,
+                             0,
+                             encoder_hidden_states,
+                             trg_layer_list=args.trg_layer_list,
                              noise_type=position_embedder).sample
                     query_dict, key_dict = controller.query_dict, controller.key_dict
                     controller.reset()
