@@ -61,7 +61,7 @@ def main(args):
 
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
                                                             torch_dtype=torch.float16, ).to(accelerator.device)
-    # [1] unet
+
     unet = pipe.unet
 
     # [2] vae
@@ -69,8 +69,6 @@ def main(args):
 
     # [3] depth model
     depth_model = pipe.depth_estimator
-
-    # DPTImageProcessor
     depth_feature_extractor = pipe.feature_extractor
 
     # [4] image condition model
@@ -112,18 +110,123 @@ def main(args):
         info = network.load_weights(args.network_weights)
     network.to(dtype=weight_dtype, device=accelerator.device)
 
+    segmentation_head = None
+    if args.use_segmentation_model:
+        args.double = (args.previous_positioning_module == 'False') and (args.channel_spatial_cascaded == 'False')
+        if args.use_simple_segmodel:
+            segmentation_head = SemanticModel(n_classes=args.n_classes,
+                                              mask_res=args.mask_res,
+                                              use_layer_norm=args.use_layer_norm,
+                                              double=args.double)
+        else:
+            segmentation_head = PFNet(n_classes=args.n_classes,
+                                      mask_res=args.mask_res,
+                                      use_layer_norm=args.use_layer_norm,
+                                      double=args.double)
+        if args.segmentation_model_weights is not None:
+            segmentation_head.load_state_dict(torch.load(args.segmentation_model_weights))
 
-    # what is feature extractor ? DPTFeatureExtractor
-    # put dptfeature extractor on dataloader
-    feature_extractor = pipe.feature_extractor
+    vision_head = None
+    if args.image_processor == 'pvt':
+        vision_head = vision_condition_head(reverse=args.reverse, use_one=args.use_one)
+        if args.vision_head_weights is not None:
+            vision_head.load_state_dict(torch.load(args.vision_head_weights))
+    position_embedder = None
+    if args.use_position_embedder:
+        position_embedder = AllPositionalEmbedding()
+        if args.position_embedder_weights is not None:
+            position_embedder.load_state_dict(torch.load(args.position_embedder_weights))
 
-    # what is depth model ?
-    depth_estimator = pipe.depth_estimator
-
+    positioning_module = None
+    if args.use_positioning_module:
+        positioning_module = AllPositioning(use_channel_attn=args.use_channel_attn,
+                                            use_self_attn=args.use_self_attn,
+                                            n_classes=args.n_classes, )
+        if args.positioning_module_weights is not None:
+            positioning_module.load_state_dict(torch.load(args.positioning_module_weights))
 
 
     train_dataloader = call_dataset_depth(args, depth_feature_extractor)
 
+    print(f'\n step 5. optimizer')
+    args.max_train_steps = len(train_dataloader) * args.max_train_epochs
+    trainable_params = network.prepare_optimizer_params(args.text_encoder_lr,
+                                                        args.unet_lr,
+                                                        args.learning_rate,
+                                                        condition_modality=condition_modality, )
+    if args.use_position_embedder:
+        trainable_params.append({"params": position_embedder.parameters(), "lr": args.learning_rate})
+    if args.image_processor == 'pvt':
+        trainable_params.append({"params": vision_head.parameters(), "lr": args.learning_rate})
+    if args.use_positioning_module:
+        trainable_params.append({"params": positioning_module.parameters(), "lr": args.learning_rate})
+    if args.use_segmentation_model:
+        trainable_params.append({"params": segmentation_head.parameters(), "lr": args.learning_rate})
+    optimizer_name, optimizer_args, optimizer = get_optimizer(args, trainable_params)
+
+    print(f'\n step 6. lr')
+    lr_scheduler = get_scheduler_fix(args, optimizer, accelerator.num_processes)
+
+    print(f'\n step 7. loss function')
+    loss_CE = nn.CrossEntropyLoss()
+    loss_FC = Multiclass_FocalLoss()
+    loss_dicece = DiceCELoss(include_background=False,
+                             to_onehot_y=False,
+                             sigmoid=False,
+                             softmax=True,
+                             squared_pred=True,
+                             lambda_dice=args.dice_weight,
+                             smooth_nr=1e-5,
+                             smooth_dr=1e-5,
+                             weight=None, )
+
+    print(f'\n step 8. model to device')
+    condition_model = accelerator.prepare(condition_model)
+    condition_models = transform_models_if_DDP([condition_model])
+    segmentation_head, unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(segmentation_head,
+                                                                                                      unet,
+                                                                                                      network,
+                                                                                                      optimizer,
+                                                                                                      train_dataloader,
+                                                                                                      lr_scheduler)
+
+    from transformers import DPTForDepthEstimation
+    depth_estimator = DPTForDepthEstimation.from_pretrained(args.pretrained_model_name_or_path,
+                                                            sub_folder='')
+
+    # unet = UNet2DConditionModel(**unet_config).to(device)
+    # info = unet.load_state_dict(converted_unet_checkpoint)
+
+    if args.use_positioning_module:
+        positioning_module = accelerator.prepare(positioning_module)
+
+    if args.use_position_embedder:
+        position_embedder = accelerator.prepare(position_embedder)
+        position_embedder = transform_models_if_DDP([position_embedder])[0]
+    if args.image_processor == 'pvt':
+        vision_head = accelerator.prepare(vision_head)
+        vision_head = transform_models_if_DDP([vision_head])[0]
+    unet, network = transform_models_if_DDP([unet, network])
+    if args.use_segmentation_model:
+        segmentation_head = transform_models_if_DDP([segmentation_head])[0]
+    if args.gradient_checkpointing:
+        unet.train()
+        if args.use_segmentation_model:
+            segmentation_head.train()
+        for t_enc in condition_models:
+            t_enc.train()
+            if args.train_text_encoder:
+                t_enc.text_model.embeddings.requires_grad_(True)
+    else:
+        unet.eval()
+        for t_enc in condition_models:
+            t_enc.eval()
+        del t_enc
+        network.prepare_grad_etc()
+
+    print(f'\n step 9. registering saving tensor')
+    controller = AttentionStore()
+    register_attention_control(unet, controller)
 
     for step, batch in enumerate(train_dataloader):
         total_loss = 0
@@ -150,8 +253,6 @@ def main(args):
             if args.use_image_condition:
                 with torch.set_grad_enabled(True):
                     if args.image_processor == 'pvt':
-                        # condition_model
-                        #
                         output = condition_model(batch["image_condition"])
                         encoder_hidden_states = vision_head(output)
                     elif args.image_processor == 'vit':
