@@ -20,11 +20,11 @@ accelerate launch --config_file ../../gpu_config/gpu_0_config \
  --train_data_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/${benchmark}/train/res_256" \
  --base_path "/home/dreamyou070/MyData/anomaly_detection/${category}/${obj_name}/Pranet" \
  --network_dim 64 --network_alpha 4 --resize_shape 512 --latent_res 64 --trigger_word "${trigger_word}" --obj_name "${obj_name}" \
- --trg_layer_list "['up_blocks.1.attentions.2.transformer_blocks_0_attn2',
-                    'up_blocks.2.attentions.2.transformer_blocks_0_attn2',
-                    'up_blocks.3.attentions.2.transformer_blocks_0_attn2',]" \
+ --trg_layer_list "['up_blocks_1_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_2_attentions_2_transformer_blocks_0_attn2',
+                    'up_blocks_3_attentions_2_transformer_blocks_0_attn2',]" \
  --n_classes 2 --mask_res 64 --batch_size 1 \
  --use_dice_ce_loss --optimizer_args weight_decay=0.00005 \
- --use_image_condition --image_model_training \
- --image_processor 'pvt' --reverse \
- --use_simple_segmodel --use_segmentation_model
+ --use_image_condition --image_m_d_l_training \
+ --image_processor 'pvt' --rever_e_\
+ --use_simple_segmodel --use_seg_e_tation_model
