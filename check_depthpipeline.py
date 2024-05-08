@@ -132,7 +132,7 @@ def main(args):
 
 
         # [1] Prepare depth mask
-        depth_mask = batch['depth_map'] #  should be, [batch, 1, 512, 512]
+        depth_mask = batch['depth_map'] #  should be, [1,3,384,384]
         print(f'depth_mask = {depth_mask.shape}')
 
         # here problem --------------------------------------------------------------------------------------------------------------------------------------------

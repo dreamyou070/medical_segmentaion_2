@@ -107,9 +107,7 @@ class TrainDataset_Depth(Dataset):
 
         # [depth] DPTImageProcessor(
         depth_map = self.depth_processor(images = img,
-                                         return_tensors="pt").pixel_values # 384 size
-        # batch features ?
-        print(f'depth_map = {depth_map.shape}')
+                                         return_tensors="pt").pixel_values.squeeze(0) # 384 size (1,3,384,384) -> (3,384,384)
         if self.use_data_aug :
             # rotating
             random_p = np.random.rand()
