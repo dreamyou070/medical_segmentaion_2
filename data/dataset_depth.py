@@ -5,6 +5,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 from tensorflow.keras.utils import to_categorical
+from transformers import CLIPProcessor, CLIPModel, AutoImageProcessor
 
 def passing_mvtec_argument(args):
     global argument
@@ -107,12 +108,6 @@ class TrainDataset_Depth(Dataset):
         # [depth]
         img = [img]
         depth_map = self.depth_processor(images = [img], return_tensors="pt").pixel_values # 384 size
-
-
-        """
-        
-        """
-
 
 
 
