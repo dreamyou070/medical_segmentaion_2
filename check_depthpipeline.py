@@ -60,7 +60,7 @@ def main(args):
     from diffusers import StableDiffusionDepth2ImgPipeline
 
     pipe = StableDiffusionDepth2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-depth",
-                                                            torch_dtype=torch.float16, ).to(accelerator.device)
+                                                            torch_dtype=torch.float16, ).to(accelerator.device).to(dtype = weight_dtype)
 
     unet = pipe.unet
 
@@ -191,6 +191,7 @@ def main(args):
                                                                                                       lr_scheduler)
     depth_estimator = accelerator.prepare(depth_estimator)
     depth_estimator = transform_models_if_DDP([depth_estimator])[0]
+    depth_estimator.to(dtype = weight_dtype)
 
     if args.use_positioning_module:
         positioning_module = accelerator.prepare(positioning_module)
